@@ -58,6 +58,10 @@ void recJ()
 		SetBranchImm(newpc);
 }
 
+void recJALLog() {
+	printf("EECALL %x\n", cpuRegs.GPR.n.ra);
+}
+
 ////////////////////////////////////////////////////
 void recJAL()
 {
@@ -76,6 +80,8 @@ void recJAL()
 		xMOV(ptr32[&cpuRegs.GPR.r[31].UL[0]], pc + 4);
 		xMOV(ptr32[&cpuRegs.GPR.r[31].UL[1]], 0);
 	}
+
+	xCALL((void*) recJALLog);
 
 	recompileNextInstruction(1);
 	if (EmuConfig.Gamefixes.GoemonTlbHack)
