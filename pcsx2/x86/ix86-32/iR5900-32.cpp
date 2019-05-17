@@ -15,6 +15,8 @@
 
 #include "PrecompiledHeader.h"
 
+#include <map>
+
 #include "Common.h"
 #include "Memory.h"
 
@@ -1263,6 +1265,35 @@ void encodeMemcheck()
 	}
 }
 
+std::map<u32, u32> g_callCountByFunction = {};
+u16 g_totalNumCalls = 0;
+u32 g_prevOpcode = 0;
+
+void logCall() {
+	g_callCountByFunction[cpuRegs.pc]++;
+	g_totalNumCalls++;
+	if(g_totalNumCalls == 0) {
+
+		std::multimap<u32, u32> sorted_map;
+
+		printf("====== FUNCTION PROFILE ======\n");
+		for(auto entry : g_callCountByFunction) {
+			sorted_map.emplace(entry.second, entry.first);
+		}
+		for(auto entry : sorted_map) {
+			printf("%08x\t%ld\n", entry.second, entry.first);
+		}
+		printf("==== END FUNCTION PROFILE ====\n");
+	}
+}
+
+void recLogCall() {
+	if(g_prevOpcode == 3) {
+		xCALL((void*) logCall);
+	}
+	g_prevOpcode = _Opcode_;
+}
+
 void recompileNextInstruction(int delayslot)
 {
 	u32 i;
@@ -1290,6 +1321,8 @@ void recompileNextInstruction(int delayslot)
 		pc += 4;
 		g_cpuFlushedPC = false;
 		g_cpuFlushedCode = false;
+
+		recLogCall();
 	} else {
 		// increment after recompiling so that pc points to the branch during recompilation
 		g_recompilingDelaySlot = true;
