@@ -304,6 +304,7 @@ void MainEmuFrame::ConnectMenus()
 
 	// Debug
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
+	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_BeginVUTrace_Click, this, MenuId_Debug_VUTrace);
 
 	// Capture
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Capture_Video_ToggleCapture_Click, this, MenuId_Capture_Video_Record);
@@ -370,7 +371,11 @@ void MainEmuFrame::CreatePcsx2Menu()
 		_("For running raw PS2 binaries directly."));
 
 	m_menuSys.AppendSeparator();
-
+	
+	m_menuSys.Append(MenuId_Debug_VUTrace,		_("Begin &VU trace..."),	wxEmptyString);
+	
+	m_menuSys.AppendSeparator();
+	
 	m_menuSys.Append(MenuId_Config_FastBoot, _("Fast Boot"),
 		_("Skips PS2 splash screens when booting from ISO or DVD media"), wxITEM_CHECK);
 

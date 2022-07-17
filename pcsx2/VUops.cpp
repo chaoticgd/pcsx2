@@ -1936,11 +1936,27 @@ static __fi void _vuMR32(VURegs* VU)
 //  Load / Store Instructions (VU Interpreter)
 // --------------------------------------------------------------------------------------
 
-__fi u32* GET_VU_MEM(VURegs* VU, u32 addr) // non-static, also used by sVU for now.
+__fi u32* GET_VU_MEM(VURegs* VU, u32 addr)
 {
-	if (VU == &vuRegs[1])
+	if (VU == &vuRegs[1]) {
+		Console.Warning("You need to use the VU1 interpreter!!!\n");
 		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
-	else if (addr & 0x4000)
+	} else if (addr & 0x4000)
+		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
+	else
+		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
+}
+
+__fi u32* GET_VU_MEM(VURegs* VU, u32 addr, bool isWriting)		// non-static, also used by sVU for now.
+{
+	if (VU == &vuRegs[1]) {
+		if(isWriting) {
+			VUTracer::get().onMemoryWrite(addr, 0x10);
+		} else {
+			VUTracer::get().onMemoryRead(addr, 0x10);
+		}
+		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
+	} else if (addr & 0x4000)
 		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
 	else
 		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
@@ -1954,7 +1970,7 @@ static __ri void _vuLQ(VURegs* VU)
 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
 
- 	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+ 	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
@@ -1970,7 +1986,7 @@ static __ri void _vuLQD(VURegs* VU)
 		return;
 
 	u32 addr = (VU->VI[_Is_].US[0] * 16);
-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
@@ -1983,7 +1999,7 @@ static __ri void _vuLQI(VURegs* VU)
 	if (_Ft_)
 	{
 		u32 addr = (VU->VI[_Is_].US[0] * 16);
-		u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+		u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
 		if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
 		if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
 		if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
@@ -1997,7 +2013,7 @@ static __ri void _vuSQ(VURegs* VU)
 {
 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
 	u16 addr = ((imm + VU->VI[_It_].SS[0]) * 16);
-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
@@ -2010,7 +2026,7 @@ static __ri void _vuSQD(VURegs* VU)
 	if (_Ft_ != 0)
 		VU->VI[_It_].US[0]--;
 	u32 addr = (VU->VI[_It_].US[0] * 16);
-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
@@ -2021,7 +2037,7 @@ static __ri void _vuSQI(VURegs* VU)
 {
 	_vuBackupVI(VU, _It_);
 	u32 addr = (VU->VI[_It_].US[0] * 16);
-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
+	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
@@ -2036,7 +2052,7 @@ static __ri void _vuILW(VURegs* VU)
 
 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
+	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
 
 	if (_X) VU->VI[_It_].US[0] = ptr[0];
 	if (_Y) VU->VI[_It_].US[0] = ptr[2];
@@ -2048,7 +2064,7 @@ static __fi void _vuISW(VURegs* VU)
 {
 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
+	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
@@ -2061,7 +2077,7 @@ static __ri void _vuILWR(VURegs* VU)
 		return;
 
 	u32 addr = (VU->VI[_Is_].US[0] * 16);
-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
+	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
 
 	if (_X) VU->VI[_It_].US[0] = ptr[0];
 	if (_Y) VU->VI[_It_].US[0] = ptr[2];
@@ -2072,7 +2088,7 @@ static __ri void _vuILWR(VURegs* VU)
 static __ri void _vuISWR(VURegs* VU)
 {
 	u32 addr = (VU->VI[_Is_].US[0] * 16);
-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
+	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }

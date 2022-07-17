@@ -1826,4 +1826,10 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys)
 	 }},
 END_HOTKEY_LIST()
 
+void GSvutraceSetTraceIndex(int index)
+{
+	VUTraceGSSideData::get().vutrace_trace_index = index;
+	VUTraceGSSideData::get().vutrace_backbuffer_index = 0;
+}
+
 #endif

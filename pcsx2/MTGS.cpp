@@ -278,6 +278,8 @@ bool SysMtgsThread::TryOpenGS()
 	return true;
 }
 
+void GS_vutraceSetTraceIndex(int index);
+
 void SysMtgsThread::MainLoop()
 {
 	// Threading info: run in MTGS thread
@@ -328,7 +330,9 @@ void SysMtgsThread::MainLoop()
 			ringposStack.pop_back();
 			m_lock_Stack.Release();
 #endif
-
+			
+			GS_vutraceSetTraceIndex(VUTracer::get().trace_index);
+			
 			switch (tag.command)
 			{
 #if COPY_GS_PACKET_TO_MTGS == 1

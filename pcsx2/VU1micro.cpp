@@ -77,6 +77,8 @@ void vu1ExecMicro(u32 addr)
 	static int count = 0;
 	vu1Finish(false);
 
+	VUTracer::get().onVu1ExecMicro(addr);
+
 	VUM_LOG("vu1ExecMicro %x (count=%d)", addr, count++);
 	VU1.cycle = cpuRegs.cycle;
 	VU0.VI[REG_VPU_STAT].UL &= ~0xFF00;

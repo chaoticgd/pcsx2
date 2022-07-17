@@ -20,6 +20,62 @@
 
 #include "common/StringUtil.h"
 
+#include <atomic>
+
+enum VUTracePacketType {
+	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
+	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
+	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
+	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
+	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
+	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
+};
+
+enum VUTraceStatus {
+	VUTRACESTATUS_DISABLED,
+	VUTRACESTATUS_WAITING, // We're waiting for a new VIF1 DMA chain to trace.
+	VUTRACESTATUS_TRACING
+};
+
+struct VURegs;
+class VUTracer {
+public:
+	VUTracer();
+	
+	void onTraceMenuItemClicked();
+	void onVif1DmaSendChain(u32 tadr);
+	void onVifDmaTag(u32 madr, u64 dma_tag);
+	void onVu1ExecMicro(u32 pc);
+	void onInstructionExecuted(VURegs* regs);
+	void onMemoryRead(u32 addr, u32 size);
+	void onMemoryWrite(u32 addr, u32 size);
+	
+	static VUTracer& get();
+	
+	std::atomic<int> trace_index { -1 };
+	FILE* log_file = nullptr;
+private:
+	void beginTraceSession();
+	void endTraceSession();
+	void beginTrace();
+	void endTrace();
+	
+	void pushLastPacket();
+
+	VUTraceStatus status;
+	static const int DMA_MAX_CHAINS_PER_FRAME = 0x10;
+	u32 dma_waiting_chain_count = 0;
+	u32 dma_tracing_chain_count = 0;
+	u32 dma_target_tadr = UINT32_MAX;
+	
+	FILE* trace_file = nullptr;
+	bool has_output_instructions = false;
+	
+	u32 read_addr = 0, read_size = 0;
+	u32 write_addr = 0, write_size = 0;
+};
+
+
 enum vif0_stat_flags
 {
 	VIF0_STAT_VPS_W 	= (1),

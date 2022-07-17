@@ -369,6 +369,20 @@ extern void __Log( const char* fmt, ... );
 #define VifCodeLog		macTrace(EE.VIFcode)
 #define GifTagLog		macTrace(EE.GIFtag)
 
+void vutrace_log(const char* prefix, const char* fmt, ...);
+
+#undef DMA_LOG
+#define DMA_LOG(...) \
+	macTrace(EE.DMAhw)(__VA_ARGS__); \
+	vutrace_log("[DMA] ", __VA_ARGS__)
+#undef VIF_LOG
+#define VIF_LOG(...) \
+	macTrace(EE.VIF)(__VA_ARGS__); \
+	vutrace_log("[VIF] ", __VA_ARGS__)
+#undef VifCodeLog
+#define VifCodeLog(...) \
+	macTrace(EE.VIFcode)(__VA_ARGS__); \
+	vutrace_log("[VifCode] ", __VA_ARGS__)
 
 #define PSXBIOS_LOG		macTrace(IOP.Bios)
 #define PSXCPU_LOG		macTrace(IOP.R3000A)

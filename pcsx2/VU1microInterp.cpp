@@ -272,6 +272,7 @@ void InterpVU1::Step()
 {
 	VU1.VI[REG_TPC].UL &= VU1_PROGMASK;
 	vu1Exec(&VU1);
+	VUTracer::get().onInstructionExecuted(&VU1);
 }
 
 void InterpVU1::Execute(u32 cycles)

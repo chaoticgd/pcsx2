@@ -901,6 +901,13 @@ void MainEmuFrame::Menu_Debug_MemoryDump_Click(wxCommandEvent& event)
 {
 }
 
+#include "Vif.h"
+
+void MainEmuFrame::Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event)
+{
+	VUTracer::get().onTraceMenuItemClicked();
+}
+
 void MainEmuFrame::Menu_ShowConsole(wxCommandEvent& event)
 {
 	// Use messages to relay open/close commands (thread-safe)

@@ -157,7 +157,9 @@ __fi void vif1SetupTransfer()
 
 	VIF_LOG("VIF1 Tag %8.8x_%8.8x size=%d, id=%d, madr=%lx, tadr=%lx",
 			ptag[1]._u32, ptag[0]._u32, vif1ch.qwc, ptag->ID, vif1ch.madr, vif1ch.tadr);
-
+	
+	VUTracer::get().onVifDmaTag(vif1ch.madr, *(u64*) &ptag);
+	
 	if (!vif1.done && ((dmacRegs.ctrl.STD == STD_VIF1) && (ptag->ID == TAG_REFS)))   // STD == VIF1
 	{
 		// there are still bugs, need to also check if gif->madr +16*qwc >= stadr, if not, stall
@@ -427,7 +429,6 @@ void dmaVIF1()
 
 	if (vif1ch.qwc > 0)   // Normal Mode
 	{
-		
 		// ignore tag if it's a GS download (Def Jam Fight for NY)
 		if(vif1ch.chcr.MOD == CHAIN_MODE && vif1ch.chcr.DIR) 
 		{
@@ -461,10 +462,11 @@ void dmaVIF1()
 	}
 	else
 	{
+		VUTracer::get().onVif1DmaSendChain(vif1ch.tadr);
+		
 		vif1.inprogress &= ~0x1;
 		vif1.dmamode = VIF_CHAIN_MODE;
 		vif1.done = false;
-		
 	}
 
 	if (vif1ch.chcr.DIR) vif1Regs.stat.FQC = std::min((u32)0x10, vif1ch.qwc);

@@ -27,6 +27,11 @@ CONSTINIT const GSVector4 GSVertexSW::m_pos_scale = GSVector4::cxpr(1.0f / 16, 1
 CONSTINIT const GSVector8 GSVertexSW::m_pos_scale2 = GSVector8::cxpr(1.0f / 16, 1.0f / 16, 1.0f, 128.0f, 1.0f / 16, 1.0f / 16, 1.0f, 128.0f);
 #endif
 
+void GS_vutraceSetTraceIndex(int index) {
+	VUTraceGSSideData::get().vutrace_trace_index = index;
+	VUTraceGSSideData::get().vutrace_backbuffer_index = 0;
+}
+
 GSRendererSW::GSRendererSW(int threads)
 	: GSRenderer(), m_fzb(NULL)
 {
@@ -472,6 +477,14 @@ void GSRendererSW::Draw()
 	else
 	{
 		Queue(data);
+	}
+	
+	VUTraceGSSideData& vutrace = VUTraceGSSideData::get();
+	if(vutrace.vutrace_trace_index != -1)
+	{
+		std::string s = StringUtil::StdStringFromFormat("vutrace_output/trace%06d_buffer%d.bmp", vutrace.vutrace_trace_index, vutrace.vutrace_backbuffer_index++);
+		printf("[VUTrace] Dumping framebuffer: %s\n", s.c_str());
+		m_mem.SaveBMP(s, m_context->FRAME.Block(), m_context->FRAME.FBW, m_context->FRAME.PSM, GetFrameRect().width(), 512);
 	}
 
 	/*

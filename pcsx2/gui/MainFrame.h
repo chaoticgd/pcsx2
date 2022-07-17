@@ -185,6 +185,7 @@ protected:
 	void Menu_Debug_Open_Click(wxCommandEvent& event);
 	void Menu_Debug_MemoryDump_Click(wxCommandEvent& event);
 	void Menu_Debug_CreateBlockdump_Click(wxCommandEvent& event);
+	void Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event);
 	void Menu_Ask_On_Boot_Click(wxCommandEvent& event);
 
 	void Menu_ShowConsole(wxCommandEvent& event);

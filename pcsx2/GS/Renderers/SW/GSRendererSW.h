@@ -19,6 +19,16 @@
 #include "GSDrawScanline.h"
 #include "GS/GSRingHeap.h"
 
+struct VUTraceGSSideData {
+	int vutrace_trace_index = -1;
+	int vutrace_backbuffer_index = 0;
+	
+	static VUTraceGSSideData& get() {
+		static VUTraceGSSideData instance;
+		return instance;
+	}
+};
+
 class GSRendererSW final : public GSRenderer
 {
 public:
