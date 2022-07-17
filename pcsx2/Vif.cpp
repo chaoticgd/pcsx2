@@ -158,6 +158,14 @@ void VUTracer::beginTrace() {
 	if(trace_file == nullptr) {
 		printf("[VUTrace] Fatal error: Cannot open trace file!\n");
 	}
+	
+	// Write header.
+	fputc('V', trace_file);
+	fputc('U', trace_file);
+	fputc('T', trace_file);
+	fputc('R', trace_file);
+	int format_version = 2;
+	fwrite(&format_version, 4, 1, trace_file);
 }
 
 void VUTracer::endTrace() {
