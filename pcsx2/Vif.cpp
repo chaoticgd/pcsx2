@@ -175,7 +175,7 @@ void VUTracer::endTrace() {
 }
 
 void VUTracer::pushLastPacket() {
-	if(ftell(trace_file) > 0) {
+	if(ftell(trace_file) > 8) {
 		fputc(VUTRACE_PUSHSNAPSHOT, trace_file);
 	}
 }
