@@ -24,7 +24,7 @@
 
 enum VUTracePacketType {
 	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
-	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
+	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows.
 	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
 	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
 	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
