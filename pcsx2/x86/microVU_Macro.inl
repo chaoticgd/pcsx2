@@ -1,6 +1,6 @@
 /*  PCSX2 - PS2 Emulator for PCs
  *  Copyright (C) 2002-2010  PCSX2 Dev Team
- * 
+ *
  *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU Lesser General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -49,7 +49,7 @@ void setupMacroOp(int mode, const char* opName)
 	microVU0.prog.IRinfo.curPC = 0;
 	microVU0.code = cpuRegs.code;
 	memset(&microVU0.prog.IRinfo.info[0], 0, sizeof(microVU0.prog.IRinfo.info[0]));
-	
+
 	if (mode & 0x01) // Q-Reg will be Read
 	{
 		xMOVSSZX(xmmPQ, ptr32[&vu0Regs.VI[REG_Q].UL]);
@@ -71,7 +71,7 @@ void setupMacroOp(int mode, const char* opName)
 		microVU0.prog.IRinfo.info[0].mFlag.doFlag      = true;
 		microVU0.prog.IRinfo.info[0].mFlag.write       = 0xff;
 	}
-	if (mode & 0x10)
+	if (mode & 0x10 && (!CHECK_VU_FLAGHACK || g_pCurInstInfo->info & (EEINST_COP2_STATUS_FLAG | EEINST_COP2_DENORMALIZE_STATUS_FLAG)))
 	{
 		_freeX86reg(gprF0);
 
@@ -107,7 +107,7 @@ void endMacroOp(int mode)
 			mVUallocSFLAGc(eax, gprF0, 0);
 			xMOV(ptr32[&vu0Regs.VI[REG_STATUS_FLAG].UL], eax);
 		}
-		else
+		else if (g_pCurInstInfo->info & (EEINST_COP2_STATUS_FLAG | EEINST_COP2_DENORMALIZE_STATUS_FLAG))
 		{
 			// backup denormalized flags for the next instruction
 			// this is fine, because we'll normalize them again before this reg is accessed
@@ -513,11 +513,22 @@ static void recCTC2()
 			xAND(eax, 0x0C0C);
 			xMOV(ptr32[&vu0Regs.VI[REG_FBRST].UL], eax);
 			break;
+		case 0:
+			// Ignore writes to vi00.
+			break;
 		default:
 			// Executing vu0 block here fixes the intro of Ratchet and Clank
 			// sVU's COP2 has a comment that "Donald Duck" needs this too...
-			if (_Rd_)
+			if (_Rd_ < REG_STATUS_FLAG)
+			{
+				// Need to expand this out, because we want to write as 16 bits.
+				_eeMoveGPRtoR(eax, _Rt_);
+				xMOV(ptr16[&vu0Regs.VI[_Rd_].US[0]], ax);
+			}
+			else
+			{
 				_eeMoveGPRtoM((uptr)&vu0Regs.VI[_Rd_].UL, _Rt_);
+			}
 			break;
 	}
 }
@@ -531,7 +542,7 @@ static void recQMFC2()
 
 	if (!_Rt_)
 		return;
-	
+
 	if (!(cpuRegs.code & 1))
 	{
 		_freeX86reg(eax);
@@ -555,14 +566,11 @@ static void recQMFC2()
 	}
 
 	int rtreg = _allocGPRtoXMMreg(-1, _Rt_, MODE_WRITE);
-	int t0reg = _allocTempXMMreg(XMMT_INT, -1);
 	// Update Refraction 20/09/2021: This is needed because Const Prop is broken
 	// the Flushed flag isn't being cleared when it's not flushed. TODO I guess
 	_eeOnWriteReg(_Rt_, 0); // This is needed because Const Prop is broken
 
-	xMOVAPS(xRegisterSSE(t0reg), ptr128[&vu0Regs.VF[_Rd_]]);
-	xMOVAPS(xRegisterSSE(rtreg), xRegisterSSE(t0reg));
-	_freeXMMreg(t0reg);
+	xMOVAPS(xRegisterSSE(rtreg), ptr128[&vu0Regs.VF[_Rd_]]);
 }
 
 static void recQMTC2()
@@ -572,7 +580,7 @@ static void recQMTC2()
 
 	if (!_Rd_)
 		return;
-	
+
 	if (!(cpuRegs.code & 1))
 	{
 		_freeX86reg(eax);
@@ -596,11 +604,8 @@ static void recQMTC2()
 	}
 
 	int rtreg = _allocGPRtoXMMreg(-1, _Rt_, MODE_READ);
-	int t0reg = _allocTempXMMreg(XMMT_INT, -1);
 
-	xMOVAPS(xRegisterSSE(t0reg), xRegisterSSE(rtreg));
-	xMOVAPS(ptr128[&vu0Regs.VF[_Rd_]], xRegisterSSE(t0reg));
-	_freeXMMreg(t0reg);
+	xMOVAPS(ptr128[&vu0Regs.VF[_Rd_]], xRegisterSSE(rtreg));
 }
 
 //------------------------------------------------------------------

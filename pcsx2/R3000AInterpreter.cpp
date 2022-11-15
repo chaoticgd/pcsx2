@@ -187,7 +187,7 @@ void psxCheckMemcheck()
 	int needed = psxIsMemcheckNeeded(pc);
 	if (needed == 0)
 		return;
-	
+
 	u32 op = iopMemRead32(needed == 2 ? pc + 4 : pc);
 	// Yeah, we use the R5900 opcode table for the R3000
 	const R5900::OPCODE& opcode = R5900::GetInstruction(op);
@@ -308,22 +308,10 @@ static void intClear(u32 Addr, u32 Size) {
 static void intShutdown() {
 }
 
-static void intSetCacheReserve( uint reserveInMegs )
-{
-}
-
-static uint intGetCacheReserve()
-{
-	return 0;
-}
-
 R3000Acpu psxInt = {
 	intReserve,
 	intReset,
 	intExecuteBlock,
 	intClear,
-	intShutdown,
-
-	intGetCacheReserve,
-	intSetCacheReserve
+	intShutdown
 };

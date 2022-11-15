@@ -109,6 +109,7 @@ private:
 	VkBuffer m_readback_staging_buffer = VK_NULL_HANDLE;
 	void* m_readback_staging_buffer_map = nullptr;
 	u32 m_readback_staging_buffer_size = 0;
+	bool m_warned_slow_spin = false;
 
 	VkSampler m_point_sampler = VK_NULL_HANDLE;
 	VkSampler m_linear_sampler = VK_NULL_HANDLE;
@@ -201,7 +202,7 @@ public:
 	__fi VkSampler GetPointSampler() const { return m_point_sampler; }
 	__fi VkSampler GetLinearSampler() const { return m_linear_sampler; }
 
-	bool Create(HostDisplay* display) override;
+	bool Create() override;
 	void Destroy() override;
 
 	void ResetAPIState() override;
@@ -260,7 +261,7 @@ public:
 
 	void RenderHW(GSHWDrawConfig& config) override;
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe);
-	void SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt);
+	void SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, bool skip_first_barrier);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vulkan State

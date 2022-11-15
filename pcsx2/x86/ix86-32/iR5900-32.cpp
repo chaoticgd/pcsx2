@@ -47,6 +47,8 @@
 #include "common/MemsetFast.inl"
 #include "common/Perf.h"
 
+// Only for MOVQ workaround.
+#include "common/emitter/internal.h"
 
 using namespace x86Emitter;
 using namespace R5900;
@@ -89,8 +91,6 @@ static RecompiledCodeReserve* recMem = NULL;
 static u8* recRAMCopy = NULL;
 static u8* recLutReserve_RAM = NULL;
 static const size_t recLutSize = (Ps2MemSize::MainRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) * wordsize / 4;
-
-static uptr m_ConfiguredCacheReserve = 64;
 
 alignas(16) static u32 recConstBuf[RECCONSTBUF_SIZE]; // 64-bit pseudo-immediates
 static BASEBLOCK* recRAM  = NULL; // and the ptr to the blocks here
@@ -187,6 +187,27 @@ void _eeMoveGPRtoR(const xRegister32& to, int fromgpr)
 		else
 		{
 			xMOV(to, ptr[&cpuRegs.GPR.r[fromgpr].UL[0]]);
+		}
+	}
+}
+
+void _eeMoveGPRtoR(const xRegister64& to, int fromgpr)
+{
+	if (fromgpr == 0)
+		xXOR(to, to);
+	else if (GPR_IS_CONST1(fromgpr))
+		xMOV64(to, g_cpuConstRegs[fromgpr].UD[0]);
+	else
+	{
+		int mmreg;
+
+		if ((mmreg = _checkXMMreg(XMMTYPE_GPRREG, fromgpr, MODE_READ)) >= 0 && (xmmregs[mmreg].mode & MODE_WRITE))
+		{
+			xMOVD(to, xRegisterSSE(mmreg));
+		}
+		else
+		{
+			xMOV(to, ptr[&cpuRegs.GPR.r[fromgpr].UD[0]]);
 		}
 	}
 }
@@ -522,42 +543,14 @@ static __ri void ClearRecLUT(BASEBLOCK* base, int memsize)
 		base[i].SetFnptr((uptr)JITCompile);
 }
 
-
-static void recThrowHardwareDeficiency(const char* extFail)
-{
-	throw Exception::HardwareDeficiency()
-		.SetDiagMsg(fmt::format("R5900-32 recompiler init failed: {} is not available.", extFail))
-		.SetUserMsg(fmt::format("{} Extensions not found.  The R5900-32 recompiler requires a host CPU with SSE2 extensions.", extFail));
-}
-
-static void recReserveCache()
-{
-	if (!recMem)
-		recMem = new RecompiledCodeReserve("R5900-32 Recompiler Cache", _16mb);
-	recMem->SetProfilerName("EErec");
-
-	while (!recMem->IsOk())
-	{
-		if (recMem->Reserve(GetVmMemory().MainMemory(), HostMemoryMap::EErecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
-			break;
-
-		// If it failed, then try again (if possible):
-		if (m_ConfiguredCacheReserve < 16)
-			break;
-		m_ConfiguredCacheReserve /= 2;
-	}
-
-	recMem->ThrowIfNotOk();
-}
-
 static void recReserve()
 {
-	// Hardware Requirements Check...
+	if (recMem)
+		return;
 
-	if (!x86caps.hasStreamingSIMD4Extensions)
-		recThrowHardwareDeficiency("SSE4");
-
-	recReserveCache();
+	recMem = new RecompiledCodeReserve("R5900 Recompiler Cache");
+	recMem->SetProfilerName("EErec");
+	recMem->Assign(GetVmMemory().CodeMemory(), HostMemoryMap::EErecOffset, 64 * _1mb);
 }
 
 static void recAlloc()
@@ -600,7 +593,7 @@ static void recAlloc()
 		recLUT_SetPage(recLUT, hwLUT, recROM, 0xa000, i, i - 0x1fc0);
 	}
 
-	for (int i = 0x1e00; i < 0x1e04; i++)
+	for (int i = 0x1e00; i < 0x1e40; i++)
 	{
 		recLUT_SetPage(recLUT, hwLUT, recROM1, 0x0000, i, i - 0x1e00);
 		recLUT_SetPage(recLUT, hwLUT, recROM1, 0x8000, i, i - 0x1e00);
@@ -618,10 +611,9 @@ static void recAlloc()
 	{
 		s_nInstCacheSize = 128;
 		s_pInstCache = (EEINST*)malloc(sizeof(EEINST) * s_nInstCacheSize);
+		if (!s_pInstCache)
+			pxFailRel("Failed to allocate R5900-32 InstCache array");
 	}
-
-	if (s_pInstCache == NULL)
-		throw Exception::OutOfMemory("R5900-32 InstCache");
 
 	// No errors.. Proceed with initialization:
 
@@ -708,7 +700,7 @@ void recStep()
 
 static fastjmp_buf m_SetJmp_StateCheck;
 static std::unique_ptr<BaseR5900Exception> m_cpuException;
-static ScopedExcept m_Exception;
+static std::unique_ptr<BaseException> m_Exception;
 
 static void recExitExecution()
 {
@@ -2394,18 +2386,8 @@ static void recThrowException(const BaseException& ex)
 {
 	if (!eeCpuExecuting)
 		ex.Rethrow();
-	m_Exception = ScopedExcept(ex.Clone());
+	m_Exception = std::unique_ptr<BaseException>(ex.Clone());
 	recExitExecution();
-}
-
-static void recSetCacheReserve(uint reserveInMegs)
-{
-	m_ConfiguredCacheReserve = reserveInMegs;
-}
-
-static uint recGetCacheReserve()
-{
-	return m_ConfiguredCacheReserve;
 }
 
 R5900cpu recCpu =
@@ -2420,8 +2402,5 @@ R5900cpu recCpu =
 	recSafeExitExecution,
 	recThrowException,
 	recThrowException,
-	recClear,
-
-	recGetCacheReserve,
-	recSetCacheReserve,
+	recClear
 };

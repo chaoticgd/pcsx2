@@ -18,6 +18,7 @@
 #include "Common.h"
 #include "Gif.h"
 #include "GS/GS.h"
+#include "SingleRegisterTypes.h"
 #include <atomic>
 #include <functional>
 #include <mutex>
@@ -367,6 +368,7 @@ public:
 	Threading::ThreadHandle m_thread_handle;
 	std::atomic_bool m_open_flag{false};
 	std::atomic_bool m_shutdown_flag{false};
+	std::atomic_bool m_run_idle_flag{false};
 	Threading::KernelSemaphore m_open_or_close_done;
 
 public:
@@ -411,11 +413,13 @@ public:
 	void ApplySettings();
 	void ResizeDisplayWindow(int width, int height, float scale);
 	void UpdateDisplayWindow();
-	void SetVSync(VsyncMode mode);
+	void SetVSyncMode(VsyncMode mode);
+	void UpdateVSyncMode();
 	void SwitchRenderer(GSRendererType renderer, bool display_message = true);
 	void SetSoftwareRendering(bool software, bool display_message = true);
 	void ToggleSoftwareRendering();
 	bool SaveMemorySnapshot(u32 width, u32 height, std::vector<u32>* pixels);
+	void SetRunIdle(bool enabled);
 
 protected:
 	bool TryOpenGS();
@@ -449,13 +453,13 @@ extern void gsWrite8(u32 mem, u8 value);
 extern void gsWrite16(u32 mem, u16 value);
 extern void gsWrite32(u32 mem, u32 value);
 
-extern void gsWrite64_page_00(u32 mem, const mem64_t* value);
-extern void gsWrite64_page_01(u32 mem, const mem64_t* value);
-extern void gsWrite64_generic(u32 mem, const mem64_t* value);
+extern void gsWrite64_page_00(u32 mem, u64 value);
+extern void gsWrite64_page_01(u32 mem, u64 value);
+extern void gsWrite64_generic(u32 mem, u64 value);
 
-extern void gsWrite128_page_00(u32 mem, const mem128_t* value);
-extern void gsWrite128_page_01(u32 mem, const mem128_t* value);
-extern void gsWrite128_generic(u32 mem, const mem128_t* value);
+extern void TAKES_R128 gsWrite128_page_00(u32 mem, r128 value);
+extern void TAKES_R128 gsWrite128_page_01(u32 mem, r128 value);
+extern void TAKES_R128 gsWrite128_generic(u32 mem, r128 value);
 
 extern u8 gsRead8(u32 mem);
 extern u16 gsRead16(u32 mem);

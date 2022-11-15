@@ -102,6 +102,7 @@ public:
 	public:
 		ShaderMacro(D3D_FEATURE_LEVEL fl);
 		void AddMacro(const char* n, int d);
+		void AddMacro(const char* n, std::string d);
 		D3D_SHADER_MACRO* GetPtr(void);
 	};
 
@@ -133,8 +134,6 @@ public:
 	};
 
 private:
-	static constexpr u32 SHADER_VERSION = 1;
-
 	ComPtr<ID3D12RootSignature> m_tfx_root_signature;
 	ComPtr<ID3D12RootSignature> m_utility_root_signature;
 
@@ -223,7 +222,7 @@ public:
 
 	__fi static GSDevice12* GetInstance() { return static_cast<GSDevice12*>(g_gs_device.get()); }
 
-	bool Create(HostDisplay* display) override;
+	bool Create() override;
 	void Destroy() override;
 
 	void ResetAPIState() override;

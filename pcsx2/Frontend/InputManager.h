@@ -16,6 +16,7 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
 #include <optional>
 #include <string_view>
 #include <variant>
@@ -23,6 +24,7 @@
 
 #include "common/Pcsx2Types.h"
 #include "common/SettingsInterface.h"
+#include "common/WindowInfo.h"
 
 /// Class, or source of an input event.
 enum class InputSourceType : u32
@@ -30,7 +32,7 @@ enum class InputSourceType : u32
 	Keyboard,
 	Pointer,
 #ifdef _WIN32
-	//DInput,
+	DInput,
 	XInput,
 #endif
 #ifdef SDL_BUILD
@@ -130,7 +132,7 @@ struct HotkeyInfo
 	} \
 	;
 
-DECLARE_HOTKEY_LIST(g_vm_manager_hotkeys);
+DECLARE_HOTKEY_LIST(g_common_hotkeys);
 DECLARE_HOTKEY_LIST(g_gs_hotkeys);
 DECLARE_HOTKEY_LIST(g_host_hotkeys);
 
@@ -205,6 +207,9 @@ namespace InputManager
 	/// Converts an input class to a string.
 	const char* InputSourceToString(InputSourceType clazz);
 
+	/// Returns the default state for an input source.
+	bool GetInputSourceDefaultEnabled(InputSourceType type);
+
 	/// Parses an input class string.
 	std::optional<InputSourceType> ParseInputSourceString(const std::string_view& str);
 
@@ -250,6 +255,10 @@ namespace InputManager
 
 	/// Re-parses the sources part of the config and initializes any backends.
 	void ReloadSources(SettingsInterface& si, std::unique_lock<std::mutex>& settings_lock);
+
+	/// Called when a device change is triggered by the system (DBT_DEVNODES_CHANGED on Windows).
+	/// Returns true if any device changes are detected.
+	bool ReloadDevices();
 
 	/// Shuts down any enabled input sources.
 	void CloseSources();
@@ -299,6 +308,9 @@ namespace InputManager
 
 namespace Host
 {
+	/// Return the current window handle. Needed for DInput.
+	std::optional<WindowInfo> GetTopLevelWindowInfo();
+
 	/// Called when a new input device is connected.
 	void OnInputDeviceConnected(const std::string_view& identifier, const std::string_view& device_name);
 

@@ -123,7 +123,7 @@ void GSPanel::InitRecordingAccelerators()
 	m_Accels->Map(AAC(wxKeyCode('r')).Shift(), "InputRecordingModeToggle");
 	m_Accels->Map(AAC(wxKeyCode('l')).Shift(), "GoToFirstFrame");
 #if defined(__unix__)
-	// Shift+P (80) and Shift+p (112) have two completely different codes 
+	// Shift+P (80) and Shift+p (112) have two completely different codes
 	// On Linux the former is sometimes fired so define bindings for both
 	m_Accels->Map(AAC(wxKeyCode('P')).Shift(), "TogglePause");
 	m_Accels->Map(AAC(wxKeyCode('R')).Shift(), "InputRecordingModeToggle");
@@ -527,8 +527,8 @@ void GSPanel::DirectKeyCommand( wxKeyEvent& evt )
 
 void GSPanel::UpdateScreensaver()
 {
-    bool prevent = g_Conf->GSWindow.DisableScreenSaver && m_HasFocus && m_coreRunning;
-	ScreensaverAllow(!prevent);
+	const bool prevent = g_Conf->GSWindow.DisableScreenSaver && m_HasFocus && m_coreRunning;
+	WindowInfo::InhibitScreensaver(g_gs_window_info, prevent);
 }
 
 void GSPanel::OnFocus( wxFocusEvent& evt )

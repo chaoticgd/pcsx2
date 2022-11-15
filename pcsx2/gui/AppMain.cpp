@@ -98,6 +98,43 @@ void Pcsx2App::PostMenuAction( MenuIdentifiers menu_id ) const
 		mainFrame->GetEventHandler()->AddPendingEvent( joe );
 }
 
+#ifdef _WIN32
+
+// --------------------------------------------------------------------------------------
+//  Exception::WinApiError   (implementations)
+// --------------------------------------------------------------------------------------
+Exception::WinApiError::WinApiError()
+{
+	ErrorId = GetLastError();
+	m_message_diag = "Unspecified Windows API error.";
+}
+
+std::string Exception::WinApiError::GetMsgFromWindows() const
+{
+	if (!ErrorId)
+		return "No valid error number was assigned to this exception!";
+
+	const DWORD BUF_LEN = 2048;
+	wchar_t t_Msg[BUF_LEN];
+	if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, 0, ErrorId, 0, t_Msg, BUF_LEN, 0))
+		return fmt::format("Win32 Error #{}: {}", ErrorId, StringUtil::WideStringToUTF8String(t_Msg));
+
+	return fmt::format("Win32 Error #{} (no text msg available)", ErrorId);
+}
+
+std::string Exception::WinApiError::FormatDisplayMessage() const
+{
+	return m_message_user + "\n\n" + GetMsgFromWindows();
+}
+
+std::string Exception::WinApiError::FormatDiagnosticMessage() const
+{
+	return m_message_diag + "\n\t" + GetMsgFromWindows();
+}
+
+#endif
+
+
 // --------------------------------------------------------------------------------------
 //  Pcsx2AppMethodEvent
 // --------------------------------------------------------------------------------------
@@ -128,18 +165,18 @@ public:
 	{
 		m_Method = method;
 	}
-	
+
 	Pcsx2AppMethodEvent( const Pcsx2AppMethodEvent& src )
 		: pxActionEvent( src )
 	{
 		m_Method = src.m_Method;
 	}
-		
+
 	void SetMethod( FnPtr_Pcsx2App method )
 	{
 		m_Method = method;
 	}
-	
+
 protected:
 	void InvokeEvent()
 	{
@@ -359,7 +396,7 @@ wxAppTraits* Pcsx2App::CreateTraits()
 // ----------------------------------------------------------------------------
 
 // LogicalVsync - Event received from the AppCoreThread (EEcore) for each vsync,
-// roughly 50/60 times a second when frame limiting is enabled, and up to 10,000 
+// roughly 50/60 times a second when frame limiting is enabled, and up to 10,000
 // times a second if not (ok, not quite, but you get the idea... I hope.)
 void Pcsx2App::LogicalVsync()
 {
@@ -374,7 +411,7 @@ void Pcsx2App::LogicalVsync()
 	{
 		if( ev->key == 0 ) break;
 
-		// in the past, in the plugin api, all plugins would have a first chance at treating the 
+		// in the past, in the plugin api, all plugins would have a first chance at treating the
 		// input here, with the ui eventually dealing with it otherwise. Obviously this solution
 		// sucked and we had multiple components battling for input processing. I managed to make
 		// most of them go away during the plugin merge but GS still needs to process the inputs,
@@ -456,17 +493,17 @@ void Pcsx2App::HandleEvent(wxEvtHandler* handler, wxEventFunction func, wxEvent&
 		// [TODO]  Bind a listener to the CoreThread status, and automatically close the dialog
 		// if the thread starts responding while we're waiting (not hard in fact, but I'm getting
 		// a little tired, so maybe later!)  --air
-	
+
 		Console.Warning( ex.FormatDiagnosticMessage() );
 		wxDialogWithHelpers dialog( NULL, _("PCSX2 Unresponsive Thread"), wxVERTICAL );
-		
+
 		dialog += dialog.Heading( ex.FormatDisplayMessage() + L"\n\n" +
 			pxE( L"'Ignore' to continue waiting for the thread to respond.\n'Cancel' to attempt to cancel the thread.\n'Terminate' to quit PCSX2 immediately.\n"
 			)
 		);
 
 		int result = pxIssueConfirmation( dialog, MsgButtons().Ignore().Cancel().Custom( _("Terminate") ) );
-		
+
 		if( result == pxID_CUSTOM )
 		{
 			// fastest way to kill the process! (works in Linux and win32, thanks to windows having very
@@ -565,7 +602,7 @@ void Pcsx2App::enterDebugMode()
 	if (dlg)
 		dlg->setDebugMode(true,false);
 }
-	
+
 void Pcsx2App::leaveDebugMode()
 {
 	DisassemblyDialog* dlg = GetDisassemblyPtr();
@@ -716,7 +753,7 @@ void Pcsx2App::OpenGsPanel()
 		//
 		// FIXME: GS memory leaks in DX10 have been fixed.  This code may not be needed
 		// anymore.
-		
+
 		const wxSize oldsize( gsFrame->GetSize() );
 		wxSize newsize( oldsize );
 		newsize.DecBy(1);
@@ -832,7 +869,7 @@ public:
 	{
 		return _("Executing PS2 Virtual Machine...");
 	}
-	
+
 	SysExecEvent_Execute()
 		: m_UseCDVDsrc(false)
 		, m_UseELFOverride(false)

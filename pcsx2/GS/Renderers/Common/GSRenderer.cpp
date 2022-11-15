@@ -112,8 +112,8 @@ bool GSRenderer::Merge(int field)
 
 			display_baseline.x = std::min(display_offsets[i].x, display_baseline.x);
 			display_baseline.y = std::min(display_offsets[i].y, display_baseline.y);
-			frame_baseline.x = std::min(fr[i].left, frame_baseline.x);
-			frame_baseline.y = std::min(fr[i].top, frame_baseline.y);
+			frame_baseline.x = std::min(std::max(fr[i].left, 0), frame_baseline.x);
+			frame_baseline.y = std::min(std::max(fr[i].top, 0), frame_baseline.y);
 
 			display_offset |= std::abs(display_baseline.y - display_offsets[i].y) == 1;
 			/*DevCon.Warning("Read offset was X %d(left %d) Y %d(top %d)", display_baseline.x, dr[i].left, display_baseline.y, dr[i].top);
@@ -147,7 +147,8 @@ bool GSRenderer::Merge(int field)
 
 	s_n++;
 
-	if (samesrc && fr[0].bottom == fr[1].bottom && !feedback_merge)
+	// Only need to check the right/bottom on software renderer, hardware always gets the full texture then cuts a bit out later.
+	if (samesrc && !feedback_merge && (GSConfig.UseHardwareRenderer() || (fr[0].right == fr[1].right && fr[0].bottom == fr[1].bottom)))
 	{
 		tex[0] = GetOutput(0, y_offset[0]);
 		tex[1] = tex[0]; // saves one texture fetch
@@ -200,10 +201,19 @@ bool GSRenderer::Merge(int field)
 		GSVector2i display_diff(display_offsets[i].x - display_baseline.x, display_offsets[i].y - display_baseline.y);
 		GSVector2i frame_diff(fr[i].left - frame_baseline.x, fr[i].top - frame_baseline.y);
 
+		if (!GSConfig.UseHardwareRenderer())
+		{
+			// Clear any frame offsets, we don't need them now.
+			fr[i].right -= fr[i].left;
+			fr[i].left = 0;
+			fr[i].bottom -= fr[i].top;
+			fr[i].top = 0;
+		}
+
 		// If using scanmsk we have to keep the single line offset, regardless of upscale
 		// so we handle this separately after the rect calculations.
 		float interlace_offset = 0.0f;
-		
+
 		if ((!GSConfig.PCRTCAntiBlur || m_scanmask_used) && display_offset)
 		{
 			interlace_offset = static_cast<float>(display_diff.y & 1);
@@ -233,11 +243,15 @@ bool GSRenderer::Merge(int field)
 					if (display_diff.y < 4)
 						off.y -= display_diff.y;
 
-					// Offset by DISPFB setting
-					if (frame_diff.x == 1)
-						off.x += 1;
-					if (frame_diff.y == 1)
-						off.y += 1;
+					// Only functional in HW mode, software clips/positions the framebuffer on read.
+					if (GSConfig.UseHardwareRenderer())
+					{
+						// Offset by DISPFB setting
+						if (abs(frame_diff.x) < 4)
+							off.x += frame_diff.x;
+						if (abs(frame_diff.y) < 4)
+							off.y += frame_diff.y;
+					}
 				}
 			}
 		}
@@ -252,7 +266,7 @@ bool GSRenderer::Merge(int field)
 				if (display_diff.y >= 4 || !GSConfig.PCRTCAntiBlur)
 					off.y = display_diff.y;
 
-				
+
 				if (samesrc)
 				{
 					// Adjusting the screen offset when using a negative offset.
@@ -283,14 +297,14 @@ bool GSRenderer::Merge(int field)
 						off.y += display_baseline.y;
 
 					// Anti-Blur stuff
-					if (GSConfig.PCRTCAntiBlur)
+					// Only functional in HW mode, software clips/positions the framebuffer on read.
+					if (GSConfig.PCRTCAntiBlur && GSConfig.UseHardwareRenderer())
 					{
 						// Offset by DISPFB setting
-						if (frame_diff.x == 1)
-							off.x += 1;
-
-						if (frame_diff.y == 1)
-							off.y += 1;
+						if (abs(frame_diff.x) < 4)
+							off.x += frame_diff.x;
+						if (abs(frame_diff.y) < 4)
+							off.y += frame_diff.y;
 					}
 				}
 			}
@@ -312,7 +326,7 @@ bool GSRenderer::Merge(int field)
 		if (m_regs->SMODE2.FFMD && !is_bob && !GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 		{
 			// We do half because FFMD is a half sized framebuffer, then we offset by 1 in the shader for the actual interlace
-			if(GetUpscaleMultiplier() > 1)
+			if(GetUpscaleMultiplier() > 1.0f)
 				interlace_offset += ((((tex[1] ? tex[1]->GetScale().y : tex[0]->GetScale().y) + 0.5f) * 0.5f) - 1.0f) * static_cast<float>(field ^ field2);
 			offset = 1.0f;
 		}
@@ -339,7 +353,7 @@ bool GSRenderer::Merge(int field)
 		GSVector2i max_resolution = GetResolution();
 		resolution.x = display_combined.x - display_baseline.x;
 		resolution.y = display_combined.y - display_baseline.y;
-		
+
 		if (isinterlaced() && m_regs->SMODE2.FFMD)
 		{
 			resolution.y >>= 1;
@@ -349,7 +363,8 @@ bool GSRenderer::Merge(int field)
 		resolution.y = std::min(max_resolution.y, resolution.y);
 	}
 
-	fs = resolution * GSVector2i(GetUpscaleMultiplier());
+	fs = GSVector2i(static_cast<int>(static_cast<float>(resolution.x) * GetUpscaleMultiplier()),
+		static_cast<int>(static_cast<float>(resolution.y) * GetUpscaleMultiplier()));
 	ds = fs;
 
 	// When interlace(FRAME) mode, the rect is half height, so it needs to be stretched.
@@ -407,7 +422,7 @@ static float GetCurrentAspectRatioFloat(bool is_progressive)
 	return ars[static_cast<u32>(GSConfig.AspectRatio) + (3u * (is_progressive && GSConfig.AspectRatio == AspectRatioType::RAuto4_3_3_2))];
 }
 
-static GSVector4 CalculateDrawRect(s32 window_width, s32 window_height, s32 texture_width, s32 texture_height, HostDisplay::Alignment alignment, bool flip_y, bool is_progressive)
+static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const GSVector4i& src_rect, const GSVector2i& src_size, HostDisplay::Alignment alignment, bool flip_y, bool is_progressive)
 {
 	const float f_width = static_cast<float>(window_width);
 	const float f_height = static_cast<float>(window_height);
@@ -428,7 +443,10 @@ static GSVector4 CalculateDrawRect(s32 window_width, s32 window_height, s32 text
 	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R16_9)
 		targetAr = 16.0f / 9.0f;
 
-	const double arr = targetAr / clientAr;
+	const float crop_adjust = (static_cast<float>(src_rect.width()) / static_cast<float>(src_size.x)) /
+		(static_cast<float>(src_rect.height()) / static_cast<float>(src_size.y));
+
+	const double arr = (targetAr * crop_adjust) / clientAr;
 	float target_width = f_width;
 	float target_height = f_height;
 	if (arr < 1)
@@ -446,8 +464,8 @@ static GSVector4 CalculateDrawRect(s32 window_width, s32 window_height, s32 text
 	if (GSConfig.IntegerScaling)
 	{
 		// make target width/height an integer multiple of the texture width/height
-		const float t_width = static_cast<double>(texture_width);
-		const float t_height = static_cast<double>(texture_height);
+		const float t_width = static_cast<double>(src_rect.width());
+		const float t_height = static_cast<double>(src_rect.height());
 
 		float scale;
 		if ((t_width / t_height) >= 1.0)
@@ -505,9 +523,11 @@ static GSVector4 CalculateDrawRect(s32 window_width, s32 window_height, s32 text
 		}
 	}
 
+#ifndef PCSX2_CORE
 	const float unit = .01f * std::min(target_x, target_y);
 	target_x += unit * GSConfig.OffsetX;
 	target_y += unit * GSConfig.OffsetY;
+#endif
 
 	GSVector4 ret(target_x, target_y, target_x + target_width, target_y + target_height);
 
@@ -521,9 +541,24 @@ static GSVector4 CalculateDrawRect(s32 window_width, s32 window_height, s32 text
 	return ret;
 }
 
+static GSVector4i CalculateDrawSrcRect(const GSTexture* src)
+{
+#ifndef PCSX2_CORE
+	return GSVector4i(0, 0, src->GetWidth(), src->GetHeight());
+#else
+	const float upscale = GSConfig.UpscaleMultiplier;
+	const GSVector2i size(src->GetSize());
+	const int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0]) * upscale);
+	const int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1]) * upscale);
+	const int right =  size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2]) * upscale);
+	const int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3]) * upscale);
+	return GSVector4i(left, top, right, bottom);
+#endif
+}
+
 void GSRenderer::VSync(u32 field, bool registers_written)
 {
-	Flush();
+	Flush(GSFlushReason::VSYNC);
 
 	if (s_dump && s_n >= s_saven)
 	{
@@ -585,21 +620,23 @@ void GSRenderer::VSync(u32 field, bool registers_written)
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current && !blank_frame)
 		{
-			HostDisplay* const display = g_gs_device->GetDisplay();
-			const GSVector4 draw_rect(CalculateDrawRect(display->GetWindowWidth(), display->GetWindowHeight(),
-				current->GetWidth(), current->GetHeight(), display->GetDisplayAlignment(), display->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets)));
+			const GSVector4i src_rect(CalculateDrawSrcRect(current));
+			const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
+			const GSVector4 draw_rect(CalculateDrawDstRect(g_host_display->GetWindowWidth(), g_host_display->GetWindowHeight(),
+				src_rect, current->GetSize(), g_host_display->GetDisplayAlignment(), g_host_display->UsesLowerLeftOrigin(),
+				GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets)));
 
 			const u64 current_time = Common::Timer::GetCurrentValue();
 			const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
-			g_gs_device->PresentRect(current, GSVector4(0, 0, 1, 1), nullptr, draw_rect,
+			g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
 				s_tv_shader_indices[GSConfig.TVShader], shader_time, GSConfig.LinearPresent);
 		}
 
 		Host::EndPresentFrame();
 
 		if (GSConfig.OsdShowGPU)
-			PerformanceMetrics::OnGPUPresent(Host::GetHostDisplay()->GetAndResetAccumulatedGPUTime());
+			PerformanceMetrics::OnGPUPresent(g_host_display->GetAndResetAccumulatedGPUTime());
 	}
 	g_gs_device->RestoreAPIState();
 	PerformanceMetrics::Update(registers_written, fb_sprite_frame);
@@ -725,6 +762,23 @@ void GSRenderer::QueueSnapshot(const std::string& path, u32 gsdump_frames)
 	}
 	else
 	{
+		m_snapshot = "";
+
+		// append the game serial and title
+		if (std::string name(GetDumpName()); !name.empty())
+		{
+			Path::SanitizeFileName(&name);
+			if (name.length() > 219)
+				name.resize(219);
+			m_snapshot += name;
+		}
+		if (std::string serial(GetDumpSerial()); !serial.empty())
+		{
+			Path::SanitizeFileName(&serial);
+			m_snapshot += '_';
+			m_snapshot += serial;
+		}
+
 		time_t cur_time = time(nullptr);
 		char local_time[16];
 
@@ -737,28 +791,16 @@ void GSRenderer::QueueSnapshot(const std::string& path, u32 gsdump_frames)
 			// the captured image is the 2nd image captured at this specific time.
 			static int n = 2;
 
+			m_snapshot += '_';
+
 			if (cur_time == prev_snap)
-				m_snapshot = fmt::format("gs_{0}_({1})", local_time, n++);
+				m_snapshot += fmt::format("{0}_({1})", local_time, n++);
 			else
 			{
 				n = 2;
-				m_snapshot = fmt::format("gs_{}", local_time);
+				m_snapshot += fmt::format("{}", local_time);
 			}
 			prev_snap = cur_time;
-		}
-
-		// append the game serial and title
-		if (std::string name(GetDumpName()); !name.empty())
-		{
-			Path::SanitizeFileName(name);
-			m_snapshot += '_';
-			m_snapshot += name;
-		}
-		if (std::string serial(GetDumpSerial()); !serial.empty())
-		{
-			Path::SanitizeFileName(serial);
-			m_snapshot += '_';
-			m_snapshot += serial;
 		}
 
 		// prepend snapshots directory
@@ -785,14 +827,16 @@ void GSRenderer::PresentCurrentFrame()
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current)
 		{
-			HostDisplay* const display = g_gs_device->GetDisplay();
-			const GSVector4 draw_rect(CalculateDrawRect(display->GetWindowWidth(), display->GetWindowHeight(),
-				current->GetWidth(), current->GetHeight(), display->GetDisplayAlignment(), display->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets)));
+			const GSVector4i src_rect(CalculateDrawSrcRect(current));
+			const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
+			const GSVector4 draw_rect(CalculateDrawDstRect(g_host_display->GetWindowWidth(), g_host_display->GetWindowHeight(),
+				src_rect, current->GetSize(), g_host_display->GetDisplayAlignment(), g_host_display->UsesLowerLeftOrigin(),
+				GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets)));
 
 			const u64 current_time = Common::Timer::GetCurrentValue();
 			const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
-			g_gs_device->PresentRect(current, GSVector4(0, 0, 1, 1), nullptr, draw_rect,
+			g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
 				s_tv_shader_indices[GSConfig.TVShader], shader_time, GSConfig.LinearPresent);
 		}
 
@@ -876,11 +920,6 @@ void GSRenderer::KeyEvent(const HostKeyEvent& e)
 				theApp.SetConfig("deinterlace", static_cast<int>(GSConfig.InterlaceMode));
 				printf("GS: Set deinterlace mode to %d (%s).\n", static_cast<int>(GSConfig.InterlaceMode), theApp.m_gs_deinterlace.at(static_cast<int>(GSConfig.InterlaceMode)).name.c_str());
 				return;
-			case VK_DELETE:
-				GSConfig.AA1 = !GSConfig.AA1;
-				theApp.SetConfig("aa1", GSConfig.AA1);
-				printf("GS: (Software) Edge anti-aliasing is now %s.\n", GSConfig.AA1 ? "enabled" : "disabled");
-				return;
 			case VK_NEXT: // As requested by Prafull, to be removed later
 				char dither_msg[3][16] = {"disabled", "auto", "auto unscaled"};
 				GSConfig.Dithering = (GSConfig.Dithering + 1) % 3;
@@ -907,7 +946,9 @@ bool GSRenderer::SaveSnapshotToMemory(u32 width, u32 height, std::vector<u32>* p
 	if (!current)
 		return false;
 
-	GSVector4 draw_rect(CalculateDrawRect(width, height, current->GetWidth(), current->GetHeight(),
+	const GSVector4i src_rect(CalculateDrawSrcRect(current));
+	const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
+	GSVector4 draw_rect(CalculateDrawDstRect(width, height, src_rect, current->GetSize(),
 		HostDisplay::Alignment::LeftOrTop, false, GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets)));
 	u32 draw_width = static_cast<u32>(draw_rect.z - draw_rect.x);
 	u32 draw_height = static_cast<u32>(draw_rect.w - draw_rect.y);
@@ -926,7 +967,7 @@ bool GSRenderer::SaveSnapshotToMemory(u32 width, u32 height, std::vector<u32>* p
 
 	GSTexture::GSMap map;
 	const bool result = g_gs_device->DownloadTextureConvert(
-		current, GSVector4(0.0f, 0.0f, 1.0f, 1.0f),
+		current, src_uv,
 		GSVector2i(draw_width, draw_height), GSTexture::Format::Color,
 		ShaderConvert::COPY, map, true);
 	if (result)

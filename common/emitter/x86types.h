@@ -420,6 +420,8 @@ namespace x86Emitter
 	// This register type is provided to allow legal syntax for instructions that accept
 	// an XMM register as a parameter, but do not allow for a GPR.
 
+	struct xRegisterYMMTag {};
+
 	class xRegisterSSE : public xRegisterBase
 	{
 		typedef xRegisterBase _parent;
@@ -430,11 +432,21 @@ namespace x86Emitter
 			: _parent(16, regId)
 		{
 		}
+		xRegisterSSE(int regId, xRegisterYMMTag)
+			: _parent(32, regId)
+		{
+		}
 
 		bool operator==(const xRegisterSSE& src) const { return this->Id == src.Id; }
 		bool operator!=(const xRegisterSSE& src) const { return this->Id != src.Id; }
 
 		static const inline xRegisterSSE& GetInstance(uint id);
+		static const inline xRegisterSSE& GetYMMInstance(uint id);
+
+		/// Returns the register to use when calling a C function.
+		/// arg_number is the argument position from the left, starting with 0.
+		/// sse_number is the argument position relative to the number of vector registers.
+		static const inline xRegisterSSE& GetArgRegister(uint arg_number, uint sse_number, bool ymm = false);
 	};
 
 	class xRegisterCL : public xRegister8
@@ -476,6 +488,11 @@ namespace x86Emitter
 		// Returns true if the register is the stack pointer: ESP.
 		bool IsStackPointer() const { return Id == 4; }
 
+		/// Returns the register to use when calling a C function.
+		/// arg_number is the argument position from the left, starting with 0.
+		/// sse_number is the argument position relative to the number of vector registers.
+		static const inline xAddressReg& GetArgRegister(uint arg_number, uint gpr_number);
+
 		xAddressVoid operator+(const xAddressReg& right) const;
 		xAddressVoid operator+(sptr right) const;
 		xAddressVoid operator+(const void* right) const;
@@ -483,7 +500,6 @@ namespace x86Emitter
 		xAddressVoid operator-(const void* right) const;
 		xAddressVoid operator*(int factor) const;
 		xAddressVoid operator<<(u32 shift) const;
-		xAddressReg& operator=(const xAddressReg&) = default;
 	};
 
 	// --------------------------------------------------------------------------------------
@@ -570,12 +586,18 @@ namespace x86Emitter
 	extern const xRegisterEmpty xEmptyReg;
 
 	// clang-format off
-
-extern const xRegisterSSE
+	extern const xRegisterSSE
     xmm0, xmm1, xmm2, xmm3,
     xmm4, xmm5, xmm6, xmm7,
     xmm8, xmm9, xmm10, xmm11,
     xmm12, xmm13, xmm14, xmm15;
+
+	// TODO: This needs to be _M_SSE >= 0x500'ed, but we can't do it atm because common doesn't have variants.
+	extern const xRegisterSSE
+	  ymm0, ymm1, ymm2, ymm3,
+	  ymm4, ymm5, ymm6, ymm7,
+	  ymm8, ymm9, ymm10, ymm11,
+	  ymm12, ymm13, ymm14, ymm15;
 
 extern const xAddressReg
     rax, rbx, rcx, rdx,
@@ -625,6 +647,45 @@ extern const xRegister32
 
 		pxAssert(id < iREGCNT_XMM);
 		return *m_tbl_xmmRegs[id];
+	}
+
+	const xRegisterSSE& xRegisterSSE::GetYMMInstance(uint id)
+	{
+		static const xRegisterSSE* const m_tbl_ymmRegs[] =
+			{
+				&ymm0, &ymm1, &ymm2, &ymm3,
+				&ymm4, &ymm5, &ymm6, &ymm7,
+				&ymm8, &ymm9, &ymm10, &ymm11,
+				&ymm12, &ymm13, &ymm14, &ymm15};
+
+		pxAssert(id < iREGCNT_XMM);
+		return *m_tbl_ymmRegs[id];
+	}
+
+	const xRegisterSSE& xRegisterSSE::GetArgRegister(uint arg_number, uint sse_number, bool ymm)
+	{
+#ifdef _WIN32
+		// Windows passes arguments according to their position from the left.
+		return ymm ? GetYMMInstance(arg_number) : GetInstance(arg_number);
+#else
+		// Linux counts the number of vector parameters.
+		return ymm ? GetYMMInstance(sse_number) : GetInstance(sse_number);
+#endif
+	}
+
+	const xAddressReg& xAddressReg::GetArgRegister(uint arg_number, uint gpr_number)
+	{
+#ifdef _WIN32
+		// Windows passes arguments according to their position from the left.
+		static constexpr const xAddressReg* regs[] = {&rcx, &rdx, &r8, &r9};
+		pxAssert(arg_number < std::size(regs));
+		return *regs[arg_number];
+#else
+		// Linux counts the number of GPR parameters.
+		static constexpr const xAddressReg* regs[] = {&rdi, &rsi, &rdx, &rcx};
+		pxAssert(gpr_number < std::size(regs));
+		return *regs[gpr_number];
+#endif
 	}
 
 	// --------------------------------------------------------------------------------------
@@ -949,3 +1010,4 @@ extern const xRegister32
 #include "implement/jmpcall.h"
 
 #include "implement/bmi.h"
+#include "implement/avx.h"

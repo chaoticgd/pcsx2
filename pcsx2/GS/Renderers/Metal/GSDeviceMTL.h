@@ -25,6 +25,7 @@
 
 #include "common/HashCombine.h"
 #include "common/MRCHelpers.h"
+#include "common/ReadbackSpinManager.h"
 #include "GS/GS.h"
 #include "GSMTLDeviceInfo.h"
 #include "GSMTLSharedHeader.h"
@@ -201,6 +202,7 @@ public:
 				bool iip        : 1;
 				bool fst        : 1;
 				bool point_size : 1;
+				GSMTLExpandType expand : 2;
 			};
 			u8 key;
 		};
@@ -226,6 +228,14 @@ public:
 	u64 m_current_draw = 1;
 	std::atomic<u64> m_last_finished_draw{0};
 
+	// Spinning
+	ReadbackSpinManager m_spin_manager;
+	u32 m_encoders_in_current_cmdbuf;
+	u32 m_spin_timer;
+	MRCOwned<id<MTLComputePipelineState>> m_spin_pipeline;
+	MRCOwned<id<MTLBuffer>> m_spin_buffer;
+	MRCOwned<id<MTLFence>> m_spin_fence;
+
 	// Functions and Pipeline States
 	MRCOwned<id<MTLRenderPipelineState>> m_convert_pipeline[static_cast<int>(ShaderConvert::Count)];
 	MRCOwned<id<MTLRenderPipelineState>> m_present_pipeline[static_cast<int>(PresentShader::Count)];
@@ -243,7 +253,7 @@ public:
 	MRCOwned<id<MTLRenderPipelineState>> m_imgui_pipeline;
 	MRCOwned<id<MTLRenderPipelineState>> m_imgui_pipeline_a8;
 
-	MRCOwned<id<MTLFunction>> m_hw_vs[1 << 3];
+	MRCOwned<id<MTLFunction>> m_hw_vs[1 << 5];
 	std::unordered_map<PSSelector, MRCOwned<id<MTLFunction>>> m_hw_ps;
 	std::unordered_map<PipelineSelectorMTL, MRCOwned<id<MTLRenderPipelineState>>> m_hw_pipeline;
 
@@ -323,12 +333,16 @@ public:
 	id<MTLBlitCommandEncoder> GetVertexUploadEncoder();
 	/// Get the render command buffer, creating a new one if it doesn't exist
 	id<MTLCommandBuffer> GetRenderCmdBuf();
+	/// Called by command buffers when they finish
+	void DrawCommandBufferFinished(u64 draw, id<MTLCommandBuffer> buffer);
 	/// Flush pending operations from all encoders to the GPU
 	void FlushEncoders();
 	/// End current render pass without flushing
 	void EndRenderPass();
 	/// Begin a new render pass (may reuse existing)
 	void BeginRenderPass(NSString* name, GSTexture* color, MTLLoadAction color_load, GSTexture* depth, MTLLoadAction depth_load, GSTexture* stencil = nullptr, MTLLoadAction stencil_load = MTLLoadActionDontCare);
+	/// Call at the end of each frame
+	void FrameCompleted();
 
 	GSTexture* CreateSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format) override;
 
@@ -340,7 +354,7 @@ public:
 
 	MRCOwned<id<MTLFunction>> LoadShader(NSString* name);
 	MRCOwned<id<MTLRenderPipelineState>> MakePipeline(MTLRenderPipelineDescriptor* desc, id<MTLFunction> vertex, id<MTLFunction> fragment, NSString* name);
-	bool Create(HostDisplay* display) override;
+	bool Create() override;
 
 	void ClearRenderTarget(GSTexture* t, const GSVector4& c) override;
 	void ClearRenderTarget(GSTexture* t, u32 c) override;

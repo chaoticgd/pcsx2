@@ -217,7 +217,7 @@ __fi u32 ipuRead32(u32 mem)
 		ipucase(IPU_BP): // IPU_BP
 		{
 			pxAssume(g_BP.FP <= 2);
-			
+
 			ipuRegs.ipubp = g_BP.BP & 0x7f;
 			ipuRegs.ipubp |= g_BP.IFC << 8;
 			ipuRegs.ipubp |= g_BP.FP << 16;
@@ -233,7 +233,7 @@ __fi u32 ipuRead32(u32 mem)
 	return psHu32(IPU_CMD + mem);
 }
 
-__fi RETURNS_R64 ipuRead64(u32 mem)
+__fi u64 ipuRead64(u32 mem)
 {
 	// Note: It's assumed that mem's input value is always in the 0x10002000 page
 	// of memory (if not, it's probably bad code).
@@ -250,18 +250,18 @@ __fi RETURNS_R64 ipuRead64(u32 mem)
 				if (getBits32((u8*)&ipuRegs.cmd.DATA, 0))
 					ipuRegs.cmd.DATA = BigEndian(ipuRegs.cmd.DATA);
 			}
-			
+
 			if (ipuRegs.cmd.DATA & 0xffffff)
 				IPU_LOG("read64: IPU_CMD=BUSY=%x, DATA=%08X", ipuRegs.cmd.BUSY ? 1 : 0, ipuRegs.cmd.DATA);
-			return r64_load(&ipuRegs.cmd._u64);
+			return ipuRegs.cmd._u64;
 		}
 
 		ipucase(IPU_CTRL):
-			DevCon.Warning("reading 64bit IPU ctrl");
+			IPU_LOG("reading 64bit IPU ctrl");
 			break;
 
 		ipucase(IPU_BP):
-			DevCon.Warning("reading 64bit IPU top");
+			IPU_LOG("reading 64bit IPU top");
 			break;
 
 		ipucase(IPU_TOP): // IPU_TOP
@@ -272,7 +272,7 @@ __fi RETURNS_R64 ipuRead64(u32 mem)
 			IPU_LOG("read64: Unknown=%x", mem);
 			break;
 	}
-	return r64_load(&psHu64(IPU_CMD + mem));
+	return psHu64(IPU_CMD + mem);
 }
 
 void ipuSoftReset()
@@ -287,7 +287,7 @@ void ipuSoftReset()
 	ipu_cmd.clear();
 	ipuRegs.cmd.BUSY = 0;
 	ipuRegs.cmd.DATA = 0; // required for Enthusia - Professional Racing after fix, or will freeze at start of next video.
-	
+
 	hwIntcIrq(INTC_IPU); // required for FightBox
 }
 
@@ -582,7 +582,7 @@ static __ri bool ipuCSC(tIPU_CMD_CSC csc)
 
 		ipu_csc(decoder.mb8, decoder.rgb32, 0);
 		if (csc.OFM) ipu_dither(decoder.rgb32, decoder.rgb16, csc.DTE);
-		
+
 		if (csc.OFM)
 		{
 			ipu_cmd.pos[1] += ipu_fifo.out.write(((u32*) & decoder.rgb16) + 4 * ipu_cmd.pos[1], 32 - ipu_cmd.pos[1]);
@@ -769,7 +769,7 @@ __fi u8 getBits32(u8 *address, bool advance)
 	if (!g_BP.FillBuffer(32)) return 0;
 
 	const u8* readpos = &g_BP.internal_qwc->_u8[g_BP.BP/8];
-	
+
 	if(uint shift = (g_BP.BP & 7))
 	{
 		u32 mask = (0xff >> shift);

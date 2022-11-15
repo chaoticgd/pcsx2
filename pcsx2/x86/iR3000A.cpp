@@ -688,37 +688,19 @@ void psxRecompileCodeConst3(R3000AFNPTR constcode, R3000AFNPTR_INFO constscode, 
 	noconstcode(0);
 }
 
-static uptr m_ConfiguredCacheReserve = 32;
 static u8* m_recBlockAlloc = NULL;
 
 static const uint m_recBlockAllocSize =
 	(((Ps2MemSize::IopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4) * sizeof(BASEBLOCK));
 
-static void recReserveCache()
-{
-	if (!recMem)
-		recMem = new RecompiledCodeReserve("R3000A Recompiler Cache", _8mb);
-	recMem->SetProfilerName("IOPrec");
-
-	while (!recMem->IsOk())
-	{
-		if (recMem->Reserve(GetVmMemory().MainMemory(), HostMemoryMap::IOPrecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
-			break;
-
-		// If it failed, then try again (if possible):
-		if (m_ConfiguredCacheReserve < 4)
-			break;
-		m_ConfiguredCacheReserve /= 2;
-	}
-
-	recMem->ThrowIfNotOk();
-}
-
 static void recReserve()
 {
-	// IOP has no hardware requirements!
+	if (recMem)
+		return;
 
-	recReserveCache();
+	recMem = new RecompiledCodeReserve("R3000A Recompiler Cache");
+	recMem->SetProfilerName("IOPrec");
+	recMem->Assign(GetVmMemory().CodeMemory(), HostMemoryMap::IOPrecOffset, 32 * _1mb);
 }
 
 static void recAlloc()
@@ -727,11 +709,13 @@ static void recAlloc()
 	// Any 4-byte aligned address makes a valid branch target as per MIPS design (all instructions are
 	// always 4 bytes long).
 
-	if (m_recBlockAlloc == NULL)
+	if (!m_recBlockAlloc)
+	{
+		// We're on 64-bit, if these memory allocations fail, we're in real trouble.
 		m_recBlockAlloc = (u8*)_aligned_malloc(m_recBlockAllocSize, 4096);
-
-	if (m_recBlockAlloc == NULL)
-		throw Exception::OutOfMemory("R3000A BASEBLOCK lookup tables");
+		if (!m_recBlockAlloc)
+			pxFailRel("Failed to allocate R3000A BASEBLOCK lookup tables");
+	}
 
 	u8* curpos = m_recBlockAlloc;
 	recRAM  = (BASEBLOCK*)curpos; curpos += (Ps2MemSize::IopRam / 4) * sizeof(BASEBLOCK);
@@ -740,14 +724,13 @@ static void recAlloc()
 	recROM2 = (BASEBLOCK*)curpos; curpos += (Ps2MemSize::Rom2   / 4) * sizeof(BASEBLOCK);
 
 
-	if (s_pInstCache == NULL)
+	if (!s_pInstCache)
 	{
 		s_nInstCacheSize = 128;
 		s_pInstCache = (EEINST*)malloc(sizeof(EEINST) * s_nInstCacheSize);
+		if (!s_pInstCache)
+			pxFailRel("Failed to allocate R3000 InstCache array.");
 	}
-
-	if (s_pInstCache == NULL)
-		throw Exception::OutOfMemory("R3000 InstCache.");
 
 	_DynGen_Dispatchers();
 }
@@ -789,7 +772,7 @@ void recResetIOP()
 		recLUT_SetPage(psxRecLUT, psxhwLUT, recROM, 0xa000, i, i - 0x1fc0);
 	}
 
-	for (int i = 0x1e00; i < 0x1e04; i++)
+	for (int i = 0x1e00; i < 0x1e40; i++)
 	{
 		recLUT_SetPage(psxRecLUT, psxhwLUT, recROM1, 0x0000, i, i - 0x1e00);
 		recLUT_SetPage(psxRecLUT, psxhwLUT, recROM1, 0x8000, i, i - 0x1e00);
@@ -1561,23 +1544,10 @@ StartRecomp:
 	s_pCurBlockEx = NULL;
 }
 
-static void recSetCacheReserve(uint reserveInMegs)
-{
-	m_ConfiguredCacheReserve = reserveInMegs;
-}
-
-static uint recGetCacheReserve()
-{
-	return m_ConfiguredCacheReserve;
-}
-
 R3000Acpu psxRec = {
 	recReserve,
 	recResetIOP,
 	recExecuteBlock,
 	recClearIOP,
 	recShutdown,
-
-	recGetCacheReserve,
-	recSetCacheReserve
 };

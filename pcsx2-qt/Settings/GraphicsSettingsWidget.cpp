@@ -98,6 +98,8 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.adapter, "EmuCore/GS", "Adapter");
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.vsync, "EmuCore/GS", "VsyncEnable", 0);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.enableHWFixes, "EmuCore/GS", "UserHacks", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.spinGPUDuringReadbacks, "EmuCore/GS", "HWSpinGPUForReadbacks", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.spinCPUDuringReadbacks, "EmuCore/GS", "HWSpinCPUForReadbacks", false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Game Display Settings
@@ -116,8 +118,10 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.internalResolutionScreenshots, "EmuCore/GS", "InternalResolutionScreenshots", false);
 	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.zoom, "EmuCore/GS", "Zoom", 100.0f);
 	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.stretchY, "EmuCore/GS", "StretchY", 100.0f);
-	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.offsetX, "EmuCore/GS", "OffsetX", 0.0f);
-	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.offsetY, "EmuCore/GS", "OffsetY", 0.0f);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cropLeft, "EmuCore/GS", "CropLeft", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cropTop, "EmuCore/GS", "CropTop", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cropRight, "EmuCore/GS", "CropRight", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cropBottom, "EmuCore/GS", "CropBottom", 0);
 
 	connect(m_ui.integerScaling, &QCheckBox::stateChanged, this, &GraphicsSettingsWidget::onIntegerScalingChanged);
 	onIntegerScalingChanged();
@@ -136,6 +140,8 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.osdShowResolution, "EmuCore/GS", "OsdShowResolution", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.osdShowGSStats, "EmuCore/GS", "OsdShowGSStats", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.osdShowIndicators, "EmuCore/GS", "OsdShowIndicators", true);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.osdShowSettings, "EmuCore/GS", "OsdShowSettings", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.osdShowInputs, "EmuCore/GS", "OsdShowInputs", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.fxaa, "EmuCore/GS", "fxaa", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.shadeBoost, "EmuCore/GS", "ShadeBoost", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.shadeBoostBrightness, "EmuCore/GS", "ShadeBoost_Brightness", false);
@@ -173,18 +179,49 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	//////////////////////////////////////////////////////////////////////////
 	// HW Settings
 	//////////////////////////////////////////////////////////////////////////
-	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.upscaleMultiplier, "EmuCore/GS", "upscale_multiplier", 1, 1);
+	static const char* upscale_entries[] = {
+		"Native (PS2)",
+		"1.25x Native",
+		"1.5x Native",
+		"1.75x Native",
+		"2x Native (~720p)",
+		"2.25x Native",
+		"2.5x Native",
+		"2.75x Native",
+		"3x Native (~1080p)",
+		"3.5x Native",
+		"4x Native (~1440p/2K)",
+		"5x Native (~1620p)",
+		"6x Native (~2160p/4K)",
+		"7x Native (~2520p)",
+		"8x Native (~2880p)",
+	nullptr};
+	static const char* upscale_values[] = {
+		"1",
+		"1.25",
+		"1.5",
+		"1.75",
+		"2",
+		"2.25",
+		"2.5",
+		"2.75",
+		"3",
+		"3.5",
+		"4",
+		"5",
+		"6",
+		"7",
+		"8",
+	nullptr };
+	SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.upscaleMultiplier, "EmuCore/GS", "upscale_multiplier", upscale_entries, upscale_values, "1.0");
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.textureFiltering, "EmuCore/GS", "filter", static_cast<int>(BiFiltering::PS2));
-	SettingWidgetBinder::BindWidgetToIntSetting(
-		sif, m_ui.trilinearFiltering, "EmuCore/GS", "UserHacks_TriFilter", static_cast<int>(TriFiltering::Automatic), -1);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.trilinearFiltering, "EmuCore/GS", "TriFilter", static_cast<int>(TriFiltering::Automatic), -1);
 	SettingWidgetBinder::BindWidgetToEnumSetting(
-		sif, m_ui.anisotropicFiltering, "EmuCore/GS", "MaxAnisotropy", s_anisotropic_filtering_entries, s_anisotropic_filtering_values, "1");
+		sif, m_ui.anisotropicFiltering, "EmuCore/GS", "MaxAnisotropy", s_anisotropic_filtering_entries, s_anisotropic_filtering_values, "0");
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.dithering, "EmuCore/GS", "dithering_ps2", 2);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.mipmapping, "EmuCore/GS", "mipmap_hw", static_cast<int>(HWMipmapLevel::Automatic), -1);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.crcFixLevel, "EmuCore/GS", "crc_hack_level", static_cast<int>(CRCHackLevel::Automatic), -1);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.blending, "EmuCore/GS", "accurate_blending_unit", static_cast<int>(AccBlendLevel::Basic));
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.accurateDATE, "EmuCore/GS", "accurate_date", true);
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.conservativeBufferAllocation, "EmuCore/GS", "conservative_framebuffer", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.gpuPaletteConversion, "EmuCore/GS", "paltex", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.texturePreloading, "EmuCore/GS", "texture_preloading",
 		static_cast<int>(TexturePreloadingLevel::Off));
@@ -199,6 +236,7 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	//////////////////////////////////////////////////////////////////////////
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.halfScreenFix, "EmuCore/GS", "UserHacks_Half_Bottom_Override", -1, -1);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cpuSpriteRenderBW, "EmuCore/GS", "UserHacks_CPUSpriteRenderBW", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.cpuCLUTRender, "EmuCore/GS", "UserHacks_CPUCLUTRender", 0);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.skipDrawStart, "EmuCore/GS", "UserHacks_SkipDraw_Start", 0);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.skipDrawEnd, "EmuCore/GS", "UserHacks_SkipDraw_End", 0);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.hwAutoFlush, "EmuCore/GS", "UserHacks_AutoFlush", false);
@@ -231,7 +269,7 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.loadTextureReplacementsAsync, "EmuCore/GS", "LoadTextureReplacementsAsync", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.precacheTextureReplacements, "EmuCore/GS", "PrecacheTextureReplacements", false);
 	SettingWidgetBinder::BindWidgetToFolderSetting(sif, m_ui.texturesDirectory, m_ui.texturesBrowse, m_ui.texturesOpen, m_ui.texturesReset,
-		"Folders", "Textures", "textures");
+		"Folders", "Textures", Path::Combine(EmuFolders::DataRoot, "textures"));
 
 	//////////////////////////////////////////////////////////////////////////
 	// Advanced Settings
@@ -241,17 +279,17 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.skipPresentingDuplicateFrames, "EmuCore/GS", "SkipDuplicateFrames", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.overrideTextureBarriers, "EmuCore/GS", "OverrideTextureBarriers", -1, -1);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.overrideGeometryShader, "EmuCore/GS", "OverrideGeometryShaders", -1, -1);
-	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.gsDumpCompression, "EmuCore/GS", "GSDumpCompression", static_cast<int>(GSDumpCompressionMethod::Uncompressed));
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.gsDumpCompression, "EmuCore/GS", "GSDumpCompression", static_cast<int>(GSDumpCompressionMethod::LZMA));
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.disableFramebufferFetch, "EmuCore/GS", "DisableFramebufferFetch", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.disableDualSource, "EmuCore/GS", "DisableDualSourceBlend", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.disableHardwareReadbacks, "EmuCore/GS", "HWDisableReadbacks", false);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.gsDownloadMode, "EmuCore/GS", "HWDownloadMode", static_cast<int>(GSHardwareDownloadMode::Enabled));
 
 	//////////////////////////////////////////////////////////////////////////
 	// SW Settings
 	//////////////////////////////////////////////////////////////////////////
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.swTextureFiltering, "EmuCore/GS", "filter", static_cast<int>(BiFiltering::PS2));
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.extraSWThreads, "EmuCore/GS", "extrathreads", 2);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.swAutoFlush, "EmuCore/GS", "autoflush_sw", true);
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.swAA1, "EmuCore/GS", "aa1", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.swMipmap, "EmuCore/GS", "mipmap", true);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -285,18 +323,26 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 
 	connect(m_ui.renderer, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &GraphicsSettingsWidget::onRendererChanged);
 	connect(m_ui.enableHWFixes, &QCheckBox::stateChanged, this, &GraphicsSettingsWidget::onEnableHardwareFixesChanged);
+	connect(m_ui.textureFiltering, &QComboBox::currentIndexChanged, this, &GraphicsSettingsWidget::onTextureFilteringChange);
+	connect(m_ui.swTextureFiltering, &QComboBox::currentIndexChanged, this, &GraphicsSettingsWidget::onSWTextureFilteringChange);
 	updateRendererDependentOptions();
 
+#ifndef PCSX2_DEVBUILD
 	// only allow disabling readbacks for per-game settings, it's too dangerous
-	m_ui.disableHardwareReadbacks->setEnabled(m_dialog->isPerGameSettings());
+	m_ui.gsDownloadMode->setEnabled(m_dialog->isPerGameSettings());
 
-	// allow Texture Offset for per-game settings only 
-	m_ui.textureOffsetX->setEnabled(m_dialog->isPerGameSettings());
-	m_ui.textureOffsetY->setEnabled(m_dialog->isPerGameSettings());
-
-	// allow Skipdraw Range for per-game settings only 
-	m_ui.skipDrawStart->setEnabled(m_dialog->isPerGameSettings());
-	m_ui.skipDrawEnd->setEnabled(m_dialog->isPerGameSettings());
+	// Remove texture offset and skipdraw range for global settings.
+	if (!m_dialog->isPerGameSettings())
+	{
+		m_ui.upscalingFixesLayout->removeRow(2);
+		m_ui.hardwareFixesLayout->removeRow(2);
+		m_ui.hardwareFixesLayout->removeRow(1);
+		m_ui.skipDrawStart = nullptr;
+		m_ui.skipDrawEnd = nullptr;
+		m_ui.textureOffsetX = nullptr;
+		m_ui.textureOffsetY = nullptr;
+	}
+#endif
 
 	// Display tab
 	{
@@ -318,6 +364,15 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 	
 		dialog->registerWidgetHelp(m_ui.PCRTCAntiBlur, tr("Anti-Blur"), tr("Checked"),
 			tr("Enables internal Anti-Blur hacks. Less accurate to PS2 rendering but will make a lot of games look less blurry."));
+		
+		dialog->registerWidgetHelp(m_ui.vsync, tr("VSync"), tr("Unchecked"),
+			tr("Enable this option to match PCSX2's refresh rate with your current monitor or screen. VSync is automatically disabled when it is not possible (eg. running at non-100% speed)."));
+
+		dialog->registerWidgetHelp(m_ui.internalResolutionScreenshots, tr("Internal Resolution Screenshots"), tr("Unchecked"),
+			tr("Saves screenshots at internal render resolution and without postprocessing. If this option is disabled, the screenshots will be taken at the window's resolution. Internal resolution screenshots can be very large at high rendering scales."));
+
+		dialog->registerWidgetHelp(m_ui.integerScaling, tr("Integer Scaling"), tr("Unchecked"),
+			tr("Adds padding to the display area to ensure that the ratio between pixels on the host to pixels in the console is an integer number. May result in a sharper image in some 2D games."));
 	}
 
 	// Rendering tab
@@ -346,17 +401,9 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 			   "The higher the setting, the more blending is emulated in the shader accurately, and the higher the speed penalty will be. "
 			   "Do note that Direct3D's blending is reduced in capability compared to OpenGL/Vulkan"));
 
-		dialog->registerWidgetHelp(m_ui.texturePreloading, tr("Texture Preloading"), tr(""),
+		dialog->registerWidgetHelp(m_ui.texturePreloading, tr("Texture Preloading"), tr("Full (Hash Cache)"),
 			tr("Uploads entire textures at once instead of small pieces, avoiding redundant uploads when possible. "
 			   "Improves performance in most games, but can make a small selection slower."));
-
-		dialog->registerWidgetHelp(m_ui.accurateDATE, tr("Accurate DestinationAlpha Test"), tr("Checked"),
-			tr("Implement a more accurate algorithm to compute GS destination alpha testing. "
-			   "It improves shadow and transparency rendering."));
-
-		dialog->registerWidgetHelp(m_ui.conservativeBufferAllocation, tr("Conservative Buffer Allocation"), tr("Checked"),
-			tr("Disabled: Reserves a larger framebuffer to prevent FMV flickers. Increases GPU/memory requirements. "
-			   "Disabling this can amplify stuttering due to low RAM/VRAM."));
 
 		dialog->registerWidgetHelp(m_ui.gpuPaletteConversion, tr("GPU Palette Conversion"), tr("Unchecked"),
 			tr("When enabled GPU converts colormap-textures, otherwise the CPU will. "
@@ -367,6 +414,14 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 			   "to your games. However IF you have ENABLED this, you WILL DISABLE AUTOMATIC "
 			   "SETTINGS and you can re-enable automatic settings by unchecking this option."));
 
+		dialog->registerWidgetHelp(m_ui.spinCPUDuringReadbacks, tr("Spin CPU During Readbacks"), tr("Unchecked"),
+			tr("Does useless work on the CPU during readbacks to prevent it from going to into powersave modes. "
+			   "May improve performance but with a significant increase in power usage."));
+
+		dialog->registerWidgetHelp(m_ui.spinGPUDuringReadbacks, tr("Spin GPU During Readbacks"), tr("Unchecked"),
+			tr("Submits useless work to the GPU during readbacks to prevent it from going into powersave modes. "
+			   "May improve performance but with a significant increase in power usage."));
+
 		// Software
 		dialog->registerWidgetHelp(m_ui.extraSWThreads, tr("Extra Rendering Threads"), tr("2 threads"),
 			tr("Number of rendering threads: 0 for single thread, 2 or more for multithread (1 is for debugging). "
@@ -376,9 +431,6 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 		dialog->registerWidgetHelp(m_ui.swAutoFlush, tr("Auto Flush"), tr("Checked"),
 			tr("Force a primitive flush when a framebuffer is also an input texture. "
 			   "Fixes some processing effects such as the shadows in the Jak series and radiosity in GTA:SA."));
-
-		dialog->registerWidgetHelp(m_ui.swAA1, tr("Edge Anti-Aliasing"), tr("Checked"),
-			tr("Internal GS feature. Reduces edge aliasing of lines and triangles when the game requests it."));
 
 		dialog->registerWidgetHelp(m_ui.swMipmap, tr("Mipmapping"), tr("Checked"),
 			tr("Enables mipmapping, which some games require to render correctly."));
@@ -471,7 +523,7 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 			   "the GPU has more time to complete it (this is NOT frame skipping). Can smooth our frame time fluctuations when the CPU/GPU are near maximum "
 			   "utilization, but makes frame pacing more inconsistent and can increase input lag."));
 
-		dialog->registerWidgetHelp(m_ui.disableHardwareReadbacks, tr("Disable Hardware Readbacks"), tr("Unchecked"),
+		dialog->registerWidgetHelp(m_ui.gsDownloadMode, tr("GS Download Mode"), tr("Accurate"),
 			tr("Skips synchronizing with the GS thread and host GPU for GS downloads. "
 			   "Can result in a large speed boost on slower systems, at the cost of many broken graphical effects. "
 			   "If games are broken and you have this option enabled, please disable it first."));
@@ -479,6 +531,20 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsDialog* dialog, QWidget* 
 }
 
 GraphicsSettingsWidget::~GraphicsSettingsWidget() = default;
+
+void GraphicsSettingsWidget::onTextureFilteringChange()
+{
+	const QSignalBlocker block(m_ui.swTextureFiltering);
+
+	m_ui.swTextureFiltering->setCurrentIndex(m_ui.textureFiltering->currentIndex());
+}
+
+void GraphicsSettingsWidget::onSWTextureFilteringChange()
+{
+	const QSignalBlocker block(m_ui.textureFiltering);
+
+	m_ui.textureFiltering->setCurrentIndex(m_ui.swTextureFiltering->currentIndex());
+}
 
 void GraphicsSettingsWidget::onRendererChanged(int index)
 {
@@ -534,7 +600,7 @@ void GraphicsSettingsWidget::onIntegerScalingChanged()
 void GraphicsSettingsWidget::onTrilinearFilteringChanged()
 {
 	const bool forced_bilinear =
-		(m_dialog->getEffectiveIntValue("EmuCore/GS", "UserHacks_TriFilter", static_cast<int>(TriFiltering::Automatic))
+		(m_dialog->getEffectiveIntValue("EmuCore/GS", "TriFilter", static_cast<int>(TriFiltering::Automatic))
 			>= static_cast<int>(TriFiltering::Forced));
 	m_ui.textureFiltering->setDisabled(forced_bilinear);
 }
