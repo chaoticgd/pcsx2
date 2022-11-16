@@ -188,7 +188,8 @@ set(pcsx2Sources
 	VU1microInterp.cpp
 	VUflags.cpp
 	VUmicroMem.cpp
-	VUops.cpp)
+	VUops.cpp
+	VUtracer.cpp)
 
 # Main pcsx2 header
 set(pcsx2Headers

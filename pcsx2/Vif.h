@@ -17,69 +17,11 @@
 
 #include "MemoryTypes.h"
 #include "R5900.h"
+#include "VUtracer.h"
 
 #include "common/StringUtil.h"
 
 #include <atomic>
-
-enum VUTracePacketType {
-	VUTRACE_NULLPACKET = 0,
-	VUTRACE_PUSHSNAPSHOT = 'P',
-	VUTRACE_SETREGISTERS = 'R',
-	VUTRACE_SETMEMORY = 'M',
-	VUTRACE_SETINSTRUCTIONS = 'I',
-	VUTRACE_LOADOP = 'L',
-	VUTRACE_STOREOP = 'S',
-	VUTRACE_PATCHREGISTER = 'r',
-	VUTRACE_PATCHMEMORY = 'm'
-};
-
-enum VUTraceStatus {
-	VUTRACESTATUS_DISABLED,
-	VUTRACESTATUS_WAITING, // We're waiting for vsync.
-	VUTRACESTATUS_TRACING
-};
-
-struct VURegs;
-class VUTracer {
-public:
-	VUTracer();
-	
-	void onTraceMenuItemClicked();
-	void onVsync();
-	void onVif1DmaSendChain(u32 tadr);
-	void onVifDmaTag(u32 madr, u64 dma_tag);
-	void onVu1ExecMicro(u32 pc);
-	void onInstructionExecuted(VURegs* regs);
-	void onMemoryRead(u32 addr, u32 size);
-	void onMemoryWrite(u32 addr, u32 size);
-	
-	static VUTracer& get();
-	
-	std::atomic<int> trace_index { -1 };
-	FILE* log_file = nullptr;
-private:
-	void beginTraceSession();
-	void endTraceSession();
-	void beginTrace();
-	void endTrace();
-	
-	void pushLastPacket();
-
-	VUTraceStatus status = VUTRACESTATUS_DISABLED;
-	
-	FILE* trace_file = nullptr;
-	bool has_output_instructions = false;
-	
-	u32 read_addr = 0, read_size = 0;
-	u32 write_addr = 0, write_size = 0;
-	
-	bool last_regs_populated = false;
-	VURegs* last_regs;
-	bool last_memory_populated = false;
-	u8 last_memory[16 * 1024];
-};
-
 
 enum vif0_stat_flags
 {
