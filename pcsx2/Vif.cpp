@@ -26,12 +26,18 @@
 
 alignas(16) vifStruct vif0, vif1;
 
-VUTracer::VUTracer() {}
+VUTracer::VUTracer() {
+	last_regs = new VURegs;
+}
 
 void VUTracer::onTraceMenuItemClicked() {
 	if(status == VUTRACESTATUS_DISABLED) {
 		status = VUTRACESTATUS_WAITING;
 	}
+}
+
+void VUTracer::onVsync() {
+	
 }
 
 void VUTracer::onVif1DmaSendChain(u32 tadr) {
@@ -74,17 +80,88 @@ void VUTracer::onInstructionExecuted(VURegs* regs) {
 	if(status == VUTRACESTATUS_TRACING) {
 		pushLastPacket();
 		
+		// Only write the microcode out once per file.
 		if(!has_output_instructions) {
 			fputc(VUTRACE_SETINSTRUCTIONS, trace_file);
 			fwrite(regs->Micro, VU1_PROGSIZE, 1, trace_file);
 			has_output_instructions = true;
 		}
 		
-		fputc(VUTRACE_SETREGISTERS, trace_file);
-		fwrite((void*) regs, sizeof(VURegs), 1, trace_file);
-		fputc(VUTRACE_SETMEMORY, trace_file);
-		fwrite(regs->Mem, VU1_MEMSIZE, 1, trace_file);
+		// Only write out the registers that have changed.
+		if(!last_regs_populated) {
+			fputc(VUTRACE_SETREGISTERS, trace_file);
+			fwrite(&regs->VF, sizeof(regs->VF), 1, trace_file);
+			fwrite(&regs->VI, sizeof(regs->VI), 1, trace_file);
+			fwrite(&regs->ACC, sizeof(regs->ACC), 1, trace_file);
+			fwrite(&regs->q, sizeof(regs->q), 1, trace_file);
+			fwrite(&regs->p, sizeof(regs->p), 1, trace_file);
+			memcpy(last_regs, regs, sizeof(VURegs));
+			last_regs_populated = true;
+		} else {
+			// Floating point registers.
+			for(u8 i = 0; i < 32; i++) {
+				if(memcmp(&last_regs->VF[i], &regs->VF[i], 16) != 0) {
+					fputc(VUTRACE_PATCHREGISTER, trace_file);
+					u8 register_index = i;
+					fwrite(&register_index, 1, 1, trace_file);
+					fwrite(&regs->VF[i], 16, 1, trace_file);
+					memcpy(&last_regs->VF[i], &regs->VF[i], 16);
+				}
+			}
+			
+			// Integer registers.
+			for(u8 i = 0; i < 32; i++) {
+				if(memcmp(&last_regs->VI[i], &regs->VI[i], 16) != 0) {
+					fputc(VUTRACE_PATCHREGISTER, trace_file);
+					u8 register_index = 32 + i;
+					fwrite(&register_index, 1, 1, trace_file);
+					fwrite(&regs->VI[i], 16, 1, trace_file);
+					memcpy(&last_regs->VI[i], &regs->VI[i], 16);
+				}
+			}
+			
+			// Other registers.
+			if(memcmp(&last_regs->ACC, &regs->ACC, 16) != 0) {
+				fputc(VUTRACE_PATCHREGISTER, trace_file);
+				u8 register_index = 64;
+				fwrite(&register_index, 1, 1, trace_file);
+				fwrite(&regs->ACC, 16, 1, trace_file);
+				memcpy(&last_regs->ACC, &regs->ACC, 16);
+			}
+			if(memcmp(&last_regs->q, &regs->q, 16) != 0) {
+				fputc(VUTRACE_PATCHREGISTER, trace_file);
+				u8 register_index = 65;
+				fwrite(&register_index, 1, 1, trace_file);
+				fwrite(&regs->q, 16, 1, trace_file);
+				memcpy(&last_regs->q, &regs->q, 16);
+			}
+			if(memcmp(&last_regs->p, &regs->p, 16) != 0) {
+				fputc(VUTRACE_PATCHREGISTER, trace_file);
+				u8 register_index = 66;
+				fwrite(&register_index, 1, 1, trace_file);
+				fwrite(&regs->p, 16, 1, trace_file);
+				memcpy(&last_regs->p, &regs->p, 16);
+			}
+		}
 		
+		// Only write out the values from memory that have changed.
+		if(!last_memory_populated) {
+			fputc(VUTRACE_SETMEMORY, trace_file);
+			fwrite(regs->Mem, VU1_MEMSIZE, 1, trace_file);
+			memcpy(last_memory, regs->Mem, VU1_MEMSIZE);
+			last_memory_populated = true;
+		} else {
+			for(s32 i = 0; i < VU1_MEMSIZE; i += 4) {
+				if(memcmp(&last_memory[i], &regs->Mem[i], 4) != 0) {
+					fputc(VUTRACE_PATCHMEMORY, trace_file);
+					fwrite(&i, 2, 1, trace_file);
+					fwrite(&regs->Mem[i], 4, 1, trace_file);
+					memcpy(&last_memory[i], &regs->Mem[i], 4);
+				}
+			}
+		}
+		
+		// Keep track of which instructions are loads and stores.
 		if(read_size > 0) {
 			fputc(VUTRACE_LOADOP, trace_file);
 			fwrite(&read_addr, sizeof(u32), 1, trace_file);
@@ -131,9 +208,9 @@ VUTracer& VUTracer::get() {
 }
 
 void VUTracer::beginTraceSession() {
-	log_file = fopen("vutrace_output/_log.txt", "wb");
+	log_file = fopen("vutrace_output/LOG.txt", "wb");
 	if(log_file == nullptr) {
-		printf("[VUTrace] Fatal error: Cannot open log file!\n");
+		printf("[VUTrace] Fatal error: Cannot open log file for writing!\n");
 	}
 	
 	trace_index = -1;
@@ -145,6 +222,7 @@ void VUTracer::endTraceSession() {
 	trace_index = -1;
 	fclose(log_file);
 	log_file = nullptr;
+	printf("[VUTrace] Trace session ended.\n");
 }
 
 void VUTracer::beginTrace() {
@@ -164,7 +242,7 @@ void VUTracer::beginTrace() {
 	fputc('U', trace_file);
 	fputc('T', trace_file);
 	fputc('R', trace_file);
-	int format_version = 2;
+	int format_version = 3;
 	fwrite(&format_version, 4, 1, trace_file);
 }
 
@@ -172,6 +250,8 @@ void VUTracer::endTrace() {
 	pushLastPacket();
 	fclose(trace_file);
 	has_output_instructions = false;
+	last_regs_populated = false;
+	last_memory_populated = false;
 }
 
 void VUTracer::pushLastPacket() {

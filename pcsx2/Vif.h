@@ -23,12 +23,15 @@
 #include <atomic>
 
 enum VUTracePacketType {
-	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
-	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows.
-	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
-	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
-	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
-	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
+	VUTRACE_NULLPACKET = 0,
+	VUTRACE_PUSHSNAPSHOT = 'P',
+	VUTRACE_SETREGISTERS = 'R',
+	VUTRACE_SETMEMORY = 'M',
+	VUTRACE_SETINSTRUCTIONS = 'I',
+	VUTRACE_LOADOP = 'L',
+	VUTRACE_STOREOP = 'S',
+	VUTRACE_PATCHREGISTER = 'r',
+	VUTRACE_PATCHMEMORY = 'm'
 };
 
 enum VUTraceStatus {
@@ -43,6 +46,7 @@ public:
 	VUTracer();
 	
 	void onTraceMenuItemClicked();
+	void onVsync();
 	void onVif1DmaSendChain(u32 tadr);
 	void onVifDmaTag(u32 madr, u64 dma_tag);
 	void onVu1ExecMicro(u32 pc);
@@ -73,6 +77,11 @@ private:
 	
 	u32 read_addr = 0, read_size = 0;
 	u32 write_addr = 0, write_size = 0;
+	
+	bool last_regs_populated = false;
+	VURegs* last_regs;
+	bool last_memory_populated = false;
+	u8 last_memory[16 * 1024];
 };
 
 
