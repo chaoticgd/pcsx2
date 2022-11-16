@@ -36,7 +36,7 @@ enum VUTracePacketType {
 
 enum VUTraceStatus {
 	VUTRACESTATUS_DISABLED,
-	VUTRACESTATUS_WAITING, // We're waiting for a new VIF1 DMA chain to trace.
+	VUTRACESTATUS_WAITING, // We're waiting for vsync.
 	VUTRACESTATUS_TRACING
 };
 
@@ -66,11 +66,7 @@ private:
 	
 	void pushLastPacket();
 
-	VUTraceStatus status;
-	static const int DMA_MAX_CHAINS_PER_FRAME = 0x10;
-	u32 dma_waiting_chain_count = 0;
-	u32 dma_tracing_chain_count = 0;
-	u32 dma_target_tadr = UINT32_MAX;
+	VUTraceStatus status = VUTRACESTATUS_DISABLED;
 	
 	FILE* trace_file = nullptr;
 	bool has_output_instructions = false;

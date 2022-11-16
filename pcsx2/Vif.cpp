@@ -37,32 +37,17 @@ void VUTracer::onTraceMenuItemClicked() {
 }
 
 void VUTracer::onVsync() {
-	
+	if(status == VUTRACESTATUS_WAITING) {
+		status = VUTRACESTATUS_TRACING;
+		beginTraceSession();
+	} else if(status == VUTRACESTATUS_TRACING) {
+		status = VUTRACESTATUS_DISABLED;
+		endTraceSession();
+	}
 }
 
 void VUTracer::onVif1DmaSendChain(u32 tadr) {
-	if(status == VUTRACESTATUS_WAITING) {
-		if(dma_waiting_chain_count < DMA_MAX_CHAINS_PER_FRAME) {
-			// Assume the chain with the lowest address is the first one.
-			// This should make the order of the traces consistent between runs.
-			dma_target_tadr = std::min(dma_target_tadr, tadr);
-			dma_waiting_chain_count++;
-		} else {
-			status = VUTRACESTATUS_TRACING;
-			beginTraceSession();
-		}
-	} else if(status == VUTRACESTATUS_TRACING) {
-		if(tadr == dma_target_tadr ||
-		   dma_tracing_chain_count >= DMA_MAX_CHAINS_PER_FRAME) {
-			status = VUTRACESTATUS_DISABLED;
-			dma_waiting_chain_count = 0;
-			dma_tracing_chain_count = 0;
-			dma_target_tadr = UINT32_MAX;
-			endTraceSession();
-		} else {
-			dma_tracing_chain_count++;
-		}
-	}
+	
 }
 
 void VUTracer::onVifDmaTag(u32 madr, u64 dma_tag) {
@@ -151,7 +136,7 @@ void VUTracer::onInstructionExecuted(VURegs* regs) {
 			memcpy(last_memory, regs->Mem, VU1_MEMSIZE);
 			last_memory_populated = true;
 		} else {
-			for(s32 i = 0; i < VU1_MEMSIZE; i += 4) {
+			for(u32 i = 0; i < VU1_MEMSIZE; i += 4) {
 				if(memcmp(&last_memory[i], &regs->Mem[i], 4) != 0) {
 					fputc(VUTRACE_PATCHMEMORY, trace_file);
 					fwrite(&i, 2, 1, trace_file);
@@ -222,7 +207,7 @@ void VUTracer::endTraceSession() {
 	trace_index = -1;
 	fclose(log_file);
 	log_file = nullptr;
-	printf("[VUTrace] Trace session ended.\n");
+	printf("[VUTrace] Trace session finished.\n");
 }
 
 void VUTracer::beginTrace() {

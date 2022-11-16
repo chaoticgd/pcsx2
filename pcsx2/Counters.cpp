@@ -557,6 +557,7 @@ static __fi void frameLimitUpdateCore()
 	if (VMManager::Internal::IsExecutionInterrupted())
 		Cpu->ExitExecution();
 #endif
+	VUTracer::get().onVsync();
 }
 
 // Framelimiter - Measures the delta time between calls and stalls until a
