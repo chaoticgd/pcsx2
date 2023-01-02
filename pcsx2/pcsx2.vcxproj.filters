@@ -1799,6 +1799,9 @@
     <ClCompile Include="Frontend\ImGuiOverlays.cpp">
       <Filter>Host</Filter>
     </ClCompile>
+    <ClCompile Include="VUtracer.cpp">
+      <Filter>System\Ps2\EmotionEngine\VU</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Patch.h">
@@ -2998,6 +3001,9 @@
     </ClInclude>
     <ClInclude Include="ShaderCacheVersion.h">
       <Filter>System\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="VUtracer.h">
+      <Filter>System\Ps2\EmotionEngine\VU</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

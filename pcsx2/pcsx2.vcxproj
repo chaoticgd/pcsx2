@@ -555,6 +555,7 @@
     <ClCompile Include="GS\Renderers\Common\GSVertexTrace.cpp" />
     <ClCompile Include="Dump.cpp" />
     <ClCompile Include="Pcsx2Config.cpp" />
+    <ClCompile Include="VUtracer.cpp" />
     <ClCompile Include="windows\FlatFileReaderWindows.cpp" />
     <ClCompile Include="Darwin\DarwinFlatFileReader.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
@@ -1042,6 +1043,7 @@
     <ClInclude Include="MTVU.h" />
     <ClInclude Include="VU.h" />
     <ClInclude Include="VUmicro.h" />
+    <ClInclude Include="VUtracer.h" />
     <ClInclude Include="x86\iR5900Analysis.h" />
     <ClInclude Include="x86\microVU.h" />
     <ClInclude Include="x86\microVU_IR.h" />
