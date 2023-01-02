@@ -199,6 +199,8 @@ void VUTracer::beginTraceSession() {
 	log_file = fopen("vutrace_output/LOG.txt", "wb");
 	if(log_file == nullptr) {
 		printf("[VUTrace] Fatal error: Cannot open log file for writing!\n");
+		status = VUTRACE_DISABLED;
+		return;
 	}
 	
 	trace_index = -1;
