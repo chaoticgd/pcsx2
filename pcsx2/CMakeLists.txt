@@ -800,7 +800,14 @@ set(pcsx2DebugToolsSources
 	DebugTools/DisR5900asm.cpp
 	DebugTools/DisVU0Micro.cpp
 	DebugTools/DisVU1Micro.cpp
-	DebugTools/BiosDebugData.cpp)
+	DebugTools/BiosDebugData.cpp
+	DebugTools/ccc/analysis.cpp
+	DebugTools/ccc/ast.cpp
+	DebugTools/ccc/mdebug.cpp
+	DebugTools/ccc/stabs.cpp
+	DebugTools/ccc/stabs_to_ast.cpp
+	DebugTools/ccc/symbols.cpp
+	DebugTools/ccc/util.cpp)
 
 # DebugTools headers
 set(pcsx2DebugToolsHeaders
@@ -817,7 +824,14 @@ set(pcsx2DebugToolsHeaders
 	DebugTools/DisASM.h
 	DebugTools/DisVUmicro.h
 	DebugTools/DisVUops.h
-	DebugTools/BiosDebugData.h)
+	DebugTools/BiosDebugData.h
+	DebugTools/ccc/analysis.h
+	DebugTools/ccc/ast.h
+	DebugTools/ccc/mdebug.h
+	DebugTools/ccc/stabs.h
+	DebugTools/ccc/stabs_to_ast.h
+	DebugTools/ccc/symbols.h
+	DebugTools/ccc/util.h)
 
 set(pcsx2ImGuiSources
 	ImGui/FullscreenUI.cpp
