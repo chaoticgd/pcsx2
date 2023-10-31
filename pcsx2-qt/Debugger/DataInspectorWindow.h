@@ -17,8 +17,8 @@
 
 #include <QMainWindow>
 
-#include "ui_DataInspectorWindow.h"
 #include "Models/DataInspectorModel.h"
+#include "ui_DataInspectorWindow.h"
 
 class DataInspectorWindow : public QMainWindow
 {

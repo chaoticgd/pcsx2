@@ -18,6 +18,7 @@
 #include <QtCore/QAbstractItemModel>
 
 #include "common/Pcsx2Types.h"
+#include "DebugTools/DebugInterface.h"
 #include "DebugTools/ccc/analysis.h"
 
 class DataInspectorModel : public QAbstractItemModel
@@ -30,10 +31,17 @@ public:
 		QString name;
 		const ccc::ast::Node* type = nullptr;
 		u32 address = 0;
-		bool isLeaf = false;
 		TreeNode* parent = nullptr;
 		std::vector<std::unique_ptr<TreeNode>> children;
 		bool childrenFetched = false;
+	};
+
+	enum Column
+	{
+		NAME = 0,
+		TYPE = 1,
+		VALUE = 2,
+		COLUMN_COUNT = 3
 	};
 
 	DataInspectorModel(std::unique_ptr<TreeNode> initialRoot, const ccc::HighSymbolTable& symbolTable, QObject* parent = nullptr);
@@ -45,13 +53,19 @@ public:
 	int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 	bool hasChildren(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;
+	bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
 	void fetchMore(const QModelIndex& parent) override;
 	bool canFetchMore(const QModelIndex& parent) const override;
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
 protected:
-	std::vector<std::unique_ptr<TreeNode>> createChildren(const ccc::ast::Node& type, const QModelIndex& parent);
+	bool nodeHasChildren(const ccc::ast::Node& type) const;
+	std::vector<std::unique_ptr<TreeNode>> createChildren(const ccc::ast::Node& type, u32 address, const QModelIndex& parent);
+	QModelIndex indexFromNode(const TreeNode& node) const;
+	QVariant readData(u32 address, const ccc::ast::Node& type) const;
+	void writeData(u32 address, const QVariant& value, const ccc::ast::Node& type) const;
+	QString typeToString(const ccc::ast::Node& type) const;
 
 	std::unique_ptr<TreeNode> m_root;
 	const ccc::HighSymbolTable& m_symbolTable;
