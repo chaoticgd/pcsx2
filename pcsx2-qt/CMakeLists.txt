@@ -149,6 +149,9 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/DebuggerWindow.cpp
 	Debugger/DebuggerWindow.h
 	Debugger/DebuggerWindow.ui
+	Debugger/DataInspectorWindow.cpp
+	Debugger/DataInspectorWindow.h
+	Debugger/DataInspectorWindow.ui
 	Debugger/DisassemblyWidget.cpp
 	Debugger/DisassemblyWidget.h
 	Debugger/DisassemblyWidget.ui
@@ -167,6 +170,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/ThreadModel.h
 	Debugger/Models/StackModel.cpp
 	Debugger/Models/StackModel.h
+	Debugger/Models/DataInspectorModel.cpp
+	Debugger/Models/DataInspectorModel.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp
 	Tools/InputRecording/NewInputRecordingDlg.h
 	Tools/InputRecording/NewInputRecordingDlg.ui

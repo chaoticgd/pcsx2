@@ -1986,6 +1986,10 @@ bool VMManager::SetELFOverride(std::string path)
 	return true;
 }
 
+std::string VMManager::GetELFPath() {
+	return s_elf_path;
+}
+
 bool VMManager::ChangeGSDump(const std::string& path)
 {
 	if (!HasValidVM() || !GSDumpReplayer::IsReplayingDump() || !IsGSDumpFileName(path))

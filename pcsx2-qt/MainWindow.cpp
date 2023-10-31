@@ -441,6 +441,7 @@ void MainWindow::connectVMThreadSignals(EmuThread* thread)
 	connect(m_ui.actionToolbarFullscreen, &QAction::triggered, thread, &EmuThread::toggleFullscreen);
 	connect(m_ui.actionToggleSoftwareRendering, &QAction::triggered, thread, &EmuThread::toggleSoftwareRendering);
 	connect(m_ui.actionDebugger, &QAction::triggered, this, &MainWindow::openDebugger);
+	connect(m_ui.actionDataInspector, &QAction::triggered, this, &MainWindow::openDataInspector);
 	connect(m_ui.actionReloadPatches, &QAction::triggered, thread, &EmuThread::reloadPatches);
 
 	static constexpr GSRendererType renderers[] = {
@@ -2328,10 +2329,25 @@ DebuggerWindow* MainWindow::getDebuggerWindow()
 	return m_debugger_window;
 }
 
+DataInspectorWindow* MainWindow::getDataInspectorWindow()
+{
+	if (!m_data_inspector_window)
+		// Don't pass us (this) as the parent, otherwise the window is always on top of the mainwindow (on windows at least)
+		m_data_inspector_window = new DataInspectorWindow(nullptr);
+
+	return m_data_inspector_window;
+}
+
 void MainWindow::openDebugger()
 {
 	DebuggerWindow* dwnd = getDebuggerWindow();
 	dwnd->isVisible() ? dwnd->hide() : dwnd->show();
+}
+
+void MainWindow::openDataInspector()
+{
+	DataInspectorWindow* diwnd = getDataInspectorWindow();
+	diwnd->isVisible() ? diwnd->hide() : diwnd->show();
 }
 
 void MainWindow::doControllerSettings(ControllerSettingsWindow::Category category)
