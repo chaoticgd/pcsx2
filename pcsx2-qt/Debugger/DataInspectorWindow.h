@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <QMainWindow>
+#include <QtWidgets/QMainWindow>
 
 #include "Models/DataInspectorModel.h"
 #include "ui_DataInspectorWindow.h"

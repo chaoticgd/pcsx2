@@ -121,7 +121,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 	if (!parentNode->type)
 		return;
 
-	std::vector<std::unique_ptr<TreeNode>> children = createChildren(*parentNode->type, parentNode->address, parent);
+	std::vector<std::unique_ptr<TreeNode>> children = createChildren(*parentNode->type, *parentNode);
 	if (children.empty())
 	{
 		parentNode->childrenFetched = true;
@@ -307,6 +307,7 @@ QVariant DataInspectorModel::readData(u32 address, const ccc::ast::Node& type) c
 		}
 		case ccc::ast::POINTER:
 		{
+			result = r5900Debug.read32(address);
 			break;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
@@ -315,6 +316,7 @@ QVariant DataInspectorModel::readData(u32 address, const ccc::ast::Node& type) c
 		}
 		case ccc::ast::REFERENCE:
 		{
+			result = r5900Debug.read32(address);
 			break;
 		}
 		case ccc::ast::SOURCE_FILE:
@@ -466,6 +468,7 @@ void DataInspectorModel::writeData(u32 address, const QVariant& value, const ccc
 		}
 		case ccc::ast::POINTER:
 		{
+			r5900Debug.write32(address, value.toInt());
 			break;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
@@ -474,6 +477,7 @@ void DataInspectorModel::writeData(u32 address, const QVariant& value, const ccc
 		}
 		case ccc::ast::REFERENCE:
 		{
+			r5900Debug.write32(address, value.toInt());
 			break;
 		}
 		case ccc::ast::SOURCE_FILE:
@@ -546,6 +550,7 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 		}
 		case ccc::ast::POINTER:
 		{
+			result = true;
 			break;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
@@ -554,6 +559,7 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 		}
 		case ccc::ast::REFERENCE:
 		{
+			result = true;
 			break;
 		}
 		case ccc::ast::SOURCE_FILE:
@@ -598,7 +604,7 @@ QModelIndex DataInspectorModel::indexFromNode(const TreeNode& node) const
 	return createIndex(row, 0, &node);
 }
 
-std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::createChildren(const ccc::ast::Node& type, u32 address, const QModelIndex& parent)
+std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::createChildren(const ccc::ast::Node& type, const TreeNode& parentNode)
 {
 	std::vector<std::unique_ptr<TreeNode>> result;
 
@@ -612,7 +618,7 @@ std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::c
 				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
 				element->name = QString("[%1]").arg(i);
 				element->type = array.element_type.get();
-				element->address = address + i * array.element_type->computed_size_bytes;
+				element->address = parentNode.address + i * array.element_type->computed_size_bytes;
 				result.emplace_back(std::move(element));
 			}
 			break;
@@ -650,16 +656,25 @@ std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::c
 			const ccc::ast::InlineStructOrUnion& structOrUnion = type.as<ccc::ast::InlineStructOrUnion>();
 			for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
 			{
-				std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
-				node->name = QString::fromStdString(field->name);
-				node->type = field.get();
-				node->address = address + field->relative_offset_bytes;
-				result.emplace_back(std::move(node));
+				std::unique_ptr<TreeNode> childNode = std::make_unique<TreeNode>();
+				childNode->name = QString::fromStdString(field->name);
+				childNode->type = field.get();
+				childNode->address = parentNode.address + field->relative_offset_bytes;
+				result.emplace_back(std::move(childNode));
 			}
 			break;
 		}
 		case ccc::ast::POINTER:
 		{
+			u32 address = r5900Debug.read32(parentNode.address);
+			if(r5900Debug.isValidAddress(address)) {
+				const ccc::ast::Pointer& pointer = type.as<ccc::ast::Pointer>();
+				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = pointer.value_type.get();
+				element->address = address;
+				result.emplace_back(std::move(element));
+			}
 			break;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
@@ -668,6 +683,15 @@ std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::c
 		}
 		case ccc::ast::REFERENCE:
 		{
+			u32 address = r5900Debug.read32(parentNode.address);
+			if(r5900Debug.isValidAddress(address)) {
+				const ccc::ast::Reference& reference = type.as<ccc::ast::Reference>();
+				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = reference.value_type.get();
+				element->address = address;
+				result.emplace_back(std::move(element));
+			}
 			break;
 		}
 		case ccc::ast::SOURCE_FILE:
@@ -689,14 +713,14 @@ std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::c
 			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
 			if (index > -1)
 			{
-				result = createChildren(*m_symbolTable.deduplicated_types.at(index), address, parent);
+				result = createChildren(*m_symbolTable.deduplicated_types.at(index), parentNode);
 			}
 			break;
 		}
 		case ccc::ast::VARIABLE:
 		{
 			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			result = createChildren(*variable.type, address, parent);
+			result = createChildren(*variable.type, parentNode);
 			break;
 		}
 	}
@@ -713,11 +737,7 @@ QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
 		case ccc::ast::TYPE_NAME:
 		{
 			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
-			if (index > -1)
-			{
-				result = typeToString(*m_symbolTable.deduplicated_types.at(index));
-			}
+			return QString::fromStdString(typeName.type_name);
 			break;
 		}
 		case ccc::ast::VARIABLE:

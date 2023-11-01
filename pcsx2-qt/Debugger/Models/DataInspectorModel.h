@@ -61,7 +61,7 @@ public:
 
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type) const;
-	std::vector<std::unique_ptr<TreeNode>> createChildren(const ccc::ast::Node& type, u32 address, const QModelIndex& parent);
+	std::vector<std::unique_ptr<TreeNode>> createChildren(const ccc::ast::Node& type, const TreeNode& parentNode);
 	QModelIndex indexFromNode(const TreeNode& node) const;
 	QVariant readData(u32 address, const ccc::ast::Node& type) const;
 	void writeData(u32 address, const QVariant& value, const ccc::ast::Node& type) const;
