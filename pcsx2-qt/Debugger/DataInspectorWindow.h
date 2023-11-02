@@ -28,7 +28,6 @@ public:
 	using TreeNode = DataInspectorModel::TreeNode;
 
 	explicit DataInspectorWindow(QWidget* parent = nullptr);
-	~DataInspectorWindow();
 
 protected:
 	std::unique_ptr<DataInspectorModel::TreeNode> populateGlobals();
@@ -36,4 +35,6 @@ protected:
 	ccc::HighSymbolTable m_symbolTable;
 	DataInspectorModel* m_globalModel;
 	Ui::DataInspectorWindow m_ui;
+	
+	std::map<std::string, s32> m_typeNameToDeduplicatedTypeIndex;
 };

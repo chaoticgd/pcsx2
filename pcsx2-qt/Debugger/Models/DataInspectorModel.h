@@ -44,8 +44,11 @@ public:
 		COLUMN_COUNT = 3
 	};
 
-	DataInspectorModel(std::unique_ptr<TreeNode> initialRoot, const ccc::HighSymbolTable& symbolTable, QObject* parent = nullptr);
-	~DataInspectorModel();
+	DataInspectorModel(
+		std::unique_ptr<TreeNode> initialRoot,
+		const ccc::HighSymbolTable& symbolTable,
+		const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
+		QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
 	QModelIndex parent(const QModelIndex& index) const override;
@@ -61,13 +64,12 @@ public:
 
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type) const;
-	std::vector<std::unique_ptr<TreeNode>> createChildren(const ccc::ast::Node& type, const TreeNode& parentNode);
 	QModelIndex indexFromNode(const TreeNode& node) const;
-	QVariant readData(u32 address, const ccc::ast::Node& type) const;
-	void writeData(u32 address, const QVariant& value, const ccc::ast::Node& type) const;
 	QString typeToString(const ccc::ast::Node& type) const;
 
 	std::unique_ptr<TreeNode> m_root;
 	const ccc::HighSymbolTable& m_symbolTable;
-	std::map<std::string, s32> m_typeNameToDeduplicatedTypeIndex;
+	const std::map<std::string, s32>& m_typeNameToDeduplicatedTypeIndex;
 };
+
+const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::HighSymbolTable& symbolTable, const std::map<std::string, s32>& nameToType);

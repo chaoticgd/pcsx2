@@ -63,6 +63,7 @@ public:
 	virtual u64 read64(u32 address, bool& valid) = 0;
 	virtual u128 read128(u32 address) = 0;
 	virtual void write8(u32 address, u8 value) = 0;
+	virtual void write16(u32 address, u16 value) = 0;
 	virtual void write32(u32 address, u32 value) = 0;
 
 	// register stuff
@@ -116,6 +117,7 @@ public:
 	u64 read64(u32 address, bool& valid) override;
 	u128 read128(u32 address) override;
 	void write8(u32 address, u8 value) override;
+	void write16(u32 address, u16 value) override;
 	void write32(u32 address, u32 value) override;
 
 	// register stuff
@@ -156,6 +158,7 @@ public:
 	u64 read64(u32 address, bool& valid) override;
 	u128 read128(u32 address) override;
 	void write8(u32 address, u8 value) override;
+	void write16(u32 address, u16 value) override;
 	void write32(u32 address, u32 value) override;
 
 	// register stuff

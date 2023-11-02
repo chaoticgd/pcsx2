@@ -1,14 +1,16 @@
 #include "DataInspectorModel.h"
 
-DataInspectorModel::DataInspectorModel(std::unique_ptr<TreeNode> initialRoot, const ccc::HighSymbolTable& symbolTable, QObject* parent)
+DataInspectorModel::DataInspectorModel(
+	std::unique_ptr<TreeNode> initialRoot,
+	const ccc::HighSymbolTable& symbolTable,
+	const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
+	QObject* parent)
 	: QAbstractItemModel(parent)
 	, m_root(std::move(initialRoot))
 	, m_symbolTable(symbolTable)
-	, m_typeNameToDeduplicatedTypeIndex(ccc::build_type_name_to_deduplicated_type_index_map(m_symbolTable))
+	, m_typeNameToDeduplicatedTypeIndex(typeNameToDeduplicatedTypeIndex)
 {
 }
-
-DataInspectorModel::~DataInspectorModel() {}
 
 QModelIndex DataInspectorModel::index(int row, int column, const QModelIndex& parent) const
 {
@@ -88,9 +90,64 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		{
 			return typeToString(*node->type);
 		}
-		case VALUE:
+	}
+
+	Q_ASSERT(index.column() == VALUE);
+
+	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+
+	QVariant result;
+	switch (type.descriptor)
+	{
+		case ccc::ast::BUILTIN:
 		{
-			return readData(node->address, *node->type);
+			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
+			switch (builtIn.bclass)
+			{
+				case ccc::BuiltInClass::UNSIGNED_8:
+					return (qulonglong)(u8)r5900Debug.read8(node->address);
+				case ccc::BuiltInClass::SIGNED_8:
+					return (qlonglong)(s8)r5900Debug.read8(node->address);
+				case ccc::BuiltInClass::UNQUALIFIED_8:
+					return (qulonglong)(u8)r5900Debug.read8(node->address);
+				case ccc::BuiltInClass::BOOL_8:
+					return (bool)r5900Debug.read8(node->address);
+				case ccc::BuiltInClass::UNSIGNED_16:
+					return (qulonglong)(u16)r5900Debug.read16(node->address);
+				case ccc::BuiltInClass::SIGNED_16:
+					return (qlonglong)(s16)r5900Debug.read16(node->address);
+				case ccc::BuiltInClass::UNSIGNED_32:
+					return (qulonglong)(u32)r5900Debug.read32(node->address);
+				case ccc::BuiltInClass::SIGNED_32:
+					return (qlonglong)(s32)r5900Debug.read32(node->address);
+				case ccc::BuiltInClass::FLOAT_32:
+				{
+					u32 value = r5900Debug.read32(node->address);
+					return *reinterpret_cast<float*>(&value);
+				}
+				case ccc::BuiltInClass::UNSIGNED_64:
+					return (qulonglong)(u64)r5900Debug.read64(node->address);
+				case ccc::BuiltInClass::SIGNED_64:
+					return (qlonglong)(s64)r5900Debug.read64(node->address);
+				case ccc::BuiltInClass::FLOAT_64:
+				{
+					u64 value = r5900Debug.read64(node->address);
+					return *reinterpret_cast<double*>(&value);
+				}
+				default:
+				{
+				}
+			}
+			break;
+		}
+		case ccc::ast::INLINE_ENUM:
+			return r5900Debug.read32(node->address);
+		case ccc::ast::POINTER:
+			return r5900Debug.read32(node->address);
+		case ccc::ast::REFERENCE:
+			return r5900Debug.read32(node->address);
+		default:
+		{
 		}
 	}
 
@@ -106,7 +163,79 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 	if (!node->type)
 		return false;
 
-	writeData(node->address, value, *node->type);
+	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+	switch (type.descriptor)
+	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
+
+			switch (builtIn.bclass)
+			{
+				case ccc::BuiltInClass::UNSIGNED_8:
+					r5900Debug.write8(node->address, value.toULongLong());
+					break;
+				case ccc::BuiltInClass::SIGNED_8:
+					r5900Debug.write8(node->address, value.toLongLong());
+					break;
+				case ccc::BuiltInClass::UNQUALIFIED_8:
+					r5900Debug.write8(node->address, value.toULongLong());
+					break;
+				case ccc::BuiltInClass::BOOL_8:
+					r5900Debug.write8(node->address, value.toBool());
+					break;
+				case ccc::BuiltInClass::UNSIGNED_16:
+					r5900Debug.write16(node->address, value.toULongLong());
+					break;
+				case ccc::BuiltInClass::SIGNED_16:
+					r5900Debug.write16(node->address, value.toLongLong());
+					break;
+				case ccc::BuiltInClass::UNSIGNED_32:
+					r5900Debug.write32(node->address, value.toULongLong());
+					break;
+				case ccc::BuiltInClass::SIGNED_32:
+					r5900Debug.write32(node->address, value.toLongLong());
+					break;
+				case ccc::BuiltInClass::FLOAT_32:
+				{
+					float f = value.toFloat();
+					r5900Debug.write32(node->address, *reinterpret_cast<float*>(&f));
+					break;
+				}
+				case ccc::BuiltInClass::UNSIGNED_64:
+					r5900Debug.write32(node->address, value.toULongLong());
+					break;
+				case ccc::BuiltInClass::SIGNED_64:
+					r5900Debug.write32(node->address, value.toLongLong());
+					break;
+				case ccc::BuiltInClass::FLOAT_64:
+				{
+					double d = value.toDouble();
+					r5900Debug.write32(node->address, *reinterpret_cast<double*>(&d));
+					break;
+				}
+				default:
+				{
+					return false;
+				}
+			}
+			break;
+		}
+		case ccc::ast::INLINE_ENUM:
+			r5900Debug.write32(node->address, value.toLongLong());
+			break;
+		case ccc::ast::POINTER:
+			r5900Debug.write32(node->address, value.toULongLong());
+			break;
+		case ccc::ast::REFERENCE:
+			r5900Debug.write32(node->address, value.toInt());
+			break;
+		default:
+		{
+			return false;
+		}
+	}
+
 	emit dataChanged(index, index);
 
 	return true;
@@ -121,7 +250,83 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 	if (!parentNode->type)
 		return;
 
-	std::vector<std::unique_ptr<TreeNode>> children = createChildren(*parentNode->type, *parentNode);
+	const ccc::ast::Node& parentType = resolvePhysicalType(*parentNode->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+
+	std::vector<std::unique_ptr<TreeNode>> children;
+	switch (parentType.descriptor)
+	{
+		case ccc::ast::ARRAY:
+		{
+			const ccc::ast::Array& array = parentType.as<ccc::ast::Array>();
+			for (s32 i = 0; i < array.element_count; i++)
+			{
+				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				element->name = QString("[%1]").arg(i);
+				element->type = array.element_type.get();
+				element->address = parentNode->address + i * array.element_type->computed_size_bytes;
+				children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::INLINE_STRUCT_OR_UNION:
+		{
+			const ccc::ast::InlineStructOrUnion& structOrUnion = parentType.as<ccc::ast::InlineStructOrUnion>();
+			for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
+			{
+				std::unique_ptr<TreeNode> childNode = std::make_unique<TreeNode>();
+				childNode->name = QString::fromStdString(field->name);
+				childNode->type = field.get();
+				childNode->address = parentNode->address + field->relative_offset_bytes;
+				children.emplace_back(std::move(childNode));
+			}
+			break;
+		}
+		case ccc::ast::POINTER:
+		{
+			u32 address = r5900Debug.read32(parentNode->address);
+			if (r5900Debug.isValidAddress(address))
+			{
+				const ccc::ast::Pointer& pointer = parentType.as<ccc::ast::Pointer>();
+				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = pointer.value_type.get();
+				element->address = address;
+				children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::REFERENCE:
+		{
+			u32 address = r5900Debug.read32(parentNode->address);
+			if (r5900Debug.isValidAddress(address))
+			{
+				const ccc::ast::Reference& reference = parentType.as<ccc::ast::Reference>();
+				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = reference.value_type.get();
+				element->address = address;
+				children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::SOURCE_FILE:
+		{
+			const ccc::ast::SourceFile& sourceFile = parentType.as<ccc::ast::SourceFile>();
+			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
+			{
+				std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
+				node->name = QString::fromStdString(global->name);
+				node->type = global.get();
+				node->address = global->as<ccc::ast::Variable>().storage.global_address;
+				children.emplace_back(std::move(node));
+			}
+			break;
+		}
+		default:
+		{
+		}
+	}
+
 	if (children.empty())
 	{
 		parentNode->childrenFetched = true;
@@ -183,368 +388,22 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 	return QVariant();
 }
 
-QVariant DataInspectorModel::readData(u32 address, const ccc::ast::Node& type) const
-{
-	QVariant result;
-
-	switch (type.descriptor)
-	{
-		case ccc::ast::ARRAY:
-		{
-		}
-		case ccc::ast::BITFIELD:
-		{
-			break;
-		}
-		case ccc::ast::BUILTIN:
-		{
-			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
-
-			switch (builtIn.bclass)
-			{
-				case ccc::BuiltInClass::UNSIGNED_8:
-				{
-					result = static_cast<u8>(r5900Debug.read8(address));
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_8:
-				{
-					result = static_cast<s8>(r5900Debug.read8(address));
-					break;
-				}
-				case ccc::BuiltInClass::UNQUALIFIED_8:
-				{
-					result = static_cast<char>(r5900Debug.read8(address));
-					break;
-				}
-				case ccc::BuiltInClass::BOOL_8:
-				{
-					result = static_cast<bool>(r5900Debug.read8(address));
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_16:
-				{
-					result = static_cast<u16>(r5900Debug.read16(address));
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_16:
-				{
-					result = static_cast<s16>(r5900Debug.read16(address));
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_32:
-				{
-					result = static_cast<u32>(r5900Debug.read32(address));
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_32:
-				{
-					result = static_cast<s32>(r5900Debug.read32(address));
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_32:
-				{
-					result = static_cast<float>(r5900Debug.read32(address));
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::UNQUALIFIED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_128:
-				{
-					break;
-				}
-				default:
-				{
-				}
-			}
-			break;
-		}
-		case ccc::ast::DATA:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_DEFINITION:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_TYPE:
-		{
-			break;
-		}
-		case ccc::ast::INITIALIZER_LIST:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_ENUM:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_STRUCT_OR_UNION:
-		{
-			break;
-		}
-		case ccc::ast::POINTER:
-		{
-			result = r5900Debug.read32(address);
-			break;
-		}
-		case ccc::ast::POINTER_TO_DATA_MEMBER:
-		{
-			break;
-		}
-		case ccc::ast::REFERENCE:
-		{
-			result = r5900Debug.read32(address);
-			break;
-		}
-		case ccc::ast::SOURCE_FILE:
-		{
-			break;
-		}
-		case ccc::ast::TYPE_NAME:
-		{
-			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
-			if (index > -1)
-			{
-				result = readData(address, *m_symbolTable.deduplicated_types.at(index));
-			}
-			break;
-		}
-		case ccc::ast::VARIABLE:
-		{
-			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			result = readData(address, *variable.type);
-			break;
-		}
-	}
-
-	return result;
-}
-
-void DataInspectorModel::writeData(u32 address, const QVariant& value, const ccc::ast::Node& type) const
-{
-	switch (type.descriptor)
-	{
-		case ccc::ast::ARRAY:
-		{
-		}
-		case ccc::ast::BITFIELD:
-		{
-			break;
-		}
-		case ccc::ast::BUILTIN:
-		{
-			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
-
-			switch (builtIn.bclass)
-			{
-				case ccc::BuiltInClass::UNSIGNED_8:
-				{
-					r5900Debug.write8(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_8:
-				{
-					r5900Debug.write8(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::UNQUALIFIED_8:
-				{
-					r5900Debug.write8(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::BOOL_8:
-				{
-					r5900Debug.write8(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_16:
-				{
-					r5900Debug.write8(address + 0, value.toInt());
-					r5900Debug.write8(address + 1, value.toInt() >> 8);
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_16:
-				{
-					r5900Debug.write8(address + 0, value.toInt());
-					r5900Debug.write8(address + 1, value.toInt() >> 8);
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_32:
-				{
-					r5900Debug.write32(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_32:
-				{
-					r5900Debug.write32(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_32:
-				{
-					r5900Debug.write32(address, value.toInt());
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_64:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::UNSIGNED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::SIGNED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::UNQUALIFIED_128:
-				{
-					break;
-				}
-				case ccc::BuiltInClass::FLOAT_128:
-				{
-					break;
-				}
-				default:
-				{
-				}
-			}
-			break;
-		}
-		case ccc::ast::DATA:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_DEFINITION:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_TYPE:
-		{
-			break;
-		}
-		case ccc::ast::INITIALIZER_LIST:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_ENUM:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_STRUCT_OR_UNION:
-		{
-			break;
-		}
-		case ccc::ast::POINTER:
-		{
-			r5900Debug.write32(address, value.toInt());
-			break;
-		}
-		case ccc::ast::POINTER_TO_DATA_MEMBER:
-		{
-			break;
-		}
-		case ccc::ast::REFERENCE:
-		{
-			r5900Debug.write32(address, value.toInt());
-			break;
-		}
-		case ccc::ast::SOURCE_FILE:
-		{
-			break;
-		}
-		case ccc::ast::TYPE_NAME:
-		{
-			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
-			if (index > -1)
-			{
-				writeData(address, value, *m_symbolTable.deduplicated_types.at(index));
-			}
-			break;
-		}
-		case ccc::ast::VARIABLE:
-		{
-			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			writeData(address, value, *variable.type);
-			break;
-		}
-	}
-}
-
 bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 {
-	bool result = false;
+	const ccc::ast::Node& physicalType = resolvePhysicalType(type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
 
-	switch (type.descriptor)
+	bool result = false;
+	switch (physicalType.descriptor)
 	{
 		case ccc::ast::ARRAY:
 		{
-			const ccc::ast::Array& array = type.as<ccc::ast::Array>();
+			const ccc::ast::Array& array = physicalType.as<ccc::ast::Array>();
 			result = array.element_count > 0;
-		}
-		case ccc::ast::BITFIELD:
-		{
-			break;
-		}
-		case ccc::ast::BUILTIN:
-		{
-			break;
-		}
-		case ccc::ast::DATA:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_DEFINITION:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_TYPE:
-		{
-			break;
-		}
-		case ccc::ast::INITIALIZER_LIST:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_ENUM:
-		{
 			break;
 		}
 		case ccc::ast::INLINE_STRUCT_OR_UNION:
 		{
-			const ccc::ast::InlineStructOrUnion& structOrUnion = type.as<ccc::ast::InlineStructOrUnion>();
+			const ccc::ast::InlineStructOrUnion& structOrUnion = physicalType.as<ccc::ast::InlineStructOrUnion>();
 			result = !structOrUnion.fields.empty() || !structOrUnion.base_classes.empty();
 			break;
 		}
@@ -553,10 +412,6 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 			result = true;
 			break;
 		}
-		case ccc::ast::POINTER_TO_DATA_MEMBER:
-		{
-			break;
-		}
 		case ccc::ast::REFERENCE:
 		{
 			result = true;
@@ -564,25 +419,12 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 		}
 		case ccc::ast::SOURCE_FILE:
 		{
-			const ccc::ast::SourceFile& sourceFile = type.as<ccc::ast::SourceFile>();
+			const ccc::ast::SourceFile& sourceFile = physicalType.as<ccc::ast::SourceFile>();
 			result = !sourceFile.globals.empty();
 			break;
 		}
-		case ccc::ast::TYPE_NAME:
+		default:
 		{
-			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
-			if (index > -1)
-			{
-				result = nodeHasChildren(*m_symbolTable.deduplicated_types.at(index));
-			}
-			break;
-		}
-		case ccc::ast::VARIABLE:
-		{
-			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			result = nodeHasChildren(*variable.type);
-			break;
 		}
 	}
 
@@ -602,130 +444,6 @@ QModelIndex DataInspectorModel::indexFromNode(const TreeNode& node) const
 		row = 0;
 
 	return createIndex(row, 0, &node);
-}
-
-std::vector<std::unique_ptr<DataInspectorModel::TreeNode>> DataInspectorModel::createChildren(const ccc::ast::Node& type, const TreeNode& parentNode)
-{
-	std::vector<std::unique_ptr<TreeNode>> result;
-
-	switch (type.descriptor)
-	{
-		case ccc::ast::ARRAY:
-		{
-			const ccc::ast::Array& array = type.as<ccc::ast::Array>();
-			for (s32 i = 0; i < array.element_count; i++)
-			{
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
-				element->name = QString("[%1]").arg(i);
-				element->type = array.element_type.get();
-				element->address = parentNode.address + i * array.element_type->computed_size_bytes;
-				result.emplace_back(std::move(element));
-			}
-			break;
-		}
-		case ccc::ast::BITFIELD:
-		{
-			break;
-		}
-		case ccc::ast::BUILTIN:
-		{
-			break;
-		}
-		case ccc::ast::DATA:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_DEFINITION:
-		{
-			break;
-		}
-		case ccc::ast::FUNCTION_TYPE:
-		{
-			break;
-		}
-		case ccc::ast::INITIALIZER_LIST:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_ENUM:
-		{
-			break;
-		}
-		case ccc::ast::INLINE_STRUCT_OR_UNION:
-		{
-			const ccc::ast::InlineStructOrUnion& structOrUnion = type.as<ccc::ast::InlineStructOrUnion>();
-			for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
-			{
-				std::unique_ptr<TreeNode> childNode = std::make_unique<TreeNode>();
-				childNode->name = QString::fromStdString(field->name);
-				childNode->type = field.get();
-				childNode->address = parentNode.address + field->relative_offset_bytes;
-				result.emplace_back(std::move(childNode));
-			}
-			break;
-		}
-		case ccc::ast::POINTER:
-		{
-			u32 address = r5900Debug.read32(parentNode.address);
-			if(r5900Debug.isValidAddress(address)) {
-				const ccc::ast::Pointer& pointer = type.as<ccc::ast::Pointer>();
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
-				element->name = QString("*%1").arg(address);
-				element->type = pointer.value_type.get();
-				element->address = address;
-				result.emplace_back(std::move(element));
-			}
-			break;
-		}
-		case ccc::ast::POINTER_TO_DATA_MEMBER:
-		{
-			break;
-		}
-		case ccc::ast::REFERENCE:
-		{
-			u32 address = r5900Debug.read32(parentNode.address);
-			if(r5900Debug.isValidAddress(address)) {
-				const ccc::ast::Reference& reference = type.as<ccc::ast::Reference>();
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
-				element->name = QString("*%1").arg(address);
-				element->type = reference.value_type.get();
-				element->address = address;
-				result.emplace_back(std::move(element));
-			}
-			break;
-		}
-		case ccc::ast::SOURCE_FILE:
-		{
-			const ccc::ast::SourceFile& sourceFile = type.as<ccc::ast::SourceFile>();
-			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
-			{
-				std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
-				node->name = QString::fromStdString(global->name);
-				node->type = global.get();
-				node->address = global->as<ccc::ast::Variable>().storage.global_address;
-				result.emplace_back(std::move(node));
-			}
-			break;
-		}
-		case ccc::ast::TYPE_NAME:
-		{
-			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			s32 index = ccc::lookup_type(typeName, m_symbolTable, &m_typeNameToDeduplicatedTypeIndex);
-			if (index > -1)
-			{
-				result = createChildren(*m_symbolTable.deduplicated_types.at(index), parentNode);
-			}
-			break;
-		}
-		case ccc::ast::VARIABLE:
-		{
-			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			result = createChildren(*variable.type, parentNode);
-			break;
-		}
-	}
-
-	return result;
 }
 
 QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
@@ -753,4 +471,23 @@ QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
 	}
 
 	return result;
+}
+
+const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::HighSymbolTable& symbolTable, const std::map<std::string, s32>& nameToType)
+{
+	const ccc::ast::Node* result = &type;
+	if (result->descriptor == ccc::ast::VARIABLE)
+	{
+		result = result->as<ccc::ast::Variable>().type.get();
+	}
+	for (s32 i = 0; i < 10 && result->descriptor == ccc::ast::TYPE_NAME; i++)
+	{
+		s32 type_index = ccc::lookup_type(result->as<ccc::ast::TypeName>(), symbolTable, &nameToType);
+		if (type_index < 0)
+		{
+			break;
+		}
+		result = symbolTable.deduplicated_types.at(type_index).get();
+	}
+	return *result;
 }

@@ -45,16 +45,16 @@ R3000DebugInterface r3000Debug;
 
 enum ReferenceIndexType
 {
-	REF_INDEX_PC       = 32,
-	REF_INDEX_HI       = 33,
-	REF_INDEX_LO       = 34,
+	REF_INDEX_PC = 32,
+	REF_INDEX_HI = 33,
+	REF_INDEX_LO = 34,
 	REF_INDEX_OPTARGET = 0x800,
-	REF_INDEX_OPSTORE  = 0x1000,
-	REF_INDEX_OPLOAD   = 0x2000,
-	REF_INDEX_IS_OPSL  = REF_INDEX_OPTARGET | REF_INDEX_OPSTORE | REF_INDEX_OPLOAD,
-	REF_INDEX_FPU      = 0x4000,
-	REF_INDEX_FPU_INT  = 0x8000,
-	REF_INDEX_VFPU     = 0x10000,
+	REF_INDEX_OPSTORE = 0x1000,
+	REF_INDEX_OPLOAD = 0x2000,
+	REF_INDEX_IS_OPSL = REF_INDEX_OPTARGET | REF_INDEX_OPSTORE | REF_INDEX_OPLOAD,
+	REF_INDEX_FPU = 0x4000,
+	REF_INDEX_FPU_INT = 0x8000,
+	REF_INDEX_VFPU = 0x10000,
 	REF_INDEX_VFPU_INT = 0x20000,
 	REF_INDEX_IS_FLOAT = REF_INDEX_FPU | REF_INDEX_VFPU,
 
@@ -143,7 +143,7 @@ public:
 			const R5900::OPCODE& opcode = R5900::GetInstruction(OP);
 			if (opcode.flags & IS_MEMORY)
 			{
-				// Fetch the address in the base register 
+				// Fetch the address in the base register
 				u32 target = cpuRegs.GPR.r[(OP >> 21) & 0x1F].UD[0];
 				// Add the offset (lower 16 bits)
 				target += static_cast<u16>(OP);
@@ -381,6 +381,14 @@ void R5900DebugInterface::write8(u32 address, u8 value)
 		return;
 
 	memWrite8(address, value);
+}
+
+void R5900DebugInterface::write16(u32 address, u16 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	memWrite16(address, value);
 }
 
 void R5900DebugInterface::write32(u32 address, u32 value)
@@ -795,7 +803,6 @@ u32 R3000DebugInterface::read32(u32 address, bool& valid)
 	if (!(valid = isValidAddress(address)))
 		return -1;
 	return iopMemRead32(address);
-
 }
 
 u64 R3000DebugInterface::read64(u32 address)
@@ -820,6 +827,14 @@ void R3000DebugInterface::write8(u32 address, u8 value)
 		return;
 
 	iopMemWrite8(address, value);
+}
+
+void R3000DebugInterface::write16(u32 address, u16 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	iopMemWrite16(address, value);
 }
 
 void R3000DebugInterface::write32(u32 address, u32 value)

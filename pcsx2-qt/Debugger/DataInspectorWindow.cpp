@@ -1,12 +1,11 @@
 #include "DataInspectorWindow.h"
 
-#include <QtCore/QTimer>
-
 #include "../QtHost.h"
 #include "common/Error.h"
 #include "Elfheader.h"
 #include "CDVD/CDVD.h"
 #include "DebugTools/ccc/analysis.h"
+#include "Debugger/Delegates/DataInspectorValueColumnDelegate.h"
 
 DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 	: QMainWindow(parent)
@@ -54,16 +53,21 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 	}
 	m_symbolTable = std::move(*symbolTable);
 
-	m_globalModel = new DataInspectorModel(populateGlobals(), m_symbolTable, this);
+	m_typeNameToDeduplicatedTypeIndex = ccc::build_type_name_to_deduplicated_type_index_map(m_symbolTable);
+
+	m_globalModel = new DataInspectorModel(populateGlobals(), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
 
 	m_ui.globalsTreeView->setModel(m_globalModel);
 
-	m_ui.globalsTreeView->setAlternatingRowColors(true);
+	for (QTreeView* view : {m_ui.watchTreeView, m_ui.globalsTreeView, m_ui.stackTreeView})
+	{
+		auto delegate = new DataInspectorValueColumnDelegate(m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+		view->setItemDelegateForColumn(DataInspectorModel::VALUE, delegate);
+		view->setAlternatingRowColors(true);
+	}
 
 	m_ui.statusBar->showMessage(QString("Loaded %1 data types").arg(m_symbolTable.deduplicated_types.size()));
 }
-
-DataInspectorWindow::~DataInspectorWindow() = default;
 
 std::unique_ptr<DataInspectorModel::TreeNode> DataInspectorWindow::populateGlobals()
 {
@@ -74,11 +78,8 @@ std::unique_ptr<DataInspectorModel::TreeNode> DataInspectorWindow::populateGloba
 	{
 		std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
 		if (!sourceFile->relative_path.empty())
-			// Display the path of the source file relative to the working
-			// directory of the compiler.
 			node->name = QString::fromStdString(sourceFile->relative_path);
 		else
-			// If we don't have that information, display the full path instead.
 			node->name = QString::fromStdString(sourceFile->full_path);
 		node->type = sourceFile.get();
 		node->parent = root.get();
