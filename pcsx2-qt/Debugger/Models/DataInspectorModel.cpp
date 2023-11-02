@@ -59,7 +59,7 @@ int DataInspectorModel::rowCount(const QModelIndex& parent) const
 
 int DataInspectorModel::columnCount(const QModelIndex& parent) const
 {
-	return 3;
+	return 4;
 }
 
 bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
@@ -85,6 +85,13 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		case NAME:
 		{
 			return node->name;
+		}
+		case ADDRESS:
+		{
+			if (node->address > 0)
+				return QString::number(node->address, 16);
+			else
+				return QVariant();
 		}
 		case TYPE:
 		{
@@ -314,11 +321,14 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			const ccc::ast::SourceFile& sourceFile = parentType.as<ccc::ast::SourceFile>();
 			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
 			{
-				std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
-				node->name = QString::fromStdString(global->name);
-				node->type = global.get();
-				node->address = global->as<ccc::ast::Variable>().storage.global_address;
-				children.emplace_back(std::move(node));
+				const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
+				if(variable.storage.global_address > -1) {
+					std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
+					node->name = QString::fromStdString(global->name);
+					node->type = global.get();
+					node->address = variable.storage.global_address;
+					children.emplace_back(std::move(node));
+				}
 			}
 			break;
 		}
@@ -374,6 +384,10 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 		case NAME:
 		{
 			return "Name";
+		}
+		case ADDRESS:
+		{
+			return "Address";
 		}
 		case TYPE:
 		{

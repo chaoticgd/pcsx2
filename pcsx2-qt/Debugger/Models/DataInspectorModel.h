@@ -39,9 +39,10 @@ public:
 	enum Column
 	{
 		NAME = 0,
-		TYPE = 1,
-		VALUE = 2,
-		COLUMN_COUNT = 3
+		ADDRESS = 1,
+		TYPE = 2,
+		VALUE = 3,
+		COLUMN_COUNT = 4
 	};
 
 	DataInspectorModel(
