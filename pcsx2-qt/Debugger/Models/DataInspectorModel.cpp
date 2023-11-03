@@ -1,7 +1,7 @@
 #include "DataInspectorModel.h"
 
 DataInspectorModel::DataInspectorModel(
-	std::unique_ptr<TreeNode> initialRoot,
+	std::unique_ptr<DataInspectorNode> initialRoot,
 	const ccc::HighSymbolTable& symbolTable,
 	const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
 	QObject* parent)
@@ -17,13 +17,13 @@ QModelIndex DataInspectorModel::index(int row, int column, const QModelIndex& pa
 	if (!hasIndex(row, column, parent))
 		return QModelIndex();
 
-	TreeNode* parentNode;
+	DataInspectorNode* parentNode;
 	if (parent.isValid())
-		parentNode = static_cast<TreeNode*>(parent.internalPointer());
+		parentNode = static_cast<DataInspectorNode*>(parent.internalPointer());
 	else
 		parentNode = m_root.get();
 
-	TreeNode* childNode = parentNode->children.at(row).get();
+	DataInspectorNode* childNode = parentNode->children.at(row).get();
 	if (!childNode)
 		return QModelIndex();
 
@@ -35,8 +35,8 @@ QModelIndex DataInspectorModel::parent(const QModelIndex& index) const
 	if (!index.isValid())
 		return QModelIndex();
 
-	TreeNode* childNode = static_cast<TreeNode*>(index.internalPointer());
-	TreeNode* parentNode = childNode->parent;
+	DataInspectorNode* childNode = static_cast<DataInspectorNode*>(index.internalPointer());
+	DataInspectorNode* parentNode = childNode->parent;
 	if (!parentNode)
 		return QModelIndex();
 
@@ -48,9 +48,9 @@ int DataInspectorModel::rowCount(const QModelIndex& parent) const
 	if (parent.column() > 0)
 		return 0;
 
-	TreeNode* node;
+	DataInspectorNode* node;
 	if (parent.isValid())
-		node = static_cast<TreeNode*>(parent.internalPointer());
+		node = static_cast<DataInspectorNode*>(parent.internalPointer());
 	else
 		node = m_root.get();
 
@@ -67,7 +67,7 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 	if (!parent.isValid())
 		return true;
 
-	TreeNode* parentNode = static_cast<TreeNode*>(parent.internalPointer());
+	DataInspectorNode* parentNode = static_cast<DataInspectorNode*>(parent.internalPointer());
 	if (!parentNode->type)
 		return true;
 
@@ -79,7 +79,7 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 	if (!index.isValid() || role != Qt::DisplayRole)
 		return QVariant();
 
-	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
+	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 
 	switch (index.column())
 	{
@@ -106,7 +106,7 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 
 	if (!node->type)
 		return QVariant();
-	
+
 	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
 
 	QVariant result;
@@ -172,7 +172,7 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 	if (!index.isValid())
 		return false;
 
-	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
+	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (!node->type)
 		return false;
 
@@ -259,13 +259,13 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 	if (!parent.isValid())
 		return;
 
-	TreeNode* parentNode = static_cast<TreeNode*>(parent.internalPointer());
+	DataInspectorNode* parentNode = static_cast<DataInspectorNode*>(parent.internalPointer());
 	if (!parentNode->type)
 		return;
 
 	const ccc::ast::Node& parentType = resolvePhysicalType(*parentNode->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
 
-	std::vector<std::unique_ptr<TreeNode>> children;
+	std::vector<std::unique_ptr<DataInspectorNode>> children;
 	switch (parentType.descriptor)
 	{
 		case ccc::ast::ARRAY:
@@ -273,7 +273,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			const ccc::ast::Array& array = parentType.as<ccc::ast::Array>();
 			for (s32 i = 0; i < array.element_count; i++)
 			{
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("[%1]").arg(i);
 				element->type = array.element_type.get();
 				element->address = parentNode->address + i * array.element_type->computed_size_bytes;
@@ -286,7 +286,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			const ccc::ast::InlineStructOrUnion& structOrUnion = parentType.as<ccc::ast::InlineStructOrUnion>();
 			for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
 			{
-				std::unique_ptr<TreeNode> childNode = std::make_unique<TreeNode>();
+				std::unique_ptr<DataInspectorNode> childNode = std::make_unique<DataInspectorNode>();
 				childNode->name = QString::fromStdString(field->name);
 				childNode->type = field.get();
 				childNode->address = parentNode->address + field->relative_offset_bytes;
@@ -300,7 +300,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			if (r5900Debug.isValidAddress(address))
 			{
 				const ccc::ast::Pointer& pointer = parentType.as<ccc::ast::Pointer>();
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("*%1").arg(address);
 				element->type = pointer.value_type.get();
 				element->address = address;
@@ -314,28 +314,11 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			if (r5900Debug.isValidAddress(address))
 			{
 				const ccc::ast::Reference& reference = parentType.as<ccc::ast::Reference>();
-				std::unique_ptr<TreeNode> element = std::make_unique<TreeNode>();
+				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("*%1").arg(address);
 				element->type = reference.value_type.get();
 				element->address = address;
 				children.emplace_back(std::move(element));
-			}
-			break;
-		}
-		case ccc::ast::SOURCE_FILE:
-		{
-			const ccc::ast::SourceFile& sourceFile = parentType.as<ccc::ast::SourceFile>();
-			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
-			{
-				const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-				if (variable.storage.global_address > -1)
-				{
-					std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
-					node->name = QString::fromStdString(global->name);
-					node->type = global.get();
-					node->address = variable.storage.global_address;
-					children.emplace_back(std::move(node));
-				}
 			}
 			break;
 		}
@@ -350,7 +333,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		return;
 	}
 
-	for (std::unique_ptr<TreeNode>& childNode : children)
+	for (std::unique_ptr<DataInspectorNode>& childNode : children)
 		childNode->parent = parentNode;
 
 	beginInsertRows(parent, 0, children.size() - 1);
@@ -364,7 +347,7 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 	if (!parent.isValid())
 		return false;
 
-	TreeNode* parentNode = static_cast<TreeNode*>(parent.internalPointer());
+	DataInspectorNode* parentNode = static_cast<DataInspectorNode*>(parent.internalPointer());
 	if (!parentNode->type)
 		return false;
 
@@ -412,19 +395,11 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 	return QVariant();
 }
 
-void DataInspectorModel::reset(std::unique_ptr<TreeNode> newRoot)
+void DataInspectorModel::reset(std::unique_ptr<DataInspectorNode> newRoot)
 {
 	beginResetModel();
 	m_root = std::move(newRoot);
 	endResetModel();
-}
-
-void DataInspectorModel::fetchAllExceptThroughPointers()
-{
-}
-
-void DataInspectorModel::removeRowsNotMatchingFilter(const QString& filter)
-{
 }
 
 bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
@@ -470,7 +445,7 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 	return result;
 }
 
-QModelIndex DataInspectorModel::indexFromNode(const TreeNode& node) const
+QModelIndex DataInspectorModel::indexFromNode(const DataInspectorNode& node) const
 {
 	int row = 0;
 	if (node.parent)

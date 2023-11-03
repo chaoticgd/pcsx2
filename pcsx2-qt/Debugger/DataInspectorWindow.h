@@ -26,20 +26,22 @@ class DataInspectorWindow : public QMainWindow
 	Q_OBJECT
 
 public:
-	using TreeNode = DataInspectorModel::TreeNode;
-
 	explicit DataInspectorWindow(QWidget* parent = nullptr);
-	
+
 	void resetGlobals();
+
 protected:
-	
-	std::unique_ptr<TreeNode> populateGlobals(bool groupBySection, bool groupByTranslationUnit);
-	std::vector<std::unique_ptr<TreeNode>> populateInnerGlobals(u32 min_address, u32 max_address, bool groupByTU);
+	std::unique_ptr<DataInspectorNode> populateGlobalSections(
+		bool groupBySection, bool groupByTranslationUnit, const QString& filter);
+	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalTranslationUnits(
+		u32 minAddress, u32 maxAddress, bool groupByTranlationUnit, const QString& filter);
+	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
+		const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter);
 
 	std::vector<std::pair<ELF_SHR, std::string>> m_sectionHeaders;
 	ccc::HighSymbolTable m_symbolTable;
 	DataInspectorModel* m_globalModel;
 	Ui::DataInspectorWindow m_ui;
-	
+
 	std::map<std::string, s32> m_typeNameToDeduplicatedTypeIndex;
 };

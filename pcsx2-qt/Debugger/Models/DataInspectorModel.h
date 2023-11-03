@@ -21,21 +21,21 @@
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/ccc/analysis.h"
 
+struct DataInspectorNode
+{
+	QString name;
+	const ccc::ast::Node* type = nullptr;
+	u32 address = 0;
+	DataInspectorNode* parent = nullptr;
+	std::vector<std::unique_ptr<DataInspectorNode>> children;
+	bool childrenFetched = false;
+};
+
 class DataInspectorModel : public QAbstractItemModel
 {
 	Q_OBJECT
 
 public:
-	struct TreeNode
-	{
-		QString name;
-		const ccc::ast::Node* type = nullptr;
-		u32 address = 0;
-		TreeNode* parent = nullptr;
-		std::vector<std::unique_ptr<TreeNode>> children;
-		bool childrenFetched = false;
-	};
-
 	enum Column
 	{
 		NAME = 0,
@@ -46,7 +46,7 @@ public:
 	};
 
 	DataInspectorModel(
-		std::unique_ptr<TreeNode> initialRoot,
+		std::unique_ptr<DataInspectorNode> initialRoot,
 		const ccc::HighSymbolTable& symbolTable,
 		const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
 		QObject* parent = nullptr);
@@ -63,16 +63,14 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-	void reset(std::unique_ptr<TreeNode> newRoot);
-	void fetchAllExceptThroughPointers();
-	void removeRowsNotMatchingFilter(const QString& filter);
+	void reset(std::unique_ptr<DataInspectorNode> newRoot);
 
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type) const;
-	QModelIndex indexFromNode(const TreeNode& node) const;
+	QModelIndex indexFromNode(const DataInspectorNode& node) const;
 	QString typeToString(const ccc::ast::Node& type) const;
 
-	std::unique_ptr<TreeNode> m_root;
+	std::unique_ptr<DataInspectorNode> m_root;
 	QString m_filter;
 	const ccc::HighSymbolTable& m_symbolTable;
 	const std::map<std::string, s32>& m_typeNameToDeduplicatedTypeIndex;

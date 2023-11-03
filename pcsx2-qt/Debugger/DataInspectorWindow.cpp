@@ -62,10 +62,12 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 
 	m_typeNameToDeduplicatedTypeIndex = ccc::build_type_name_to_deduplicated_type_index_map(m_symbolTable);
 
-	bool sortBySection = m_ui.globalsGroupBySection->isChecked();
-	bool sortByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
+	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
+	bool groupByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
+	QString filter = m_ui.globalsFilter->text().toLower();
 
-	m_globalModel = new DataInspectorModel(populateGlobals(sortBySection, sortByTranslationUnit), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+	auto initialGlobalRoot = populateGlobalSections(groupBySection, groupByTranslationUnit, filter);
+	m_globalModel = new DataInspectorModel(std::move(initialGlobalRoot), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
 	m_ui.globalsTreeView->setModel(m_globalModel);
 
 	connect(m_ui.globalsFilter, &QLineEdit::textEdited, this, &DataInspectorWindow::resetGlobals);
@@ -84,21 +86,17 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 
 void DataInspectorWindow::resetGlobals()
 {
-	bool sortBySection = m_ui.globalsGroupBySection->isChecked();
-	bool sortByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
-	QString filter = m_ui.globalsFilter->text();
+	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
+	bool groupByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
+	QString filter = m_ui.globalsFilter->text().toLower();
 
-	m_globalModel->reset(populateGlobals(sortBySection, sortByTranslationUnit));
-	if (!filter.isEmpty())
-	{
-		m_globalModel->fetchAllExceptThroughPointers();
-		m_globalModel->removeRowsNotMatchingFilter(filter);
-	}
+	m_globalModel->reset(populateGlobalSections(groupBySection, groupByTranslationUnit, filter));
 }
 
-std::unique_ptr<DataInspectorWindow::TreeNode> DataInspectorWindow::populateGlobals(bool groupBySection, bool groupByTranslationUnit)
+std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
+	bool groupBySection, bool groupByTranslationUnit, const QString& filter)
 {
-	std::unique_ptr<TreeNode> root = std::make_unique<TreeNode>();
+	std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
 	root->childrenFetched = true;
 
 	if (groupBySection)
@@ -109,14 +107,14 @@ std::unique_ptr<DataInspectorWindow::TreeNode> DataInspectorWindow::populateGlob
 			{
 				u32 minAddress = sectionHeader.sh_addr;
 				u32 maxAddress = sectionHeader.sh_addr + sectionHeader.sh_size;
-				auto sectionChildren = populateInnerGlobals(minAddress, maxAddress, groupByTranslationUnit);
+				auto sectionChildren = populateGlobalTranslationUnits(minAddress, maxAddress, groupByTranslationUnit, filter);
 				if (!sectionChildren.empty())
 				{
-					std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
+					std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 					node->name = QString::fromStdString(sectionName);
 					node->children = std::move(sectionChildren);
 
-					for (std::unique_ptr<TreeNode>& child : node->children)
+					for (std::unique_ptr<DataInspectorNode>& child : node->children)
 						child->parent = node.get();
 
 					root->children.emplace_back(std::move(node));
@@ -126,41 +124,40 @@ std::unique_ptr<DataInspectorWindow::TreeNode> DataInspectorWindow::populateGlob
 	}
 	else
 	{
-		auto rootChildren = populateInnerGlobals(0, UINT32_MAX, groupByTranslationUnit);
+		auto rootChildren = populateGlobalTranslationUnits(0, UINT32_MAX, groupByTranslationUnit, filter);
 		root->children.insert(root->children.end(),
 			std::make_move_iterator(rootChildren.begin()),
 			std::make_move_iterator(rootChildren.end()));
 	}
 
-	for (std::unique_ptr<TreeNode>& child : root->children)
+	for (std::unique_ptr<DataInspectorNode>& child : root->children)
 		child->parent = root.get();
 
 	return root;
 }
 
-std::vector<std::unique_ptr<DataInspectorWindow::TreeNode>> DataInspectorWindow::populateInnerGlobals(u32 min_address, u32 max_address, bool groupByTU)
+std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalTranslationUnits(
+	u32 minAddress, u32 maxAddress, bool groupByTranlationUnit, const QString& filter)
 {
-	std::vector<std::unique_ptr<TreeNode>> children;
+	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
-	if (groupByTU)
+	if (groupByTranlationUnit)
 	{
 		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
 		{
-			std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
+			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 			if (!sourceFile->relative_path.empty())
 				node->name = QString::fromStdString(sourceFile->relative_path);
 			else
 				node->name = QString::fromStdString(sourceFile->full_path);
 			node->type = sourceFile.get();
+			node->children = populateGlobalVariables(*sourceFile, minAddress, maxAddress, filter);
 
-			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile->globals)
+			if (!node->children.empty())
 			{
-				const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-				if ((u32)variable.storage.global_address >= min_address && (u32)variable.storage.global_address < max_address)
-				{
-					children.emplace_back(std::move(node));
-					break;
-				}
+				for (std::unique_ptr<DataInspectorNode>& child : node->children)
+					child->parent = node.get();
+				children.emplace_back(std::move(node));
 			}
 		}
 	}
@@ -168,23 +165,38 @@ std::vector<std::unique_ptr<DataInspectorWindow::TreeNode>> DataInspectorWindow:
 	{
 		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
 		{
-			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile->globals)
-			{
-				const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-				if (variable.storage.global_address > -1)
-				{
-					std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
-					node->name = QString::fromStdString(global->name);
-					node->type = global.get();
-					node->address = variable.storage.global_address;
-					if ((u32)variable.storage.global_address >= min_address && (u32)variable.storage.global_address < max_address)
-					{
-						children.emplace_back(std::move(node));
-					}
-				}
-			}
+			std::vector<std::unique_ptr<DataInspectorNode>> variables = populateGlobalVariables(*sourceFile, minAddress, maxAddress, filter);
+			children.insert(children.end(),
+				std::make_move_iterator(variables.begin()),
+				std::make_move_iterator(variables.end()));
 		}
 	}
 
 	return children;
+}
+
+std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalVariables(
+	const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter)
+{
+	std::vector<std::unique_ptr<DataInspectorNode>> variables;
+
+	for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
+	{
+		const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
+		if (variable.storage.global_address > -1)
+		{
+			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			node->name = QString::fromStdString(global->name);
+			node->type = global.get();
+			node->address = variable.storage.global_address;
+			bool addressInRange = (u32)variable.storage.global_address >= minAddress && (u32)variable.storage.global_address < maxAddress;
+			bool containsFilterString = filter.isEmpty() || node->name.toLower().contains(filter);
+			if (addressInRange && containsFilterString)
+			{
+				variables.emplace_back(std::move(node));
+			}
+		}
+	}
+
+	return variables;
 }

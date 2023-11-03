@@ -17,6 +17,8 @@
 
 #include <vector>
 
+#include "common/Pcsx2Defs.h"
+
 class Error;
 class IsoReader;
 

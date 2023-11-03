@@ -24,8 +24,6 @@ class DataInspectorValueColumnDelegate : public QStyledItemDelegate
 	Q_OBJECT
 
 public:
-	using TreeNode = DataInspectorModel::TreeNode;
-
 	DataInspectorValueColumnDelegate(
 		const ccc::HighSymbolTable& symbolTable,
 		const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,

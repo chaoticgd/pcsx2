@@ -32,7 +32,7 @@ DataInspectorValueColumnDelegate::DataInspectorValueColumnDelegate(
 
 QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
+	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
 		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
@@ -95,7 +95,7 @@ QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const Q
 
 void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
-	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
+	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
 		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
@@ -178,7 +178,7 @@ void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QMod
 
 void DataInspectorValueColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
-	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
+	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
 		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
