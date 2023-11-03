@@ -68,6 +68,9 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 		return true;
 
 	TreeNode* parentNode = static_cast<TreeNode*>(parent.internalPointer());
+	if (!parentNode->type)
+		return true;
+
 	return nodeHasChildren(*parentNode->type);
 }
 
@@ -77,8 +80,6 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		return QVariant();
 
 	TreeNode* node = static_cast<TreeNode*>(index.internalPointer());
-	if (!node->type)
-		return QVariant();
 
 	switch (index.column())
 	{
@@ -95,12 +96,17 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		}
 		case TYPE:
 		{
+			if (!node->type)
+				return QVariant();
 			return typeToString(*node->type);
 		}
 	}
 
 	Q_ASSERT(index.column() == VALUE);
 
+	if (!node->type)
+		return QVariant();
+	
 	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
 
 	QVariant result;
@@ -322,7 +328,8 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
 			{
 				const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-				if(variable.storage.global_address > -1) {
+				if (variable.storage.global_address > -1)
+				{
 					std::unique_ptr<TreeNode> node = std::make_unique<TreeNode>();
 					node->name = QString::fromStdString(global->name);
 					node->type = global.get();
@@ -358,6 +365,9 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 		return false;
 
 	TreeNode* parentNode = static_cast<TreeNode*>(parent.internalPointer());
+	if (!parentNode->type)
+		return false;
+
 	return nodeHasChildren(*parentNode->type) && !parentNode->childrenFetched;
 }
 
@@ -400,6 +410,21 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 	}
 
 	return QVariant();
+}
+
+void DataInspectorModel::reset(std::unique_ptr<TreeNode> newRoot)
+{
+	beginResetModel();
+	m_root = std::move(newRoot);
+	endResetModel();
+}
+
+void DataInspectorModel::fetchAllExceptThroughPointers()
+{
+}
+
+void DataInspectorModel::removeRowsNotMatchingFilter(const QString& filter)
+{
 }
 
 bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const

@@ -17,6 +17,7 @@
 
 #include <QtWidgets/QMainWindow>
 
+#include "Elfheader.h"
 #include "Models/DataInspectorModel.h"
 #include "ui_DataInspectorWindow.h"
 
@@ -28,10 +29,14 @@ public:
 	using TreeNode = DataInspectorModel::TreeNode;
 
 	explicit DataInspectorWindow(QWidget* parent = nullptr);
-
+	
+	void resetGlobals();
 protected:
-	std::unique_ptr<DataInspectorModel::TreeNode> populateGlobals();
+	
+	std::unique_ptr<TreeNode> populateGlobals(bool groupBySection, bool groupByTranslationUnit);
+	std::vector<std::unique_ptr<TreeNode>> populateInnerGlobals(u32 min_address, u32 max_address, bool groupByTU);
 
+	std::vector<std::pair<ELF_SHR, std::string>> m_sectionHeaders;
 	ccc::HighSymbolTable m_symbolTable;
 	DataInspectorModel* m_globalModel;
 	Ui::DataInspectorWindow m_ui;

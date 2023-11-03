@@ -137,7 +137,7 @@ public:
 	bool OpenIsoFile(std::string srcfile, IsoReader& isor, bool isPSXElf_, Error* error);
 
 	void LoadHeaders();
-	std::pair<std::vector<u8>*, u32> GetSectionContentsByType(u32 type);
+	std::vector<std::pair<ELF_SHR, std::string>> GetSectionHeaders();
 
 	bool HasProgramHeaders() const;
 	bool HasSectionHeaders() const;

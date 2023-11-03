@@ -63,12 +63,17 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
+	void reset(std::unique_ptr<TreeNode> newRoot);
+	void fetchAllExceptThroughPointers();
+	void removeRowsNotMatchingFilter(const QString& filter);
+
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type) const;
 	QModelIndex indexFromNode(const TreeNode& node) const;
 	QString typeToString(const ccc::ast::Node& type) const;
 
 	std::unique_ptr<TreeNode> m_root;
+	QString m_filter;
 	const ccc::HighSymbolTable& m_symbolTable;
 	const std::map<std::string, s32>& m_typeNameToDeduplicatedTypeIndex;
 };

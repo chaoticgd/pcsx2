@@ -111,16 +111,16 @@
         <item>
          <layout class="QHBoxLayout" name="globalsControls">
           <item>
-           <widget class="QCheckBox" name="sortBySection">
+           <widget class="QCheckBox" name="globalsGroupBySection">
             <property name="text">
-             <string>Sort by section</string>
+             <string>Group by section</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QCheckBox" name="sortByTranslationUnit">
+           <widget class="QCheckBox" name="globalsGroupByTranslationUnit">
             <property name="text">
-             <string>Sort by translation unit</string>
+             <string>Group by translation unit</string>
             </property>
             <property name="checked">
              <bool>true</bool>

@@ -392,22 +392,49 @@ void ElfObject::LoadHeaders()
 }
 
 template <typename T>
-static const T& GetPacked(const std::vector<u8>& bytes, u64 offset)
+static const T* GetStruct(const std::vector<u8>& bytes, u64 offset)
 {
-	pxAssertRel(bytes.size() >= offset + sizeof(T), "Failed to read ELF file.");
-	return *(const T*) &bytes[offset];
+	if(bytes.size() < offset + sizeof(T)) {
+		return nullptr;
+	}
+	return (const T*) &bytes[offset];
 }
 
-std::pair<std::vector<u8>*, u32> ElfObject::GetSectionContentsByType(u32 type)
-{
-	const ELF_HEADER& elf_header = GetPacked<ELF_HEADER>(data, 0);
-	for(u32 i = 0; i < elf_header.e_shnum; i++)
-	{
-		const ELF_SHR& section_header = GetPacked<ELF_SHR>(data, elf_header.e_shoff + i * sizeof(ELF_SHR));
-		if(section_header.sh_type == type)
-		{
-			return {&data, section_header.sh_offset};
+const char* GetString(const std::vector<u8>& bytes, u64 offset) {
+	for (const unsigned char* c = bytes.data() + offset; c < bytes.data() + bytes.size(); c++) {
+		if(*c == '\0') {
+			return (const char*) &bytes[offset];
 		}
 	}
-	return {nullptr, 0};
+	return nullptr;
+}
+
+std::vector<std::pair<ELF_SHR, std::string>> ElfObject::GetSectionHeaders()
+{
+	std::vector<std::pair<ELF_SHR, std::string>> headers;
+	const ELF_HEADER* elf_header = GetStruct<ELF_HEADER>(data, 0);
+	if(!elf_header)
+	{
+		return {};
+	}
+	const ELF_SHR* string_section = GetStruct<ELF_SHR>(data, elf_header->e_shoff + elf_header->e_shstrndx * sizeof(ELF_SHR));
+	if(!string_section)
+	{
+		return {};
+	}
+	for (u32 i = 0; i < elf_header->e_shnum; i++)
+	{
+		const ELF_SHR* section_header = GetStruct<ELF_SHR>(data, elf_header->e_shoff + i * sizeof(ELF_SHR));
+		if(!section_header)
+		{
+			return {};
+		}
+		const char* section_name = GetString(data, string_section->sh_offset + section_header->sh_name);
+		if(!section_name)
+		{
+			return {};
+		}
+		headers.emplace_back(*section_header, section_name);
+	}
+	return headers;
 }
