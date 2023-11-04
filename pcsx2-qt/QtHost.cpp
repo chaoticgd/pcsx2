@@ -652,7 +652,7 @@ void EmuThread::switchRenderer(GSRendererType renderer)
 	if (!VMManager::HasValidVM())
 		return;
 
-	MTGS::SwitchRenderer(renderer);
+	MTGS::SwitchRenderer(renderer, EmuConfig.GS.InterlaceMode);
 }
 
 void EmuThread::changeDisc(CDVD_SourceType source, const QString& path)
@@ -1030,7 +1030,8 @@ void EmuThread::updatePerformanceMetrics(bool force)
 		QString gs_stat;
 		if (THREAD_VU1)
 		{
-			gs_stat = QStringLiteral("%1 | EE: %2% | VU: %3% | GS: %4%")
+			gs_stat = tr("Slot: %1 | %2 | EE: %3% | VU: %4% | GS: %5%")
+						  .arg(VMManager::GetCurrentActiveSaveStateSlot())
 						  .arg(gs_stat_str.c_str())
 						  .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
 						  .arg(PerformanceMetrics::GetVUThreadUsage(), 0, 'f', 0)
@@ -1038,7 +1039,8 @@ void EmuThread::updatePerformanceMetrics(bool force)
 		}
 		else
 		{
-			gs_stat = QStringLiteral("%1 | EE: %2% | GS: %3%")
+			gs_stat = tr("Slot: %1 | %2 | EE: %3% | GS: %4%")
+						  .arg(VMManager::GetCurrentActiveSaveStateSlot())
 						  .arg(gs_stat_str.c_str())
 						  .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
 						  .arg(PerformanceMetrics::GetGSThreadUsage(), 0, 'f', 0);
