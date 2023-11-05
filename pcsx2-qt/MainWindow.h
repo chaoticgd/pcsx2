@@ -113,6 +113,8 @@ public:
 
 	void openDebugger();
 	void openDataInspector();
+	
+	DataInspectorWindow* getDataInspectorWindow();
 
 public Q_SLOTS:
 	void checkForUpdates(bool display_message, bool force_check);
@@ -260,7 +262,6 @@ private:
 	void updateInputRecordingActions(bool started);
 
 	DebuggerWindow* getDebuggerWindow();
-	DataInspectorWindow* getDataInspectorWindow();
 
 	void doControllerSettings(ControllerSettingsWindow::Category category = ControllerSettingsWindow::Category::Count);
 

@@ -31,6 +31,11 @@ public:
 	void resetGlobals();
 
 protected:
+	void loadMdebugSymbolTableAsync(
+		std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
+		std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback);
+	
+	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
 		bool groupBySection, bool groupByTranslationUnit, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalTranslationUnits(
@@ -38,8 +43,8 @@ protected:
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
 		const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter);
 
-	std::vector<std::pair<ELF_SHR, std::string>> m_sectionHeaders;
 	ccc::HighSymbolTable m_symbolTable;
+	std::vector<std::pair<ELF_SHR, std::string>> m_elfSections;
 	DataInspectorModel* m_globalModel;
 	Ui::DataInspectorWindow m_ui;
 

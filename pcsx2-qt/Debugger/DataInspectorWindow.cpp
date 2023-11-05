@@ -5,61 +5,106 @@
 #include "CDVD/CDVD.h"
 #include "DebugTools/ccc/analysis.h"
 #include "Debugger/Delegates/DataInspectorValueColumnDelegate.h"
+#include "MainWindow.h"
 
 DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 	: QMainWindow(parent)
 {
 	m_ui.setupUi(this);
 
-	// probably a race condition
-	std::string elfPath = VMManager::GetELFPath();
-	if (elfPath.empty())
-	{
-		m_ui.statusBar->showMessage("ERROR: No ELF file loaded");
-		return;
-	}
+	m_ui.statusBar->showMessage("Loading...");
 
-	ElfObject elf;
-	Error error;
-	if (!cdvdLoadElf(&elf, elfPath, false, &error))
-	{
-		QString message = QString("ERROR: Failed to load ELF file %1 (%2)").arg(elfPath.c_str()).arg(error.GetDescription().c_str());
-		m_ui.statusBar->showMessage(message);
-		return;
-	}
+	loadMdebugSymbolTableAsync(
+		[](ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections) {
+			DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+			if (window)
+			{
+				window->m_symbolTable = std::move(symbolTable);
+				window->m_elfSections = std::move(elfSections);
+				window->createGUI();
+			}
+		},
+		[](QString errorMessage, const char* sourceFile, int sourceLine) {
+			DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+			if (window)
+			{
+				window->m_ui.statusBar->showMessage(errorMessage);
+			}
+		});
+}
 
-	m_sectionHeaders = elf.GetSectionHeaders();
+void DataInspectorWindow::loadMdebugSymbolTableAsync(
+	std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
+	std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback)
+{
+	Host::RunOnCPUThread([successCallback, failureCallback]() {
+		std::string elfPath = VMManager::GetELFPath();
+		if (elfPath.empty())
+		{
+			QtHost::RunOnUIThread([failureCallback]() {
+				failureCallback("No ELF file loaded", nullptr, -1);
+			});
+			return;
+		}
 
-	// Checking the section name is better than checking the section type since
-	// both STABS and DWARF symbols have a type of MIPS_DEBUG.
-	ELF_SHR* mdebugSectionHeader = nullptr;
-	for (auto& [sectionHeader, sectionName] : m_sectionHeaders)
-		if (sectionName == ".mdebug")
-			mdebugSectionHeader = &sectionHeader;
+		ElfObject elf;
+		Error error;
+		if (!cdvdLoadElf(&elf, elfPath, false, &error))
+		{
+			QString message = QString("Failed to load ELF file %1 (%2)").arg(elfPath.c_str()).arg(error.GetDescription().c_str());
+			QtHost::RunOnUIThread([failureCallback, message]() {
+				failureCallback(message, nullptr, -1);
+			});
+			return;
+		}
 
-	if (mdebugSectionHeader == nullptr)
-	{
-		m_ui.statusBar->showMessage("ERROR: No .mdebug symbol table section present");
-		return;
-	}
+		std::vector<std::pair<ELF_SHR, std::string>> elfSections = elf.GetSectionHeaders();
 
-	m_ui.statusBar->showMessage("Loading symbols...");
+		// Checking the section name is better than checking the section type
+		// since both STABS and DWARF symbols have a type of MIPS_DEBUG.
+		ELF_SHR* mdebugSectionHeader = nullptr;
+		for (auto& [sectionHeader, sectionName] : elfSections)
+			if (sectionName == ".mdebug")
+				mdebugSectionHeader = &sectionHeader;
 
-	ccc::Result<ccc::mdebug::SymbolTable> mdebugSymbolTable = ccc::mdebug::parse_symbol_table(elf.GetData(), mdebugSectionHeader->sh_offset);
-	if (!mdebugSymbolTable.success())
-	{
-		m_ui.statusBar->showMessage(mdebugSymbolTable.error().message);
-		return;
-	}
+		if (mdebugSectionHeader == nullptr)
+		{
+			failureCallback("No .mdebug symbol table section present", nullptr, -1);
+			return;
+		}
 
-	ccc::Result<ccc::HighSymbolTable> symbolTable = ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
-	if (!symbolTable.success())
-	{
-		m_ui.statusBar->showMessage(symbolTable.error().message);
-		return;
-	}
-	m_symbolTable = std::move(*symbolTable);
+		ccc::Result<ccc::mdebug::SymbolTable> mdebugSymbolTable =
+			ccc::mdebug::parse_symbol_table(elf.GetData(), mdebugSectionHeader->sh_offset);
+		if (!mdebugSymbolTable.success())
+		{
+			QString message = mdebugSymbolTable.error().message;
+			QtHost::RunOnUIThread([failureCallback, message]() {
+				failureCallback(message, nullptr, -1);
+			});
+			return;
+		}
 
+		ccc::Result<ccc::HighSymbolTable> symbolTable =
+			ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
+		if (!symbolTable.success())
+		{
+			QString message = symbolTable.error().message;
+			const char* sourceFile = symbolTable.error().source_file;
+			s32 sourceLine = symbolTable.error().source_line;
+			QtHost::RunOnUIThread([failureCallback, message, sourceFile, sourceLine]() {
+				failureCallback(message, sourceFile, sourceLine);
+			});
+			return;
+		}
+		
+		QtHost::RunOnUIThread([successCallback, &symbolTable, &elfSections]() {
+			successCallback(*symbolTable, elfSections);
+		}, true);
+	});
+}
+
+void DataInspectorWindow::createGUI()
+{
 	m_typeNameToDeduplicatedTypeIndex = ccc::build_type_name_to_deduplicated_type_index_map(m_symbolTable);
 
 	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
@@ -101,7 +146,7 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
 
 	if (groupBySection)
 	{
-		for (auto& [sectionHeader, sectionName] : m_sectionHeaders)
+		for (auto& [sectionHeader, sectionName] : m_elfSections)
 		{
 			if (sectionHeader.sh_addr > 0)
 			{

@@ -104,10 +104,6 @@ Section Flags:  (1 bit, you may combine them like 3 = alloc & write permission)
 0xf0000000=Mask bits processor-specific
 */
 
-enum {
-	ELF_SECTION_TYPE_MIPS_DEBUG = 0x70000005
-};
-
 struct Elf32_Sym {
 	u32	st_name;
 	u32	st_value;
