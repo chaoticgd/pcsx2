@@ -153,11 +153,9 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 			}
 			break;
 		}
-		case ccc::ast::INLINE_ENUM:
+		case ccc::ast::ENUM:
 			return r5900Debug.read32(node->address);
-		case ccc::ast::POINTER:
-			return r5900Debug.read32(node->address);
-		case ccc::ast::REFERENCE:
+		case ccc::ast::POINTER_OR_REFERENCE:
 			return r5900Debug.read32(node->address);
 		default:
 		{
@@ -234,14 +232,11 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 			}
 			break;
 		}
-		case ccc::ast::INLINE_ENUM:
+		case ccc::ast::ENUM:
 			r5900Debug.write32(node->address, value.toLongLong());
 			break;
-		case ccc::ast::POINTER:
+		case ccc::ast::POINTER_OR_REFERENCE:
 			r5900Debug.write32(node->address, value.toULongLong());
-			break;
-		case ccc::ast::REFERENCE:
-			r5900Debug.write32(node->address, value.toInt());
 			break;
 		default:
 		{
@@ -281,9 +276,23 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			}
 			break;
 		}
-		case ccc::ast::INLINE_STRUCT_OR_UNION:
+		case ccc::ast::POINTER_OR_REFERENCE:
 		{
-			const ccc::ast::InlineStructOrUnion& structOrUnion = parentType.as<ccc::ast::InlineStructOrUnion>();
+			u32 address = r5900Debug.read32(parentNode->address);
+			if (r5900Debug.isValidAddress(address))
+			{
+				const ccc::ast::PointerOrReference& pointerOrReference = parentType.as<ccc::ast::PointerOrReference>();
+				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = pointerOrReference.value_type.get();
+				element->address = address;
+				children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::STRUCT_OR_UNION:
+		{
+			const ccc::ast::StructOrUnion& structOrUnion = parentType.as<ccc::ast::StructOrUnion>();
 			for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
 			{
 				std::unique_ptr<DataInspectorNode> childNode = std::make_unique<DataInspectorNode>();
@@ -291,34 +300,6 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 				childNode->type = field.get();
 				childNode->address = parentNode->address + field->relative_offset_bytes;
 				children.emplace_back(std::move(childNode));
-			}
-			break;
-		}
-		case ccc::ast::POINTER:
-		{
-			u32 address = r5900Debug.read32(parentNode->address);
-			if (r5900Debug.isValidAddress(address))
-			{
-				const ccc::ast::Pointer& pointer = parentType.as<ccc::ast::Pointer>();
-				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
-				element->name = QString("*%1").arg(address);
-				element->type = pointer.value_type.get();
-				element->address = address;
-				children.emplace_back(std::move(element));
-			}
-			break;
-		}
-		case ccc::ast::REFERENCE:
-		{
-			u32 address = r5900Debug.read32(parentNode->address);
-			if (r5900Debug.isValidAddress(address))
-			{
-				const ccc::ast::Reference& reference = parentType.as<ccc::ast::Reference>();
-				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
-				element->name = QString("*%1").arg(address);
-				element->type = reference.value_type.get();
-				element->address = address;
-				children.emplace_back(std::move(element));
 			}
 			break;
 		}
@@ -415,18 +396,7 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 			result = array.element_count > 0;
 			break;
 		}
-		case ccc::ast::INLINE_STRUCT_OR_UNION:
-		{
-			const ccc::ast::InlineStructOrUnion& structOrUnion = physicalType.as<ccc::ast::InlineStructOrUnion>();
-			result = !structOrUnion.fields.empty() || !structOrUnion.base_classes.empty();
-			break;
-		}
-		case ccc::ast::POINTER:
-		{
-			result = true;
-			break;
-		}
-		case ccc::ast::REFERENCE:
+		case ccc::ast::POINTER_OR_REFERENCE:
 		{
 			result = true;
 			break;
@@ -435,6 +405,12 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 		{
 			const ccc::ast::SourceFile& sourceFile = physicalType.as<ccc::ast::SourceFile>();
 			result = !sourceFile.globals.empty();
+			break;
+		}
+		case ccc::ast::STRUCT_OR_UNION:
+		{
+			const ccc::ast::StructOrUnion& structOrUnion = physicalType.as<ccc::ast::StructOrUnion>();
+			result = !structOrUnion.fields.empty() || !structOrUnion.base_classes.empty();
 			break;
 		}
 		default:
@@ -469,7 +445,7 @@ QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
 		case ccc::ast::TYPE_NAME:
 		{
 			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			return QString::fromStdString(typeName.type_name);
+			result = QString::fromStdString(typeName.type_name);
 			break;
 		}
 		case ccc::ast::VARIABLE:

@@ -74,11 +74,11 @@ QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const Q
 				}
 				break;
 			}
-			case ccc::ast::INLINE_ENUM:
+			case ccc::ast::ENUM:
 			{
-				const ccc::ast::InlineEnum& inline_enum = type.as<ccc::ast::InlineEnum>();
+				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* comboBox = new QComboBox(parent);
-				for (auto [value, string] : inline_enum.constants)
+				for (auto [value, string] : enumeration.constants)
 				{
 					comboBox->addItem(QString::fromStdString(string));
 				}
@@ -155,14 +155,14 @@ void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QMod
 				}
 				break;
 			}
-			case ccc::ast::INLINE_ENUM:
+			case ccc::ast::ENUM:
 			{
-				const ccc::ast::InlineEnum& inline_enum = type.as<ccc::ast::InlineEnum>();
+				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* comboBox = static_cast<QComboBox*>(editor);
 				QVariant data = index.data(Qt::EditRole);
-				for (s32 i = 0; i < (s32)inline_enum.constants.size(); i++)
+				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
 				{
-					if (inline_enum.constants[i].first == data.toInt())
+					if (enumeration.constants[i].first == data.toInt())
 					{
 						comboBox->setCurrentIndex(i);
 						break;
@@ -237,14 +237,14 @@ void DataInspectorValueColumnDelegate::setModelData(QWidget* editor, QAbstractIt
 				}
 				break;
 			}
-			case ccc::ast::INLINE_ENUM:
+			case ccc::ast::ENUM:
 			{
-				const ccc::ast::InlineEnum& inline_enum = type.as<ccc::ast::InlineEnum>();
+				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* comboBox = static_cast<QComboBox*>(editor);
 				s32 comboIndex = comboBox->currentIndex();
-				if (comboIndex < (s32)inline_enum.constants.size())
+				if (comboIndex < (s32)enumeration.constants.size())
 				{
-					s32 value = inline_enum.constants[comboIndex].first;
+					s32 value = enumeration.constants[comboIndex].first;
 					model->setData(index, QVariant(value), Qt::EditRole);
 				}
 				break;

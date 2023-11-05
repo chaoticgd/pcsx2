@@ -77,7 +77,7 @@ void DataInspectorWindow::loadMdebugSymbolTableAsync(
 			ccc::mdebug::parse_symbol_table(elf.GetData(), mdebugSectionHeader->sh_offset);
 		if (!mdebugSymbolTable.success())
 		{
-			QString message = mdebugSymbolTable.error().message;
+			QString message = QString::fromStdString(mdebugSymbolTable.error().message);
 			QtHost::RunOnUIThread([failureCallback, message]() {
 				failureCallback(message, nullptr, -1);
 			});
@@ -88,7 +88,7 @@ void DataInspectorWindow::loadMdebugSymbolTableAsync(
 			ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
 		if (!symbolTable.success())
 		{
-			QString message = symbolTable.error().message;
+			QString message = QString::fromStdString(symbolTable.error().message);
 			const char* sourceFile = symbolTable.error().source_file;
 			s32 sourceLine = symbolTable.error().source_line;
 			QtHost::RunOnUIThread([failureCallback, message, sourceFile, sourceLine]() {
@@ -96,10 +96,11 @@ void DataInspectorWindow::loadMdebugSymbolTableAsync(
 			});
 			return;
 		}
-		
+
 		QtHost::RunOnUIThread([successCallback, &symbolTable, &elfSections]() {
 			successCallback(*symbolTable, elfSections);
-		}, true);
+		},
+			true);
 	});
 }
 
@@ -228,7 +229,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 	for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
 	{
 		const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-		if (variable.storage.global_address > -1)
+		if (variable.storage.global_address != (u32)-1)
 		{
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 			node->name = QString::fromStdString(global->name);
