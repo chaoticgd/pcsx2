@@ -2331,11 +2331,7 @@ DebuggerWindow* MainWindow::getDebuggerWindow()
 
 DataInspectorWindow* MainWindow::getDataInspectorWindow()
 {
-	if (!m_data_inspector_window)
-		// Don't pass us (this) as the parent, otherwise the window is always on top of the mainwindow (on windows at least)
-		m_data_inspector_window = new DataInspectorWindow(nullptr);
-
-	return m_data_inspector_window;
+	return m_data_inspector_window.get();
 }
 
 void MainWindow::openDebugger()
@@ -2346,8 +2342,12 @@ void MainWindow::openDebugger()
 
 void MainWindow::openDataInspector()
 {
-	DataInspectorWindow* diwnd = getDataInspectorWindow();
-	diwnd->isVisible() ? diwnd->hide() : diwnd->show();
+	if(!m_data_inspector_window) {
+		m_data_inspector_window = new DataInspectorWindow(nullptr);
+		m_data_inspector_window->show();
+	} else {
+		delete m_data_inspector_window.get();
+	}
 }
 
 void MainWindow::doControllerSettings(ControllerSettingsWindow::Category category)

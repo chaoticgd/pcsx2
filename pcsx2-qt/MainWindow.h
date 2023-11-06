@@ -17,6 +17,7 @@
 
 #include "common/WindowInfo.h"
 
+#include <QtCore/QPointer>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenu>
@@ -292,7 +293,7 @@ private:
 	AutoUpdaterDialog* m_auto_updater_dialog = nullptr;
 
 	DebuggerWindow* m_debugger_window = nullptr;
-	DataInspectorWindow* m_data_inspector_window = nullptr;
+	QPointer<DataInspectorWindow> m_data_inspector_window = nullptr;
 
 	QProgressBar* m_status_progress_widget = nullptr;
 	QLabel* m_status_verbose_widget = nullptr;

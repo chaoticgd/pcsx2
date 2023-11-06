@@ -24,6 +24,11 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 {
 	m_ui.setupUi(this);
 
+	// This ensures that if the user just opens the data inspector out of
+	// curiosity and then immediately closes it we aren't wasting hundreds of
+	// megabytes of memory.
+	setAttribute(Qt::WA_DeleteOnClose);
+
 	m_ui.statusBar->showMessage("Loading...");
 
 	Host::RunOnCPUThread([]() {
