@@ -1,11 +1,23 @@
 #include "DataInspectorWindow.h"
 
+#include <QtConcurrent/QtConcurrent>
+
 #include "../QtHost.h"
 #include "common/Error.h"
 #include "CDVD/CDVD.h"
 #include "DebugTools/ccc/analysis.h"
 #include "Debugger/Delegates/DataInspectorValueColumnDelegate.h"
 #include "MainWindow.h"
+
+struct MdebugElfFile
+{
+	std::vector<u8> data;
+	std::vector<std::pair<ELF_SHR, std::string>> sections;
+	u32 mdebugSectionOffset;
+};
+
+static ccc::Result<MdebugElfFile> readMdebugElfFile();
+static ccc::Result<ccc::HighSymbolTable> parseMdebugSection(const MdebugElfFile& input);
 
 DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 	: QMainWindow(parent)
@@ -14,94 +26,93 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 
 	m_ui.statusBar->showMessage("Loading...");
 
-	loadMdebugSymbolTableAsync(
-		[](ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections) {
-			DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
-			if (window)
-			{
-				window->m_symbolTable = std::move(symbolTable);
-				window->m_elfSections = std::move(elfSections);
-				window->createGUI();
-			}
-		},
-		[](QString errorMessage, const char* sourceFile, int sourceLine) {
-			DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
-			if (window)
-			{
-				window->m_ui.statusBar->showMessage(errorMessage);
-			}
-		});
+	Host::RunOnCPUThread([]() {
+		// Read the contents of the currently loaded ELF file into memory.
+		ccc::Result<MdebugElfFile> elfFile = readMdebugElfFile();
+		if (!elfFile.success())
+		{
+			QtHost::RunOnUIThread([error = elfFile.error()]() {
+				DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+				if (window)
+				{
+					window->m_ui.statusBar->showMessage(QString::fromStdString(error.message));
+				}
+			});
+			return;
+		}
+
+		// Parsing the symbol table can take a while, so we spin off a worker
+		// thread to do it on.
+		QtConcurrent::run(
+			[](MdebugElfFile elfFile) {
+				ccc::Result<ccc::HighSymbolTable> symbolTable = parseMdebugSection(elfFile);
+				if (!symbolTable.success())
+				{
+					QtHost::RunOnUIThread([error = symbolTable.error()]() {
+						DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+						if (window)
+						{
+							window->m_ui.statusBar->showMessage(QString::fromStdString(error.message));
+						}
+					});
+					return;
+				}
+
+				QtHost::RunOnUIThread(
+					[&symbolTable, &elfFile]() {
+						DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+						if (window)
+						{
+							window->m_symbolTable = std::move(*symbolTable);
+							window->m_elfSections = std::move(elfFile.sections);
+							window->createGUI();
+						}
+					},
+					true);
+			},
+			std::move(*elfFile));
+	});
 }
 
-void DataInspectorWindow::loadMdebugSymbolTableAsync(
-	std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
-	std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback)
+static ccc::Result<MdebugElfFile> readMdebugElfFile()
 {
-	Host::RunOnCPUThread([successCallback, failureCallback]() {
-		std::string elfPath = VMManager::GetELFPath();
-		if (elfPath.empty())
-		{
-			QtHost::RunOnUIThread([failureCallback]() {
-				failureCallback("No ELF file loaded", nullptr, -1);
-			});
-			return;
-		}
+	std::string elfPath = VMManager::GetELFPath();
+	CCC_CHECK(!elfPath.empty(), "No ELF file loaded");
 
-		ElfObject elf;
-		Error error;
-		if (!cdvdLoadElf(&elf, elfPath, false, &error))
-		{
-			QString message = QString("Failed to load ELF file %1 (%2)").arg(elfPath.c_str()).arg(error.GetDescription().c_str());
-			QtHost::RunOnUIThread([failureCallback, message]() {
-				failureCallback(message, nullptr, -1);
-			});
-			return;
-		}
+	ElfObject elf;
+	Error error;
+	bool success = cdvdLoadElf(&elf, elfPath, false, &error);
+	CCC_CHECK(success, "Failed to load ELF file %s (%s)", elfPath.c_str(), error.GetDescription().c_str());
 
-		std::vector<std::pair<ELF_SHR, std::string>> elfSections = elf.GetSectionHeaders();
+	std::vector<std::pair<ELF_SHR, std::string>> elfSections = elf.GetSectionHeaders();
 
-		// Checking the section name is better than checking the section type
-		// since both STABS and DWARF symbols have a type of MIPS_DEBUG.
-		ELF_SHR* mdebugSectionHeader = nullptr;
-		for (auto& [sectionHeader, sectionName] : elfSections)
-			if (sectionName == ".mdebug")
-				mdebugSectionHeader = &sectionHeader;
+	// Checking the section name is better than checking the section type
+	// since both STABS and DWARF symbols have a type of MIPS_DEBUG.
+	ELF_SHR* mdebugSectionHeader = nullptr;
+	for (auto& [sectionHeader, sectionName] : elfSections)
+		if (sectionName == ".mdebug")
+			mdebugSectionHeader = &sectionHeader;
 
-		if (mdebugSectionHeader == nullptr)
-		{
-			failureCallback("No .mdebug symbol table section present", nullptr, -1);
-			return;
-		}
+	CCC_CHECK(mdebugSectionHeader, "No .mdebug symbol table section present");
 
-		ccc::Result<ccc::mdebug::SymbolTable> mdebugSymbolTable =
-			ccc::mdebug::parse_symbol_table(elf.GetData(), mdebugSectionHeader->sh_offset);
-		if (!mdebugSymbolTable.success())
-		{
-			QString message = QString::fromStdString(mdebugSymbolTable.error().message);
-			QtHost::RunOnUIThread([failureCallback, message]() {
-				failureCallback(message, nullptr, -1);
-			});
-			return;
-		}
+	MdebugElfFile result;
+	result.data = std::move(elf.GetData());
+	result.sections = std::move(elfSections);
+	result.mdebugSectionOffset = mdebugSectionHeader->sh_offset;
+	return result;
+}
 
-		ccc::Result<ccc::HighSymbolTable> symbolTable =
-			ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
-		if (!symbolTable.success())
-		{
-			QString message = QString::fromStdString(symbolTable.error().message);
-			const char* sourceFile = symbolTable.error().source_file;
-			s32 sourceLine = symbolTable.error().source_line;
-			QtHost::RunOnUIThread([failureCallback, message, sourceFile, sourceLine]() {
-				failureCallback(message, sourceFile, sourceLine);
-			});
-			return;
-		}
+static ccc::Result<ccc::HighSymbolTable> parseMdebugSection(const MdebugElfFile& input)
+{
+	ccc::Result<ccc::mdebug::SymbolTable> mdebugSymbolTable =
+		ccc::mdebug::parse_symbol_table(input.data, input.mdebugSectionOffset);
+	CCC_RETURN_IF_ERROR(mdebugSymbolTable);
 
-		QtHost::RunOnUIThread([successCallback, &symbolTable, &elfSections]() {
-			successCallback(*symbolTable, elfSections);
-		},
-			true);
-	});
+	ccc::Result<ccc::HighSymbolTable> symbolTable =
+		ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
+	CCC_RETURN_IF_ERROR(symbolTable);
+
+	return symbolTable;
 }
 
 void DataInspectorWindow::createGUI()

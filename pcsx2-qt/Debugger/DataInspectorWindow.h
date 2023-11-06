@@ -35,6 +35,7 @@ protected:
 		std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
 		std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback);
 	
+	
 	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
 		bool groupBySection, bool groupByTranslationUnit, const QString& filter);
