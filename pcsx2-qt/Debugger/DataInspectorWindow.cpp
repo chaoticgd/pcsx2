@@ -24,9 +24,6 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 {
 	m_ui.setupUi(this);
 
-	// This ensures that if the user just opens the data inspector out of
-	// curiosity and then immediately closes it we aren't wasting hundreds of
-	// megabytes of memory.
 	setAttribute(Qt::WA_DeleteOnClose);
 
 	m_ui.statusBar->showMessage("Loading...");
@@ -109,15 +106,15 @@ static ccc::Result<MdebugElfFile> readMdebugElfFile()
 
 static ccc::Result<ccc::HighSymbolTable> parseMdebugSection(const MdebugElfFile& input)
 {
-	ccc::Result<ccc::mdebug::SymbolTable> mdebugSymbolTable =
-		ccc::mdebug::parse_symbol_table(input.data, input.mdebugSectionOffset);
-	CCC_RETURN_IF_ERROR(mdebugSymbolTable);
+	ccc::mdebug::SymbolTable symbolTable;
+	ccc::Result<void> symbolTableResult = symbolTable.init(input.data, input.mdebugSectionOffset);
+	CCC_RETURN_IF_ERROR(symbolTableResult);
 
-	ccc::Result<ccc::HighSymbolTable> symbolTable =
-		ccc::analyse(*mdebugSymbolTable, ccc::DEDUPLICATE_TYPES);
-	CCC_RETURN_IF_ERROR(symbolTable);
+	ccc::Result<ccc::HighSymbolTable> highSymbolTable =
+		ccc::analyse(symbolTable, ccc::DEDUPLICATE_TYPES);
+	CCC_RETURN_IF_ERROR(highSymbolTable);
 
-	return symbolTable;
+	return highSymbolTable;
 }
 
 void DataInspectorWindow::createGUI()
