@@ -399,6 +399,21 @@ void R5900DebugInterface::write32(u32 address, u32 value)
 	memWrite32(address, value);
 }
 
+void R5900DebugInterface::write64(u32 address, u64 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	memWrite64(address, value);
+}
+
+void R5900DebugInterface::write128(u32 address, u128 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	memWrite128(address, value);
+}
 
 int R5900DebugInterface::getRegisterCategoryCount()
 {
@@ -843,6 +858,26 @@ void R3000DebugInterface::write32(u32 address, u32 value)
 		return;
 
 	iopMemWrite32(address, value);
+}
+
+void R3000DebugInterface::write64(u32 address, u64 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	iopMemWrite32(address + 0, value);
+	iopMemWrite32(address + 4, value >> 32);
+}
+
+void R3000DebugInterface::write128(u32 address, u128 value)
+{
+	if (!isValidAddress(address))
+		return;
+
+	iopMemWrite32(address + 0x0, value._u32[0]);
+	iopMemWrite32(address + 0x4, value._u32[1]);
+	iopMemWrite32(address + 0x8, value._u32[2]);
+	iopMemWrite32(address + 0xc, value._u32[3]);
 }
 
 int R3000DebugInterface::getRegisterCategoryCount()

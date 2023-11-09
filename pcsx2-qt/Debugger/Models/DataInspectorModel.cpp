@@ -59,7 +59,7 @@ int DataInspectorModel::rowCount(const QModelIndex& parent) const
 
 int DataInspectorModel::columnCount(const QModelIndex& parent) const
 {
-	return 4;
+	return COLUMN_COUNT;
 }
 
 bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
@@ -81,24 +81,39 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 
+	u32 pc = r5900Debug.getRegister(EECAT_GPR, 32);
+
 	switch (index.column())
 	{
 		case NAME:
 		{
 			return node->name;
 		}
-		case ADDRESS:
+		case LOCATION:
 		{
-			if (node->address > 0)
-				return QString::number(node->address, 16);
-			else
-				return QVariant();
+			return node->location.name();
 		}
 		case TYPE:
 		{
 			if (!node->type)
 				return QVariant();
 			return typeToString(*node->type);
+		}
+		case LIVENESS:
+		{
+			if (node->type && node->type->descriptor == ccc::ast::VARIABLE)
+			{
+				const ccc::ast::Variable& variable = node->type->as<ccc::ast::Variable>();
+				if (variable.storage.type != ccc::ast::VariableStorageType::GLOBAL)
+				{
+					bool alive = pc >= variable.block.low && pc < variable.block.high;
+					return alive ? "Alive" : "Dead";
+				}
+			}
+			return QVariant();
+		}
+		default:
+		{
 		}
 	}
 
@@ -118,33 +133,33 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 			switch (builtIn.bclass)
 			{
 				case ccc::BuiltInClass::UNSIGNED_8:
-					return (qulonglong)(u8)r5900Debug.read8(node->address);
+					return (qulonglong)node->location.read8();
 				case ccc::BuiltInClass::SIGNED_8:
-					return (qlonglong)(s8)r5900Debug.read8(node->address);
+					return (qlonglong)node->location.read8();
 				case ccc::BuiltInClass::UNQUALIFIED_8:
-					return (qulonglong)(u8)r5900Debug.read8(node->address);
+					return (qulonglong)node->location.read8();
 				case ccc::BuiltInClass::BOOL_8:
-					return (bool)r5900Debug.read8(node->address);
+					return (bool)node->location.read8();
 				case ccc::BuiltInClass::UNSIGNED_16:
-					return (qulonglong)(u16)r5900Debug.read16(node->address);
+					return (qulonglong)node->location.read16();
 				case ccc::BuiltInClass::SIGNED_16:
-					return (qlonglong)(s16)r5900Debug.read16(node->address);
+					return (qlonglong)node->location.read16();
 				case ccc::BuiltInClass::UNSIGNED_32:
-					return (qulonglong)(u32)r5900Debug.read32(node->address);
+					return (qulonglong)node->location.read32();
 				case ccc::BuiltInClass::SIGNED_32:
-					return (qlonglong)(s32)r5900Debug.read32(node->address);
+					return (qlonglong)node->location.read32();
 				case ccc::BuiltInClass::FLOAT_32:
 				{
-					u32 value = r5900Debug.read32(node->address);
+					u32 value = node->location.read32();
 					return *reinterpret_cast<float*>(&value);
 				}
 				case ccc::BuiltInClass::UNSIGNED_64:
-					return (qulonglong)(u64)r5900Debug.read64(node->address);
+					return (qulonglong)node->location.read64();
 				case ccc::BuiltInClass::SIGNED_64:
-					return (qlonglong)(s64)r5900Debug.read64(node->address);
+					return (qlonglong)node->location.read64();
 				case ccc::BuiltInClass::FLOAT_64:
 				{
-					u64 value = r5900Debug.read64(node->address);
+					u64 value = node->location.read64();
 					return *reinterpret_cast<double*>(&value);
 				}
 				default:
@@ -154,9 +169,9 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 			break;
 		}
 		case ccc::ast::ENUM:
-			return r5900Debug.read32(node->address);
+			return node->location.read32();
 		case ccc::ast::POINTER_OR_REFERENCE:
-			return r5900Debug.read32(node->address);
+			return node->location.read32();
 		default:
 		{
 		}
@@ -184,45 +199,45 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 			switch (builtIn.bclass)
 			{
 				case ccc::BuiltInClass::UNSIGNED_8:
-					r5900Debug.write8(node->address, value.toULongLong());
+					node->location.write8((u8)value.toULongLong());
 					break;
 				case ccc::BuiltInClass::SIGNED_8:
-					r5900Debug.write8(node->address, value.toLongLong());
+					node->location.write8((u8)value.toLongLong());
 					break;
 				case ccc::BuiltInClass::UNQUALIFIED_8:
-					r5900Debug.write8(node->address, value.toULongLong());
+					node->location.write8((u8)value.toULongLong());
 					break;
 				case ccc::BuiltInClass::BOOL_8:
-					r5900Debug.write8(node->address, value.toBool());
+					node->location.write8((u8)value.toBool());
 					break;
 				case ccc::BuiltInClass::UNSIGNED_16:
-					r5900Debug.write16(node->address, value.toULongLong());
+					node->location.write16((u16)value.toULongLong());
 					break;
 				case ccc::BuiltInClass::SIGNED_16:
-					r5900Debug.write16(node->address, value.toLongLong());
+					node->location.write16((u16)value.toLongLong());
 					break;
 				case ccc::BuiltInClass::UNSIGNED_32:
-					r5900Debug.write32(node->address, value.toULongLong());
+					node->location.write32((u32)value.toULongLong());
 					break;
 				case ccc::BuiltInClass::SIGNED_32:
-					r5900Debug.write32(node->address, value.toLongLong());
+					node->location.write32((u32)value.toLongLong());
 					break;
 				case ccc::BuiltInClass::FLOAT_32:
 				{
 					float f = value.toFloat();
-					r5900Debug.write32(node->address, *reinterpret_cast<float*>(&f));
+					node->location.write32(*reinterpret_cast<u32*>(&f));
 					break;
 				}
 				case ccc::BuiltInClass::UNSIGNED_64:
-					r5900Debug.write32(node->address, value.toULongLong());
+					node->location.write64((u64)value.toULongLong());
 					break;
 				case ccc::BuiltInClass::SIGNED_64:
-					r5900Debug.write32(node->address, value.toLongLong());
+					node->location.write64((u64)value.toLongLong());
 					break;
 				case ccc::BuiltInClass::FLOAT_64:
 				{
 					double d = value.toDouble();
-					r5900Debug.write32(node->address, *reinterpret_cast<double*>(&d));
+					node->location.write64(*reinterpret_cast<u64*>(&d));
 					break;
 				}
 				default:
@@ -233,10 +248,10 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 			break;
 		}
 		case ccc::ast::ENUM:
-			r5900Debug.write32(node->address, value.toLongLong());
+			node->location.write32((u32)value.toULongLong());
 			break;
 		case ccc::ast::POINTER_OR_REFERENCE:
-			r5900Debug.write32(node->address, value.toULongLong());
+			node->location.write32((u32)value.toULongLong());
 			break;
 		default:
 		{
@@ -271,21 +286,21 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("[%1]").arg(i);
 				element->type = array.element_type.get();
-				element->address = parentNode->address + i * array.element_type->computed_size_bytes;
+				element->location = parentNode->location.addOffset(i * array.element_type->computed_size_bytes);
 				children.emplace_back(std::move(element));
 			}
 			break;
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
-			u32 address = r5900Debug.read32(parentNode->address);
-			if (r5900Debug.isValidAddress(address))
+			u32 address = parentNode->location.read32();
+			if (parentNode->location.cpu().isValidAddress(address))
 			{
 				const ccc::ast::PointerOrReference& pointerOrReference = parentType.as<ccc::ast::PointerOrReference>();
 				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("*%1").arg(address);
 				element->type = pointerOrReference.value_type.get();
-				element->address = address;
+				element->location = parentNode->location.createAddress(address);
 				children.emplace_back(std::move(element));
 			}
 			break;
@@ -298,7 +313,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 				std::unique_ptr<DataInspectorNode> childNode = std::make_unique<DataInspectorNode>();
 				childNode->name = QString::fromStdString(field->name);
 				childNode->type = field.get();
-				childNode->address = parentNode->address + field->relative_offset_bytes;
+				childNode->location = parentNode->location.addOffset(field->relative_offset_bytes);
 				children.emplace_back(std::move(childNode));
 			}
 			break;
@@ -359,13 +374,17 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 		{
 			return "Name";
 		}
-		case ADDRESS:
+		case LOCATION:
 		{
-			return "Address";
+			return "Location";
 		}
 		case TYPE:
 		{
 			return "Type";
+		}
+		case LIVENESS:
+		{
+			return "Liveness";
 		}
 		case VALUE:
 		{

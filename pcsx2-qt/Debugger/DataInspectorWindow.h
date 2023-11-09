@@ -29,12 +29,11 @@ public:
 	explicit DataInspectorWindow(QWidget* parent = nullptr);
 
 	void resetGlobals();
-
+	void resetStack();
 protected:
 	void loadMdebugSymbolTableAsync(
 		std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
 		std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback);
-
 
 	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
@@ -43,10 +42,14 @@ protected:
 		u32 minAddress, u32 maxAddress, bool groupByTranlationUnit, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
 		const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter);
-
+	
+	std::unique_ptr<DataInspectorNode> populateStack();
+	const ccc::ast::FunctionDefinition* functionFromAddress(u32 entry);
+	
 	ccc::HighSymbolTable m_symbolTable;
 	std::vector<std::pair<ELF_SHR, std::string>> m_elfSections;
 	DataInspectorModel* m_globalModel;
+	DataInspectorModel* m_stackModel;
 	Ui::DataInspectorWindow m_ui;
 
 	std::map<std::string, s32> m_typeNameToDeduplicatedTypeIndex;

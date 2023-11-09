@@ -133,6 +133,12 @@ void DataInspectorWindow::createGUI()
 	connect(m_ui.globalsGroupBySection, &QCheckBox::toggled, this, &DataInspectorWindow::resetGlobals);
 	connect(m_ui.globalsGroupByTranslationUnit, &QCheckBox::toggled, this, &DataInspectorWindow::resetGlobals);
 
+	auto initialStackRoot = populateStack();
+	m_stackModel = new DataInspectorModel(std::move(initialStackRoot), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+	m_ui.stackTreeView->setModel(m_stackModel);
+
+	connect(m_ui.stackRefreshButton, &QPushButton::pressed, this, &DataInspectorWindow::resetStack);
+
 	for (QTreeView* view : {m_ui.watchTreeView, m_ui.globalsTreeView, m_ui.stackTreeView})
 	{
 		auto delegate = new DataInspectorValueColumnDelegate(m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
@@ -247,7 +253,8 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 			node->name = QString::fromStdString(global->name);
 			node->type = global.get();
-			node->address = variable.storage.global_address;
+			node->location.type = DataInspectorLocation::EE_MEMORY;
+			node->location.address = variable.storage.global_address;
 			bool addressInRange = (u32)variable.storage.global_address >= minAddress && (u32)variable.storage.global_address < maxAddress;
 			bool containsFilterString = filter.isEmpty() || node->name.toLower().contains(filter);
 			if (addressInRange && containsFilterString)
@@ -258,4 +265,94 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 	}
 
 	return variables;
+}
+
+void DataInspectorWindow::resetStack()
+{
+	m_stackModel->reset(populateStack());
+}
+
+std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
+{
+	std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
+	root->childrenFetched = true;
+
+	DebugInterface& cpu = r5900Debug;
+	u32 ra = cpu.getRegister(0, 31);
+	u32 sp = cpu.getRegister(0, 29);
+
+	std::vector<StackFrame> stackFrames;
+	for (const auto& thread : cpu.GetThreadList())
+	{
+		if (thread->Status() == ThreadStatus::THS_RUN)
+		{
+			stackFrames = MipsStackWalk::Walk(&cpu, cpu.getPC(), ra, sp, thread->EntryPoint(), thread->StackTop());
+			break;
+		}
+	}
+
+	for (StackFrame& frame : stackFrames)
+	{
+		std::unique_ptr<DataInspectorNode> functionNode = std::make_unique<DataInspectorNode>();
+
+		const ccc::ast::FunctionDefinition* function = functionFromAddress(frame.entry);
+		if (function)
+		{
+			functionNode->name = QString::fromStdString(function->name);
+			for (const std::unique_ptr<ccc::ast::Variable>& local : function->locals)
+			{
+				if (local->storage.type == ccc::ast::VariableStorageType::REGISTER && frame.sp == sp)
+				{
+					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
+					localNode->name = QString::fromStdString(local->name);
+					localNode->type = local.get();
+					localNode->location.type = DataInspectorLocation::EE_REGISTER;
+					localNode->location.address = local->storage.dbx_register_number;
+					functionNode->children.emplace_back(std::move(localNode));
+				}
+				else if (local->storage.type == ccc::ast::VariableStorageType::STACK)
+				{
+					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
+					localNode->name = QString::fromStdString(local->name);
+					localNode->type = local.get();
+					localNode->location.type = DataInspectorLocation::EE_MEMORY;
+					localNode->location.address = frame.sp;
+					functionNode->children.emplace_back(std::move(localNode));
+				}
+			}
+		}
+		else
+		{
+			functionNode->name = QString::number(frame.entry, 16);
+		}
+
+		for (std::unique_ptr<DataInspectorNode>& child : functionNode->children)
+			child->parent = functionNode.get();
+
+		root->children.emplace_back(std::move(functionNode));
+	}
+
+	for (std::unique_ptr<DataInspectorNode>& child : root->children)
+		child->parent = root.get();
+
+	return root;
+}
+
+const ccc::ast::FunctionDefinition* DataInspectorWindow::functionFromAddress(u32 entry)
+{
+	if (entry != (u32)-1)
+	{
+		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
+		{
+			for (std::unique_ptr<ccc::ast::Node>& node : sourceFile->functions)
+			{
+				const ccc::ast::FunctionDefinition& function = node->as<ccc::ast::FunctionDefinition>();
+				if (function.address_range.low == entry)
+				{
+					return &function;
+				}
+			}
+		}
+	}
+	return nullptr;
 }

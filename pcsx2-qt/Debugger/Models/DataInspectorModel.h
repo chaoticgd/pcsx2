@@ -17,19 +17,10 @@
 
 #include <QtCore/QAbstractItemModel>
 
-#include "common/Pcsx2Types.h"
+#include "common/Pcsx2Defs.h"
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/ccc/analysis.h"
-
-struct DataInspectorNode
-{
-	QString name;
-	const ccc::ast::Node* type = nullptr;
-	u32 address = 0;
-	DataInspectorNode* parent = nullptr;
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
-	bool childrenFetched = false;
-};
+#include "Debugger/DataInspectorNode.h"
 
 class DataInspectorModel : public QAbstractItemModel
 {
@@ -39,10 +30,11 @@ public:
 	enum Column
 	{
 		NAME = 0,
-		ADDRESS = 1,
+		LOCATION = 1,
 		TYPE = 2,
-		VALUE = 3,
-		COLUMN_COUNT = 4
+		LIVENESS = 3,
+		VALUE = 4,
+		COLUMN_COUNT = 5
 	};
 
 	DataInspectorModel(
