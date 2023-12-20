@@ -131,6 +131,7 @@ GameListModel::GameListModel(float cover_scale, bool show_cover_titles, QObject*
 	: QAbstractTableModel(parent)
 	, m_show_titles_for_covers(show_cover_titles)
 {
+	loadSettings();
 	loadCommonImages();
 	setCoverScale(cover_scale);
 	setColumnDisplayNames();
@@ -179,11 +180,11 @@ void GameListModel::loadOrGenerateCover(const GameList::Entry* ge)
 	// while there's outstanding jobs, the old jobs won't proceed (at the wrong size), or get added into the grid.
 	const u32 counter = m_cover_scale_counter.load(std::memory_order_acquire);
 
-	QFuture<QPixmap> future = QtConcurrent::run([this, path = ge->path, title = ge->GetTitle(m_prefer_english_titles), serial = ge->serial, counter]() -> QPixmap {
+	QFuture<QPixmap> future = QtConcurrent::run([this, entry = *ge, counter]() -> QPixmap {
 		QPixmap image;
 		if (m_cover_scale_counter.load(std::memory_order_acquire) == counter)
 		{
-			const std::string cover_path(GameList::GetCoverImagePath(path, serial, title));
+			const std::string cover_path(GameList::GetCoverImagePathForEntry(&entry));
 			if (!cover_path.empty())
 			{
 				const float dpr = qApp->devicePixelRatio();
@@ -195,6 +196,8 @@ void GameListModel::loadOrGenerateCover(const GameList::Entry* ge)
 				}
 			}
 		}
+
+		const std::string& title = entry.GetTitle(m_prefer_english_titles);
 
 		if (image.isNull())
 			image = createPlaceholderImage(m_placeholder_pixmap, getCoverArtWidth(), getCoverArtHeight(), m_cover_scale, title);
@@ -424,8 +427,8 @@ QVariant GameListModel::headerData(int section, Qt::Orientation orientation, int
 
 void GameListModel::refresh()
 {
-	m_prefer_english_titles = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
 	beginResetModel();
+	loadSettings();
 	endResetModel();
 }
 
@@ -545,6 +548,11 @@ bool GameListModel::lessThan(const QModelIndex& left_index, const QModelIndex& r
 		default:
 			return false;
 	}
+}
+
+void GameListModel::loadSettings()
+{
+	m_prefer_english_titles = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
 }
 
 QIcon GameListModel::getIconForType(GameList::EntryType type)

@@ -58,6 +58,7 @@
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/Path.h"
+#include "common/SmallString.h"
 #include "common/StringUtil.h"
 
 #include "fmt/format.h"
@@ -264,7 +265,7 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, const Pcsx2Config::G
 	else
 	{
 		// Make sure nothing is left over.
-		g_gs_renderer->PurgeTextureCache();
+		g_gs_renderer->PurgeTextureCache(true, true, true);
 		g_gs_renderer->PurgePool();
 	}
 
@@ -508,6 +509,12 @@ void GSGameChanged()
 		GSTextureReplacements::GameChanged();
 }
 
+bool GSHasDisplayWindow()
+{
+	pxAssert(g_gs_device);
+	return (g_gs_device->GetWindowInfo().type != WindowInfo::Type::Surfaceless);
+}
+
 void GSResizeDisplayWindow(int width, int height, float scale)
 {
 	g_gs_device->ResizeWindow(width, height, scale);
@@ -613,7 +620,7 @@ void GSgetInternalResolution(int* width, int* height)
 	*height = res.y;
 }
 
-void GSgetStats(std::string& info)
+void GSgetStats(SmallStringBase& info)
 {
 	GSPerfMon& pm = g_perfmon;
 	const char* api_name = GSDevice::RenderAPIToString(g_gs_device->GetRenderAPI());
@@ -621,7 +628,7 @@ void GSgetStats(std::string& info)
 	{
 		const double fps = GetVerticalFrequency();
 		const double fillrate = pm.Get(GSPerfMon::Fillrate);
-		fmt::format_to(std::back_inserter(info), "{} SW | {} S | {} P | {} D | {:.2f} U | {:.2f} D | {:.2f} mpps",
+		info.fmt("{} SW | {} S | {} P | {} D | {:.2f} U | {:.2f} D | {:.2f} mpps",
 			api_name,
 			(int)pm.Get(GSPerfMon::SyncPoint),
 			(int)pm.Get(GSPerfMon::Prim),
@@ -636,7 +643,7 @@ void GSgetStats(std::string& info)
 	}
 	else
 	{
-		fmt::format_to(std::back_inserter(info), "{} HW | {} P | {} D | {} DC | {} B | {} RP | {} RB | {} TC | {} TU",
+		info.fmt("{} HW | {} P | {} D | {} DC | {} B | {} RP | {} RB | {} TC | {} TU",
 			api_name,
 			(int)pm.Get(GSPerfMon::Prim),
 			(int)pm.Get(GSPerfMon::Draw),
@@ -649,7 +656,7 @@ void GSgetStats(std::string& info)
 	}
 }
 
-void GSgetMemoryStats(std::string& info)
+void GSgetMemoryStats(SmallStringBase& info)
 {
 	if (!g_texture_cache)
 		return;
@@ -753,7 +760,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 	{
 		if (GSConfig.UserHacks_ReadTCOnClose)
 			g_gs_renderer->ReadbackTextureCache();
-		g_gs_renderer->PurgeTextureCache();
+		g_gs_renderer->PurgeTextureCache(true, true, true);
 		g_gs_renderer->PurgePool();
 	}
 
@@ -770,7 +777,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 	if (GSConfig.LoadTextureReplacements != old_config.LoadTextureReplacements ||
 		GSConfig.DumpReplaceableTextures != old_config.DumpReplaceableTextures)
 	{
-		g_gs_renderer->PurgeTextureCache();
+		g_gs_renderer->PurgeTextureCache(true, false, true);
 	}
 
 	if (GSConfig.OsdShowGPU != old_config.OsdShowGPU)
@@ -1112,7 +1119,7 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 
 			MTGS::RunOnGSThread([new_level]() {
 				GSConfig.HWMipmap = new_level;
-				g_gs_renderer->PurgeTextureCache();
+				g_gs_renderer->PurgeTextureCache(true, false, true);
 				g_gs_renderer->PurgePool();
 			});
 		}},
@@ -1184,7 +1191,13 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 				{
 					Host::AddKeyedOSDMessage("ReloadTextureReplacements",
 						TRANSLATE_STR("Hotkeys", "Reloading texture replacements..."), Host::OSD_INFO_DURATION);
-					MTGS::RunOnGSThread([]() { GSTextureReplacements::ReloadReplacementMap(); });
+					MTGS::RunOnGSThread([]() {
+						if (!g_gs_renderer)
+							return;
+
+						GSTextureReplacements::ReloadReplacementMap();
+						g_gs_renderer->PurgeTextureCache(true, false, true);
+					});
 				}
 			}
 		}},
