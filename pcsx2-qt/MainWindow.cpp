@@ -1,19 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "AboutDialog.h"
 #include "AutoUpdaterDialog.h"
@@ -413,6 +399,8 @@ void MainWindow::connectSignals()
 		Qt::QueuedConnection);
 	connect(m_game_list_widget, &GameListWidget::addGameDirectoryRequested, this,
 		[this]() { getSettingsWindow()->getGameListSettingsWidget()->addSearchDirectory(this); });
+
+	createRendererSwitchMenu();
 }
 
 void MainWindow::connectVMThreadSignals(EmuThread* thread)
@@ -446,16 +434,48 @@ void MainWindow::connectVMThreadSignals(EmuThread* thread)
 	connect(m_ui.actionDebugger, &QAction::triggered, this, &MainWindow::openDebugger);
 	connect(m_ui.actionDataInspector, &QAction::triggered, this, &MainWindow::openDataInspector);
 	connect(m_ui.actionReloadPatches, &QAction::triggered, thread, &EmuThread::reloadPatches);
+}
 
-	static constexpr GSRendererType renderers[] = {
-#ifdef _WIN32
-		GSRendererType::DX11, GSRendererType::DX12,
+void MainWindow::createRendererSwitchMenu()
+{
+	static constexpr const GSRendererType renderers[] = {
+		GSRendererType::Auto,
+#if defined(_WIN32)
+		GSRendererType::DX11,
+		GSRendererType::DX12,
+#elif defined(__APPLE__)
+		GSRendererType::Metal,
 #endif
-		GSRendererType::OGL, GSRendererType::VK, GSRendererType::SW, GSRendererType::Null};
-	for (GSRendererType renderer : renderers)
+#ifdef ENABLE_OPENGL
+		GSRendererType::OGL,
+#endif
+#ifdef ENABLE_VULKAN
+		GSRendererType::VK,
+#endif
+		GSRendererType::SW,
+		GSRendererType::Null,
+	};
+	const GSRendererType current_renderer = static_cast<GSRendererType>(
+		Host::GetBaseIntSettingValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Auto)));
+	for (const GSRendererType renderer : renderers)
 	{
-		connect(m_ui.menuDebugSwitchRenderer->addAction(QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer))),
-			&QAction::triggered, [renderer] { g_emu_thread->switchRenderer(renderer); });
+		QAction* action = m_ui.menuDebugSwitchRenderer->addAction(
+			QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer)));
+		action->setCheckable(true);
+		action->setChecked(current_renderer == renderer);
+		connect(action,
+			&QAction::triggered, [this, action, renderer] {
+				Host::SetBaseIntSettingValue("EmuCore/GS", "Renderer", static_cast<int>(renderer));
+				Host::CommitBaseSettingChanges();
+				g_emu_thread->applySettings();
+
+				// clear all others
+				for (QObject* obj : m_ui.menuDebugSwitchRenderer->children())
+				{
+					if (QAction* act = qobject_cast<QAction*>(obj); act && act != action)
+						act->setChecked(false);
+				}
+			});
 	}
 }
 

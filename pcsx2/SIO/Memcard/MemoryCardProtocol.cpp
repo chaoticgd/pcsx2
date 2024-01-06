@@ -1,25 +1,16 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2022  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "SIO/Memcard/MemoryCardProtocol.h"
 
 #include "SIO/Sio.h"
 #include "SIO/Sio2.h"
 #include "SIO/Sio0.h"
+
+#include "common/Assertions.h"
+#include "common/Console.h"
+
+#include <cstring>
 
 #define MC_LOG_ENABLE 0
 #define MC_LOG if (MC_LOG_ENABLE) DevCon
@@ -191,22 +182,27 @@ void MemoryCardProtocol::SetTerminator()
 {
 	MC_LOG.WriteLn("%s", __FUNCTION__);
 	PS1_FAIL();
-	const u8 newTerminator = g_Sio2FifoIn.front();
+	mcd->term = g_Sio2FifoIn.front();
 	g_Sio2FifoIn.pop_front();
-	const u8 oldTerminator = mcd->term;
-	mcd->term = newTerminator;
 	g_Sio2FifoOut.push_back(0x00);
 	g_Sio2FifoOut.push_back(0x2b);
-	g_Sio2FifoOut.push_back(oldTerminator);
+	g_Sio2FifoOut.push_back(mcd->term);
 }
 
+// This one is a bit unusual. Old and new versions of MCMAN seem to handle this differently.
+// Some commands may check [4] for the terminator. Others may check [3]. Typically, older
+// MCMAN revisions will exclusively check [4], and newer revisions will check both [3] and [4]
+// for different values. In all cases, they expect to see a valid terminator value.
+//
+// Also worth noting old revisions of MCMAN will not set anything other than 0x55 for the terminator,
+// while newer revisions will set the terminator to another value (most commonly 0x5a).
 void MemoryCardProtocol::GetTerminator()
 {
 	MC_LOG.WriteLn("%s", __FUNCTION__);
 	PS1_FAIL();
 	g_Sio2FifoOut.push_back(0x2b);
 	g_Sio2FifoOut.push_back(mcd->term);
-	g_Sio2FifoOut.push_back(static_cast<u8>(Terminator::DEFAULT));
+	g_Sio2FifoOut.push_back(mcd->term);
 }
 
 void MemoryCardProtocol::WriteData()
@@ -330,7 +326,7 @@ u8 MemoryCardProtocol::PS1Read(u8 data)
 u8 MemoryCardProtocol::PS1State(u8 data)
 {
 	Console.Error("%s(%02X) I do not exist, please change that ASAP.", __FUNCTION__, data);
-	assert(false);
+	pxFail("Missing PS1State handler");
 	return 0x00;
 }
 
@@ -521,6 +517,7 @@ void MemoryCardProtocol::AuthF3()
 	}
 	else
 	{
+		mcd->term = Terminator::READY;
 		The2bTerminator(5);
 	}
 }

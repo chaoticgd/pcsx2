@@ -1,19 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2022  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "MainWindow.h"
 #include "QtHost.h"
@@ -328,6 +314,9 @@ void SettingsWindow::onClearSettingsClicked()
 		return;
 	}
 
+	m_game_cheat_settings_widget->disableAllCheats();
+	m_game_patch_settings_widget->disableAllPatches();
+
 	Pcsx2Config::ClearConfiguration(m_sif.get());
 	m_sif->Save();
 	g_emu_thread->reloadGameSettings();
@@ -624,18 +613,21 @@ void SettingsWindow::removeSettingValue(const char* section, const char* key)
 
 void SettingsWindow::openGamePropertiesDialog(const GameList::Entry* game, const std::string_view& title, std::string serial, u32 disc_crc)
 {
-	// check for an existing dialog with this crc
+	std::string filename = VMManager::GetGameSettingsPath(serial, disc_crc);
+
+	// check for an existing dialog with this filename
 	for (SettingsWindow* dialog : s_open_game_properties_dialogs)
 	{
-		if (dialog->m_disc_crc == disc_crc)
+		if (dialog->isPerGameSettings() && static_cast<INISettingsInterface*>(dialog->m_sif.get())->GetFileName() == filename)
 		{
 			dialog->show();
+			dialog->raise();
+			dialog->activateWindow();
 			dialog->setFocus();
 			return;
 		}
 	}
 
-	std::string filename(VMManager::GetGameSettingsPath(serial, disc_crc));
 	std::unique_ptr<INISettingsInterface> sif = std::make_unique<INISettingsInterface>(filename);
 	if (FileSystem::FileExists(sif->GetFileName().c_str()))
 		sif->Load();

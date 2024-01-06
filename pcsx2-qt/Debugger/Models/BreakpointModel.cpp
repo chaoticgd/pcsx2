@@ -1,19 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "BreakpointModel.h"
 
@@ -118,7 +104,7 @@ QVariant BreakpointModel::data(const QModelIndex& index, int role) const
 					// Note: Fix up the disassemblymanager so we can use it here, instead of calling a function through the disassemblyview (yuck)
 					return m_cpu.disasm(bp->addr, true).c_str();
 				case BreakpointColumns::CONDITION:
-					return bp->hasCond ? QString::fromLocal8Bit(bp->cond.expressionString) : tr("");
+					return bp->hasCond ? QString::fromLocal8Bit(bp->cond.expressionString) : "";
 				case BreakpointColumns::HITS:
 					return 0;
 			}
@@ -164,7 +150,7 @@ QVariant BreakpointModel::data(const QModelIndex& index, int role) const
 					// Note: Fix up the disassemblymanager so we can use it here, instead of calling a function through the disassemblyview (yuck)
 					return m_cpu.disasm(bp->addr, true).c_str();
 				case BreakpointColumns::CONDITION:
-					return bp->hasCond ? QString::fromLocal8Bit(bp->cond.expressionString) : tr("");
+					return bp->hasCond ? QString::fromLocal8Bit(bp->cond.expressionString) : "";
 				case BreakpointColumns::HITS:
 					return 0;
 			}
@@ -336,7 +322,7 @@ bool BreakpointModel::setData(const QModelIndex& index, const QVariant& value, i
 
 bool BreakpointModel::removeRows(int row, int count, const QModelIndex& index)
 {
-	beginRemoveRows(index, row, row + count);
+	beginRemoveRows(index, row, row + count - 1);
 
 	for (int i = row; i < row + count; i++)
 	{

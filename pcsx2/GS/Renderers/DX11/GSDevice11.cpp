@@ -1,19 +1,6 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023 PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
-#include "PrecompiledHeader.h"
 #include "GS.h"
 #include "GSDevice11.h"
 #include "GS/Renderers/DX11/D3D.h"
@@ -73,6 +60,21 @@ GSDevice11::GSDevice11()
 
 GSDevice11::~GSDevice11() = default;
 
+void GSDevice11::SetD3DDebugObjectName(ID3D11DeviceChild* obj, std::string_view name)
+{
+#ifdef PCSX2_DEVBUILD
+	// WKPDID_D3DDebugObjectName
+	static constexpr GUID guid = {0x429b8c22, 0x9188, 0x4b0c, {0x87, 0x42, 0xac, 0xb0, 0xbf, 0x85, 0xc2, 0x00}};
+
+	UINT existing_data_size;
+	HRESULT hr = obj->GetPrivateData(guid, &existing_data_size, nullptr);
+	if (SUCCEEDED(hr) && existing_data_size > 0)
+		return;
+
+	obj->SetPrivateData(guid, static_cast<UINT>(name.length()), name.data());
+#endif
+}
+
 RenderAPI GSDevice11::GetRenderAPI() const
 {
 	return RenderAPI::D3D11;
@@ -130,6 +132,8 @@ bool GSDevice11::Create()
 			D3D11_MESSAGE_ID hide[] = {
 				D3D11_MESSAGE_ID_DEVICE_OMSETRENDERTARGETS_HAZARD,
 				D3D11_MESSAGE_ID_DEVICE_PSSETSHADERRESOURCES_HAZARD,
+				D3D11_MESSAGE_ID_DEVICE_DRAW_RENDERTARGETVIEW_NOT_SET,
+				D3D11_MESSAGE_ID_QUERY_END_ABANDONING_PREVIOUS_RESULTS,
 			};
 
 			D3D11_INFO_QUEUE_FILTER filter = {};
@@ -1073,7 +1077,7 @@ void GSDevice11::DrawIndexedPrimitive()
 
 void GSDevice11::DrawIndexedPrimitive(int offset, int count)
 {
-	ASSERT(offset + count <= (int)m_index.count);
+	pxAssert(offset + count <= (int)m_index.count);
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
 	PSUpdateShaderState();
 	m_ctx->DrawIndexed(count, m_index.start + offset, m_vertex.start);
@@ -1719,7 +1723,7 @@ void GSDevice11::SetupPS(const PSSelector& sel, const GSHWDrawConfig::PSConstant
 	{
 		if (sel.pal_fmt || sel.wms >= 3 || sel.wmt >= 3)
 		{
-			ASSERT(ssel.biln == 0);
+			pxAssert(ssel.biln == 0);
 		}
 
 		auto i = std::as_const(m_ps_ss).find(ssel.key);
@@ -2460,12 +2464,12 @@ static GSDevice11::OMBlendSelector convertSel(GSHWDrawConfig::ColorMaskSelector 
 /// Clears things we don't support that can be quietly disabled
 static void preprocessSel(GSDevice11::PSSelector& sel)
 {
-	ASSERT(sel.write_rg  == 0); // Not supported, shouldn't be sent
+	pxAssert(sel.write_rg  == 0); // Not supported, shouldn't be sent
 }
 
 void GSDevice11::RenderHW(GSHWDrawConfig& config)
 {
-	ASSERT(!config.require_full_barrier); // We always specify no support so it shouldn't request this
+	pxAssert(!config.require_full_barrier); // We always specify no support so it shouldn't request this
 	preprocessSel(config.ps);
 
 	GSVector2i rtsize = (config.rt ? config.rt : config.ds)->GetSize();

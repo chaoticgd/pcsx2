@@ -66,6 +66,7 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/ControllerBindingWidget.ui
 	Settings/ControllerBindingWidget_DualShock2.ui
 	Settings/ControllerBindingWidget_Guitar.ui
+	Settings/ControllerBindingWidget_Popn.ui
 	Settings/ControllerBindingWidgets.cpp
 	Settings/ControllerBindingWidgets.h
 	Settings/ControllerLEDSettingsDialog.ui
@@ -176,6 +177,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/StackModel.h
 	Debugger/Models/DataInspectorModel.cpp
 	Debugger/Models/DataInspectorModel.h
+	Debugger/Models/SavedAddressesModel.cpp
+	Debugger/Models/SavedAddressesModel.h
 	Debugger/Delegates/DataInspectorValueColumnDelegate.cpp
 	Debugger/Delegates/DataInspectorValueColumnDelegate.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp
@@ -190,6 +193,7 @@ target_sources(pcsx2-qt PRIVATE
 file(GLOB TS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Translations/*.ts)
 
 target_precompile_headers(pcsx2-qt PRIVATE PrecompiledHeader.h)
+set_source_files_properties(PrecompiledHeader.cpp PROPERTIES HEADER_FILE_ONLY TRUE)
 
 target_include_directories(pcsx2-qt PRIVATE
 	${Qt6Gui_PRIVATE_INCLUDE_DIRS}

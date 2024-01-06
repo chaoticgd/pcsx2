@@ -1,28 +1,21 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2021 PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "Config.h"
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/DX11/D3D.h"
 #include "GS/GSExtra.h"
+#include "Host.h"
+
+#ifdef _M_X86
+#include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#endif
 
 #include "common/Console.h"
 #include "common/StringUtil.h"
 #include "common/Path.h"
+
+#include "IconsFontAwesome5.h"
 
 #include <array>
 #include <d3d11.h>
@@ -324,6 +317,8 @@ std::string D3D::GetDriverVersionFromLUID(const LUID& luid)
 	return ret;
 }
 
+#ifdef _M_X86
+
 D3D::VendorID D3D::GetVendorID(IDXGIAdapter1* adapter)
 {
 	DXGI_ADAPTER_DESC1 desc;
@@ -359,7 +354,7 @@ GSRendererType D3D::GetPreferredRenderer()
 	if (!adapter)
 		return GSRendererType::DX11;
 
-	const auto get_d3d11_feature_level = [&factory, &adapter]() -> std::optional<D3D_FEATURE_LEVEL> {
+	const auto get_d3d11_feature_level = [&adapter]() -> std::optional<D3D_FEATURE_LEVEL> {
 		static const D3D_FEATURE_LEVEL check[] = {
 			D3D_FEATURE_LEVEL_12_0,
 			D3D_FEATURE_LEVEL_11_0,
@@ -378,12 +373,24 @@ GSRendererType D3D::GetPreferredRenderer()
 		Console.WriteLn("D3D11 feature level for autodetection: %x", static_cast<unsigned>(feature_level));
 		return feature_level;
 	};
-	const auto get_d3d12_device = [&factory, &adapter]() {
+	const auto get_d3d12_device = [&adapter]() {
 		wil::com_ptr_nothrow<ID3D12Device> device;
 		const HRESULT hr = D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(device.put()));
 		if (FAILED(hr))
 			Console.Error("D3D12CreateDevice() for automatic renderer failed: %08X", hr);
 		return device;
+	};
+	const auto check_vulkan_supported = []() {
+		std::vector<std::string> vk_adapter_names;
+		GSDeviceVK::GetAdaptersAndFullscreenModes(&vk_adapter_names, nullptr);
+		if (!vk_adapter_names.empty())
+			return true;
+
+		Host::AddIconOSDMessage("VKDriverUnsupported", ICON_FA_TV, TRANSLATE_STR("GS",
+			"The Vulkan renderer was automatically selected, but no compatible devices were found.\n"
+			"       You should update all graphics drivers in your system, including any integrated GPUs\n"
+			"       to use the Vulkan renderer."), Host::OSD_WARNING_DURATION);
+		return false;
 	};
 
 	switch (GetVendorID(adapter.get()))
@@ -394,7 +401,7 @@ GSRendererType D3D::GetPreferredRenderer()
 			if (!feature_level.has_value())
 				return GSRendererType::DX11;
 			else if (feature_level == D3D_FEATURE_LEVEL_12_0)
-				return GSRendererType::VK;
+				return check_vulkan_supported() ? GSRendererType::VK : GSRendererType::OGL;
 			else if (feature_level == D3D_FEATURE_LEVEL_11_0)
 				return GSRendererType::OGL;
 			else
@@ -407,7 +414,7 @@ GSRendererType D3D::GetPreferredRenderer()
 			if (!feature_level.has_value())
 				return GSRendererType::DX11;
 			else if (feature_level == D3D_FEATURE_LEVEL_12_0)
-				return GSRendererType::VK;
+				return check_vulkan_supported() ? GSRendererType::VK : GSRendererType::DX11;
 			else
 				return GSRendererType::DX11;
 		}
@@ -428,7 +435,7 @@ GSRendererType D3D::GetPreferredRenderer()
 					opts.SamplerFeedbackTier >= D3D12_SAMPLER_FEEDBACK_TIER_0_9)
 				{
 					Console.WriteLn("Sampler feedback tier 0.9 found for Intel GPU, defaulting to Vulkan.");
-					return GSRendererType::VK;
+					return check_vulkan_supported() ? GSRendererType::VK : GSRendererType::DX11;
 				}
 			}
 
@@ -444,6 +451,8 @@ GSRendererType D3D::GetPreferredRenderer()
 		}
 	}
 }
+
+#endif // _M_X86
 
 wil::com_ptr_nothrow<ID3DBlob> D3D::CompileShader(D3D::ShaderType type, D3D_FEATURE_LEVEL feature_level, bool debug,
 	const std::string_view& code, const D3D_SHADER_MACRO* macros /* = nullptr */,

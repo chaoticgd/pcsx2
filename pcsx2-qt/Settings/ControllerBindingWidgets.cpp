@@ -1,19 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2022  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "PrecompiledHeader.h"
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include <QtCore/QDir>
 #include <QtWidgets/QInputDialog>
@@ -23,6 +9,7 @@
 #include <algorithm>
 #include "fmt/format.h"
 
+#include "common/Console.h"
 #include "common/StringUtil.h"
 
 #include "pcsx2/Host.h"
@@ -120,6 +107,10 @@ void ControllerBindingWidget::onTypeChanged()
 	else if (cinfo->type == Pad::ControllerType::Guitar)
 	{
 		m_bindings_widget = ControllerBindingWidget_Guitar::createInstance(this);
+	}
+	else if (cinfo->type == Pad::ControllerType::Popn)
+	{
+		m_bindings_widget = ControllerBindingWidget_Popn::createInstance(this);
 	}
 	else
 	{
@@ -908,6 +899,27 @@ QIcon ControllerBindingWidget_Guitar::getIcon() const
 ControllerBindingWidget_Base* ControllerBindingWidget_Guitar::createInstance(ControllerBindingWidget* parent)
 {
 	return new ControllerBindingWidget_Guitar(parent);
+}
+
+ControllerBindingWidget_Popn::ControllerBindingWidget_Popn(ControllerBindingWidget* parent)
+	: ControllerBindingWidget_Base(parent)
+{
+	m_ui.setupUi(this);
+	initBindingWidgets();
+}
+
+ControllerBindingWidget_Popn::~ControllerBindingWidget_Popn()
+{
+}
+
+QIcon ControllerBindingWidget_Popn::getIcon() const
+{
+	return QIcon::fromTheme("Popn-line");
+}
+
+ControllerBindingWidget_Base* ControllerBindingWidget_Popn::createInstance(ControllerBindingWidget* parent)
+{
+	return new ControllerBindingWidget_Popn(parent);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -1,22 +1,10 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2021 PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
-#include "PrecompiledHeader.h"
 #include "GS/Renderers/SW/GSTextureCacheSW.h"
 #include "GS/GSExtra.h"
 #include "GS/GSPerfMon.h"
+#include "GS/GSPng.h"
 #include "GS/GSUtil.h"
 
 GSTextureCacheSW::GSTextureCacheSW() = default;
@@ -317,45 +305,36 @@ bool GSTextureCacheSW::Texture::Update(const GSVector4i& rect)
 	return true;
 }
 
-#include "GSTextureSW.h"
-
-bool GSTextureCacheSW::Texture::Save(const std::string& fn, bool dds) const
+bool GSTextureCacheSW::Texture::Save(const std::string& fn) const
 {
 	const u32* RESTRICT clut = g_gs_renderer->m_mem.m_clut;
 
-	int w = 1 << m_TEX0.TW;
-	int h = 1 << m_TEX0.TH;
+	const u32 w = 1 << m_TEX0.TW;
+	const u32 h = 1 << m_TEX0.TH;
 
-	GSTextureSW t(GSTexture::Type::Invalid, w, h);
-
-	GSTexture::GSMap m;
-
-	if (t.Map(m, nullptr))
+	constexpr GSPng::Format format = IsDevBuild ? GSPng::RGB_A_PNG : GSPng::RGB_PNG;
+	const GSLocalMemory::psm_t& psm = GSLocalMemory::m_psm[m_TEX0.PSM];
+	const u8* RESTRICT src = (u8*)m_buff;
+	const u32 src_pitch = 1u << (m_tw + (psm.pal == 0 ? 2 : 0));
+	if (psm.pal == 0)
 	{
-		const GSLocalMemory::psm_t& psm = GSLocalMemory::m_psm[m_TEX0.PSM];
+		// no clut => dump directly
+		return GSPng::Save(format, fn, src, w, h, src_pitch, GSConfig.PNGCompressionLevel);
+	}
+	else
+	{
+		const std::unique_ptr<u32[]> dumptex = std::make_unique<u32[]>(w * h);
+		u32* dst = dumptex.get();
 
-		const u8* RESTRICT src = (u8*)m_buff;
-		int pitch = 1 << (m_tw + (psm.pal == 0 ? 2 : 0));
-
-		for (int j = 0; j < h; j++, src += pitch, m.bits += m.pitch)
+		for (u32 j = 0; j < h; j++)
 		{
-			if (psm.pal == 0)
-			{
-				memcpy(m.bits, src, sizeof(u32) * w);
-			}
-			else
-			{
-				for (int i = 0; i < w; i++)
-				{
-					((u32*)m.bits)[i] = clut[src[i]];
-				}
-			}
+			for (u32 i = 0; i < w; i++)
+				*(dst++) = clut[src[i]];
+
+			src += src_pitch;
 		}
 
-		t.Unmap();
-
-		return t.Save(fn);
+		return GSPng::Save(format, fn, reinterpret_cast<const u8*>(dumptex.get()),
+			w, h, w * sizeof(u32), GSConfig.PNGCompressionLevel);
 	}
-
-	return false;
 }

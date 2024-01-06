@@ -1,17 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023 PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #pragma once
 #include "common/Pcsx2Defs.h"
@@ -48,6 +36,7 @@ namespace ImGuiFullscreen
 	extern ImFont* g_large_font;
 
 	extern float g_layout_scale;
+	extern float g_rcp_layout_scale;
 	extern float g_layout_padding_left;
 	extern float g_layout_padding_top;
 
@@ -68,7 +57,6 @@ namespace ImGuiFullscreen
 	extern ImVec4 UISecondaryTextColor;
 
 	static __fi float DPIScale(float v) { return ImGui::GetIO().DisplayFramebufferScale.x * v; }
-
 	static __fi float DPIScale(int v) { return ImGui::GetIO().DisplayFramebufferScale.x * static_cast<float>(v); }
 
 	static __fi ImVec2 DPIScale(const ImVec2& v)
@@ -78,19 +66,20 @@ namespace ImGuiFullscreen
 	}
 
 	static __fi float WindowWidthScale(float v) { return ImGui::GetWindowWidth() * v; }
-
 	static __fi float WindowHeightScale(float v) { return ImGui::GetWindowHeight() * v; }
 
 	static __fi float LayoutScale(float v) { return g_layout_scale * v; }
-
 	static __fi ImVec2 LayoutScale(const ImVec2& v) { return ImVec2(v.x * g_layout_scale, v.y * g_layout_scale); }
-
 	static __fi ImVec2 LayoutScale(float x, float y) { return ImVec2(x * g_layout_scale, y * g_layout_scale); }
 
 	static __fi ImVec2 LayoutScaleAndOffset(float x, float y)
 	{
 		return ImVec2(g_layout_padding_left + x * g_layout_scale, g_layout_padding_top + y * g_layout_scale);
 	}
+
+	static __fi float LayoutUnscale(float v) { return g_rcp_layout_scale * v; }
+	static __fi ImVec2 LayoutUnscale(const ImVec2& v) { return ImVec2(v.x * g_rcp_layout_scale, v.y * g_rcp_layout_scale); }
+	static __fi ImVec2 LayoutUnscale(float x, float y) { return ImVec2(x * g_rcp_layout_scale, y * g_rcp_layout_scale); }
 
 	static __fi ImVec4 ModAlpha(const ImVec4& v, float a) { return ImVec4(v.x, v.y, v.z, a); }
 	static __fi ImVec4 MulAlpha(const ImVec4& v, float a) { return ImVec4(v.x, v.y, v.z, v.w * a); }

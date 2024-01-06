@@ -287,6 +287,9 @@
     <ClCompile Include="Debugger\Models\StackModel.cpp">
       <Filter>Debugger\Models</Filter>
     </ClCompile>
+    <ClCompile Include="Debugger\Models\SavedAddressesModel.cpp">
+      <Filter>Debugger\Models</Filter>
+    </ClCompile>
     <ClCompile Include="$(IntDir)Debugger\moc_CpuWidget.cpp">
       <Filter>moc</Filter>
     </ClCompile>
@@ -312,6 +315,9 @@
       <Filter>moc</Filter>
     </ClCompile>
     <ClCompile Include="$(IntDir)Debugger\Models\moc_StackModel.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)Debugger\Models\moc_SavedAddressesModel.cpp">
       <Filter>moc</Filter>
     </ClCompile>
     <ClCompile Include="ColorPickerButton.cpp" />
@@ -482,6 +488,9 @@
     <QtMoc Include="Debugger\Models\StackModel.h">
       <Filter>Debugger\Models</Filter>
     </QtMoc>
+    <QtMoc Include="Debugger\Models\SavedAddressesModel.h">
+      <Filter>Debugger\Models</Filter>
+    </QtMoc>
     <QtMoc Include="ColorPickerButton.h" />
     <QtMoc Include="SetupWizardDialog.h" />
     <QtMoc Include="Settings\GameCheatSettingsWidget.h">
@@ -636,6 +645,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Settings\FolderSettingsWidget.ui">
+      <Filter>Settings</Filter>
+    </None>
+    <None Include="Settings\ControllerBindingWidget_Popn.ui">
       <Filter>Settings</Filter>
     </None>
   </ItemGroup>
