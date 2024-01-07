@@ -49,5 +49,5 @@ struct DataInspectorNode
 	DataInspectorLocation location;
 	DataInspectorNode* parent = nullptr;
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
-	bool childrenFetched = false;
+	bool children_fetched = false;
 };

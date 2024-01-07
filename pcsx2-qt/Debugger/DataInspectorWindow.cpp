@@ -130,13 +130,13 @@ void DataInspectorWindow::reportErrorOnUiThread(const ccc::Error& error)
 
 void DataInspectorWindow::createGUI()
 {
-	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
-	bool groupByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
+	bool group_by_section = m_ui.globalsGroupBySection->isChecked();
+	bool group_by_source_file = m_ui.globalsGroupByTranslationUnit->isChecked();
 	QString filter = m_ui.globalsFilter->text().toLower();
 
-	auto initialGlobalRoot = populateGlobalSections(groupBySection, groupByTranslationUnit, filter);
-	m_globalModel = new DataInspectorModel(std::move(initialGlobalRoot), m_database, this);
-	m_ui.globalsTreeView->setModel(m_globalModel);
+	auto initialGlobalRoot = populateGlobalSections(group_by_section, group_by_source_file, filter);
+	m_global_model = new DataInspectorModel(std::move(initialGlobalRoot), m_database, this);
+	m_ui.globalsTreeView->setModel(m_global_model);
 
 	connect(m_ui.globalsFilter, &QLineEdit::textEdited, this, &DataInspectorWindow::resetGlobals);
 	connect(m_ui.globalsGroupBySection, &QCheckBox::toggled, this, &DataInspectorWindow::resetGlobals);
@@ -165,33 +165,33 @@ void DataInspectorWindow::createGUI()
 
 void DataInspectorWindow::resetGlobals()
 {
-	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
-	bool groupByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
+	bool group_by_section = m_ui.globalsGroupBySection->isChecked();
+	bool group_by_source_file = m_ui.globalsGroupByTranslationUnit->isChecked();
 	QString filter = m_ui.globalsFilter->text().toLower();
 
-	m_globalModel->reset(populateGlobalSections(groupBySection, groupByTranslationUnit, filter));
+	m_global_model->reset(populateGlobalSections(group_by_section, group_by_source_file, filter));
 }
 
 std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
-	bool groupBySection, bool groupByTranslationUnit, const QString& filter)
+	bool group_by_section, bool group_by_source_file, const QString& filter)
 {
 	std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
-	root->childrenFetched = true;
+	root->children_fetched = true;
 
-	if (groupBySection)
+	if (group_by_section)
 	{
 		for (ccc::Section& section : m_database.sections)
 		{
 			if (section.address().valid())
 			{
-				u32 minAddress = section.address().value;
-				u32 maxAddress = section.address().value + section.size();
-				auto sectionChildren = populateGlobalTranslationUnits(minAddress, maxAddress, groupByTranslationUnit, filter);
-				if (!sectionChildren.empty())
+				u32 min_address = section.address().value;
+				u32 max_address = section.address().value + section.size();
+				auto section_children = populateGlobalTranslationUnits(min_address, max_address, group_by_source_file, filter);
+				if (!section_children.empty())
 				{
 					std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 					node->name = QString::fromStdString(section.name());
-					node->children = std::move(sectionChildren);
+					node->children = std::move(section_children);
 
 					for (std::unique_ptr<DataInspectorNode>& child : node->children)
 						child->parent = node.get();
@@ -203,10 +203,10 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
 	}
 	else
 	{
-		auto rootChildren = populateGlobalTranslationUnits(0, UINT32_MAX, groupByTranslationUnit, filter);
+		auto root_children = populateGlobalTranslationUnits(0, UINT32_MAX, group_by_source_file, filter);
 		root->children.insert(root->children.end(),
-			std::make_move_iterator(rootChildren.begin()),
-			std::make_move_iterator(rootChildren.end()));
+			std::make_move_iterator(root_children.begin()),
+			std::make_move_iterator(root_children.end()));
 	}
 
 	for (std::unique_ptr<DataInspectorNode>& child : root->children)
@@ -216,7 +216,7 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
 }
 
 std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalTranslationUnits(
-	u32 minAddress, u32 maxAddress, bool group_by_source_file, const QString& filter)
+	u32 min_address, u32 max_address, bool group_by_source_file, const QString& filter)
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
@@ -230,7 +230,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 			else
 				node->name = QString::fromStdString(source_file.name());
 			node->type = source_file.type();
-			node->children = populateGlobalVariables(source_file, minAddress, maxAddress, filter);
+			node->children = populateGlobalVariables(source_file, min_address, max_address, filter);
 
 			if (!node->children.empty())
 			{
@@ -244,7 +244,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 	{
 		for (const ccc::SourceFile& source_file : m_database.source_files)
 		{
-			std::vector<std::unique_ptr<DataInspectorNode>> variables = populateGlobalVariables(source_file, minAddress, maxAddress, filter);
+			std::vector<std::unique_ptr<DataInspectorNode>> variables = populateGlobalVariables(source_file, min_address, max_address, filter);
 			children.insert(children.end(),
 				std::make_move_iterator(variables.begin()),
 				std::make_move_iterator(variables.end()));
@@ -255,7 +255,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 }
 
 std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalVariables(
-	const ccc::SourceFile& source_file, u32 minAddress, u32 maxAddress, const QString& filter)
+	const ccc::SourceFile& source_file, u32 min_address, u32 max_address, const QString& filter)
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> variables;
 
@@ -268,7 +268,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 			node->type = global_variable.type();
 			node->location.type = DataInspectorLocation::EE_MEMORY;
 			node->location.address = global_variable.address().value;
-			bool addressInRange = global_variable.address().value >= minAddress && global_variable.address().value < maxAddress;
+			bool addressInRange = global_variable.address().value >= min_address && global_variable.address().value < max_address;
 			bool containsFilterString = filter.isEmpty() || node->name.toLower().contains(filter);
 			if (addressInRange && containsFilterString)
 			{
@@ -288,64 +288,64 @@ void DataInspectorWindow::resetStack()
 std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
 {
 	std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
-	root->childrenFetched = true;
+	root->children_fetched = true;
 
 	DebugInterface& cpu = r5900Debug;
 	u32 ra = cpu.getRegister(0, 31);
 	u32 sp = cpu.getRegister(0, 29);
 
-	std::vector<StackFrame> stackFrames;
+	std::vector<StackFrame> stack_frames;
 	for (const auto& thread : cpu.GetThreadList())
 	{
 		if (thread->Status() == ThreadStatus::THS_RUN)
 		{
-			stackFrames = MipsStackWalk::Walk(&cpu, cpu.getPC(), ra, sp, thread->EntryPoint(), thread->StackTop());
+			stack_frames = MipsStackWalk::Walk(&cpu, cpu.getPC(), ra, sp, thread->EntryPoint(), thread->StackTop());
 			break;
 		}
 	}
 
-	for (StackFrame& frame : stackFrames)
+	for (StackFrame& frame : stack_frames)
 	{
-		std::unique_ptr<DataInspectorNode> functionNode = std::make_unique<DataInspectorNode>();
+		std::unique_ptr<DataInspectorNode> function_node = std::make_unique<DataInspectorNode>();
 
 		ccc::FunctionHandle handle = m_database.functions.first_handle_from_starting_address(frame.entry);
 		const ccc::Function* function = m_database.functions.symbol_from_handle(handle);
 		if (function)
 		{
-			functionNode->name = QString::fromStdString(function->name());
+			function_node->name = QString::fromStdString(function->name());
 			for (const ccc::LocalVariable& local_variable : m_database.local_variables.optional_span(function->local_variables()))
 			{
 				const ccc::RegisterStorage* register_storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage);
 				if (register_storage && frame.sp == sp)
 				{
 					
-					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
-					localNode->name = QString::fromStdString(local_variable.name());
-					localNode->type = local_variable.type();
-					localNode->location.type = DataInspectorLocation::EE_REGISTER;
-					localNode->location.address = register_storage->dbx_register_number;
-					functionNode->children.emplace_back(std::move(localNode));
+					std::unique_ptr<DataInspectorNode> local_node = std::make_unique<DataInspectorNode>();
+					local_node->name = QString::fromStdString(local_variable.name());
+					local_node->type = local_variable.type();
+					local_node->location.type = DataInspectorLocation::EE_REGISTER;
+					local_node->location.address = register_storage->dbx_register_number;
+					function_node->children.emplace_back(std::move(local_node));
 				}
 				else if (std::holds_alternative<ccc::StackStorage>(local_variable.storage))
 				{
-					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
-					localNode->name = QString::fromStdString(local_variable.name());
-					localNode->type = local_variable.type();
-					localNode->location.type = DataInspectorLocation::EE_MEMORY;
-					localNode->location.address = frame.sp;
-					functionNode->children.emplace_back(std::move(localNode));
+					std::unique_ptr<DataInspectorNode> local_node = std::make_unique<DataInspectorNode>();
+					local_node->name = QString::fromStdString(local_variable.name());
+					local_node->type = local_variable.type();
+					local_node->location.type = DataInspectorLocation::EE_MEMORY;
+					local_node->location.address = frame.sp;
+					function_node->children.emplace_back(std::move(local_node));
 				}
 			}
 		}
 		else
 		{
-			functionNode->name = QString::number(frame.entry, 16);
+			function_node->name = QString::number(frame.entry, 16);
 		}
 
-		for (std::unique_ptr<DataInspectorNode>& child : functionNode->children)
-			child->parent = functionNode.get();
+		for (std::unique_ptr<DataInspectorNode>& child : function_node->children)
+			child->parent = function_node.get();
 
-		root->children.emplace_back(std::move(functionNode));
+		root->children.emplace_back(std::move(function_node));
 	}
 
 	for (std::unique_ptr<DataInspectorNode>& child : root->children)

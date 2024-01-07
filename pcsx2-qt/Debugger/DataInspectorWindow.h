@@ -36,16 +36,16 @@ protected:
 	
 	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
-		bool groupBySection, bool groupByTranslationUnit, const QString& filter);
+		bool group_by_section, bool group_by_source_file, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalTranslationUnits(
-		u32 minAddress, u32 maxAddress, bool group_by_source_file, const QString& filter);
+		u32 min_address, u32 max_address, bool group_by_source_file, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
-		const ccc::SourceFile& source_file, u32 minAddress, u32 maxAddress, const QString& filter);
+		const ccc::SourceFile& source_file, u32 min_address, u32 max_address, const QString& filter);
 	
 	std::unique_ptr<DataInspectorNode> populateStack();
 	
 	ccc::SymbolDatabase m_database;
-	DataInspectorModel* m_globalModel;
+	DataInspectorModel* m_global_model;
 	DataInspectorModel* m_stackModel;
 	Ui::DataInspectorWindow m_ui;
 };

@@ -39,7 +39,7 @@ public:
 	};
 
 	DataInspectorModel(
-		std::unique_ptr<DataInspectorNode> initialRoot,
+		std::unique_ptr<DataInspectorNode> initial_root,
 		const ccc::SymbolDatabase& database,
 		QObject* parent = nullptr);
 
@@ -55,7 +55,7 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-	void reset(std::unique_ptr<DataInspectorNode> newRoot);
+	void reset(std::unique_ptr<DataInspectorNode> new_root);
 
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type) const;
