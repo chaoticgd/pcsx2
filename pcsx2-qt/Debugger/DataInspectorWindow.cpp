@@ -5,7 +5,9 @@
 #include "../QtHost.h"
 #include "common/Error.h"
 #include "CDVD/CDVD.h"
-#include "DebugTools/ccc/analysis.h"
+#include "DebugTools/ccc/importer_flags.h"
+#include "DebugTools/ccc/symbol_file.h"
+#include "DebugTools/ccc/symbol_table.h"
 #include "Debugger/Delegates/DataInspectorValueColumnDelegate.h"
 #include "MainWindow.h"
 
@@ -17,7 +19,7 @@ struct MdebugElfFile
 };
 
 static ccc::Result<MdebugElfFile> readMdebugElfFile();
-static ccc::Result<ccc::HighSymbolTable> parseMdebugSection(const MdebugElfFile& input);
+static void reportErrorOnUiThread(const ccc::Error& error);
 
 DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 	: QMainWindow(parent)
@@ -30,49 +32,60 @@ DataInspectorWindow::DataInspectorWindow(QWidget* parent)
 
 	Host::RunOnCPUThread([]() {
 		// Read the contents of the currently loaded ELF file into memory.
-		ccc::Result<MdebugElfFile> elfFile = readMdebugElfFile();
-		if (!elfFile.success())
+		ccc::Result<MdebugElfFile> raw_elf = readMdebugElfFile();
+		if (!raw_elf.success())
 		{
-			QtHost::RunOnUIThread([error = elfFile.error()]() {
-				DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
-				if (window)
-				{
-					window->m_ui.statusBar->showMessage(QString::fromStdString(error.message));
-				}
-			});
+			reportErrorOnUiThread(raw_elf.error());
 			return;
 		}
+
+		ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(raw_elf->data));
+		if (!parsed_elf.success())
+		{
+			reportErrorOnUiThread(parsed_elf.error());
+			return;
+		}
+
+		std::unique_ptr<ccc::SymbolFile> symbol_file = std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf));
 
 		// Parsing the symbol table can take a while, so we spin off a worker
 		// thread to do it on.
 		QtConcurrent::run(
-			[](MdebugElfFile elfFile) {
-				ccc::Result<ccc::HighSymbolTable> symbolTable = parseMdebugSection(elfFile);
-				if (!symbolTable.success())
+			[](ccc::SymbolFile* raw_symbol_file) {
+				std::unique_ptr<ccc::SymbolFile> symbol_file(raw_symbol_file);
+
+				ccc::SymbolDatabase database;
+
+				ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = symbol_file->get_all_symbol_tables();
+				if (!symbol_tables.success())
 				{
-					QtHost::RunOnUIThread([error = symbolTable.error()]() {
-						DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
-						if (window)
-						{
-							window->m_ui.statusBar->showMessage(QString::fromStdString(error.message));
-						}
-					});
+					reportErrorOnUiThread(symbol_tables.error());
+					return;
+				}
+
+				// TODO: Add GNU demangler.
+				ccc::DemanglerFunctions demangler;
+
+				ccc::Result<ccc::SymbolSourceRange> symbol_sources = ccc::import_symbol_tables(
+					database, *symbol_tables, ccc::NO_IMPORTER_FLAGS, demangler);
+				if (!symbol_sources.success())
+				{
+					reportErrorOnUiThread(symbol_sources.error());
 					return;
 				}
 
 				QtHost::RunOnUIThread(
-					[&symbolTable, &elfFile]() {
+					[&database]() {
 						DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
 						if (window)
 						{
-							window->m_symbolTable = std::move(*symbolTable);
-							window->m_elfSections = std::move(elfFile.sections);
+							window->m_database = std::move(database);
 							window->createGUI();
 						}
 					},
 					true);
 			},
-			std::move(*elfFile));
+			symbol_file.release());
 	});
 }
 
@@ -104,29 +117,25 @@ static ccc::Result<MdebugElfFile> readMdebugElfFile()
 	return result;
 }
 
-static ccc::Result<ccc::HighSymbolTable> parseMdebugSection(const MdebugElfFile& input)
+void DataInspectorWindow::reportErrorOnUiThread(const ccc::Error& error)
 {
-	ccc::mdebug::SymbolTable symbolTable;
-	ccc::Result<void> symbolTableResult = symbolTable.init(input.data, input.mdebugSectionOffset);
-	CCC_RETURN_IF_ERROR(symbolTableResult);
-
-	ccc::Result<ccc::HighSymbolTable> highSymbolTable =
-		ccc::analyse(symbolTable, ccc::DEDUPLICATE_TYPES);
-	CCC_RETURN_IF_ERROR(highSymbolTable);
-
-	return highSymbolTable;
+	QtHost::RunOnUIThread([error]() {
+		DataInspectorWindow* window = g_main_window->getDataInspectorWindow();
+		if (window)
+		{
+			window->m_ui.statusBar->showMessage(QString::fromStdString(error.message));
+		}
+	});
 }
 
 void DataInspectorWindow::createGUI()
 {
-	m_typeNameToDeduplicatedTypeIndex = ccc::build_type_name_to_deduplicated_type_index_map(m_symbolTable);
-
 	bool groupBySection = m_ui.globalsGroupBySection->isChecked();
 	bool groupByTranslationUnit = m_ui.globalsGroupByTranslationUnit->isChecked();
 	QString filter = m_ui.globalsFilter->text().toLower();
 
 	auto initialGlobalRoot = populateGlobalSections(groupBySection, groupByTranslationUnit, filter);
-	m_globalModel = new DataInspectorModel(std::move(initialGlobalRoot), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+	m_globalModel = new DataInspectorModel(std::move(initialGlobalRoot), m_database, this);
 	m_ui.globalsTreeView->setModel(m_globalModel);
 
 	connect(m_ui.globalsFilter, &QLineEdit::textEdited, this, &DataInspectorWindow::resetGlobals);
@@ -134,19 +143,24 @@ void DataInspectorWindow::createGUI()
 	connect(m_ui.globalsGroupByTranslationUnit, &QCheckBox::toggled, this, &DataInspectorWindow::resetGlobals);
 
 	auto initialStackRoot = populateStack();
-	m_stackModel = new DataInspectorModel(std::move(initialStackRoot), m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+	m_stackModel = new DataInspectorModel(std::move(initialStackRoot), m_database, this);
 	m_ui.stackTreeView->setModel(m_stackModel);
 
 	connect(m_ui.stackRefreshButton, &QPushButton::pressed, this, &DataInspectorWindow::resetStack);
 
 	for (QTreeView* view : {m_ui.watchTreeView, m_ui.globalsTreeView, m_ui.stackTreeView})
 	{
-		auto delegate = new DataInspectorValueColumnDelegate(m_symbolTable, m_typeNameToDeduplicatedTypeIndex, this);
+		auto delegate = new DataInspectorValueColumnDelegate(m_database, this);
 		view->setItemDelegateForColumn(DataInspectorModel::VALUE, delegate);
 		view->setAlternatingRowColors(true);
 	}
 
-	m_ui.statusBar->showMessage(QString("Loaded %1 data types").arg(m_symbolTable.deduplicated_types.size()));
+	s32 symbol_count = 0;
+#define CCC_X(SymbolType, symbol_list) symbol_count += m_database.symbol_list.size();
+	CCC_FOR_EACH_SYMBOL_TYPE_DO_X
+#undef CCC_X
+
+	m_ui.statusBar->showMessage(QString("Loaded %1 symbols").arg(symbol_count));
 }
 
 void DataInspectorWindow::resetGlobals()
@@ -166,17 +180,17 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
 
 	if (groupBySection)
 	{
-		for (auto& [sectionHeader, sectionName] : m_elfSections)
+		for (ccc::Section& section : m_database.sections)
 		{
-			if (sectionHeader.sh_addr > 0)
+			if (section.address().valid())
 			{
-				u32 minAddress = sectionHeader.sh_addr;
-				u32 maxAddress = sectionHeader.sh_addr + sectionHeader.sh_size;
+				u32 minAddress = section.address().value;
+				u32 maxAddress = section.address().value + section.size();
 				auto sectionChildren = populateGlobalTranslationUnits(minAddress, maxAddress, groupByTranslationUnit, filter);
 				if (!sectionChildren.empty())
 				{
 					std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
-					node->name = QString::fromStdString(sectionName);
+					node->name = QString::fromStdString(section.name());
 					node->children = std::move(sectionChildren);
 
 					for (std::unique_ptr<DataInspectorNode>& child : node->children)
@@ -202,21 +216,21 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateGlobalSections(
 }
 
 std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalTranslationUnits(
-	u32 minAddress, u32 maxAddress, bool groupByTranlationUnit, const QString& filter)
+	u32 minAddress, u32 maxAddress, bool group_by_source_file, const QString& filter)
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
-	if (groupByTranlationUnit)
+	if (group_by_source_file)
 	{
-		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
+		for (const ccc::SourceFile& source_file : m_database.source_files)
 		{
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
-			if (!sourceFile->relative_path.empty())
-				node->name = QString::fromStdString(sourceFile->relative_path);
+			if (!source_file.command_line_path.empty())
+				node->name = QString::fromStdString(source_file.command_line_path);
 			else
-				node->name = QString::fromStdString(sourceFile->full_path);
-			node->type = sourceFile.get();
-			node->children = populateGlobalVariables(*sourceFile, minAddress, maxAddress, filter);
+				node->name = QString::fromStdString(source_file.name());
+			node->type = source_file.type();
+			node->children = populateGlobalVariables(source_file, minAddress, maxAddress, filter);
 
 			if (!node->children.empty())
 			{
@@ -228,9 +242,9 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 	}
 	else
 	{
-		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
+		for (const ccc::SourceFile& source_file : m_database.source_files)
 		{
-			std::vector<std::unique_ptr<DataInspectorNode>> variables = populateGlobalVariables(*sourceFile, minAddress, maxAddress, filter);
+			std::vector<std::unique_ptr<DataInspectorNode>> variables = populateGlobalVariables(source_file, minAddress, maxAddress, filter);
 			children.insert(children.end(),
 				std::make_move_iterator(variables.begin()),
 				std::make_move_iterator(variables.end()));
@@ -241,21 +255,20 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 }
 
 std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlobalVariables(
-	const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter)
+	const ccc::SourceFile& source_file, u32 minAddress, u32 maxAddress, const QString& filter)
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> variables;
 
-	for (const std::unique_ptr<ccc::ast::Node>& global : sourceFile.globals)
+	for (const ccc::GlobalVariable& global_variable : m_database.global_variables.span(source_file.globals_variables()))
 	{
-		const ccc::ast::Variable& variable = global->as<ccc::ast::Variable>();
-		if (variable.storage.global_address != (u32)-1)
+		if (global_variable.address().valid())
 		{
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
-			node->name = QString::fromStdString(global->name);
-			node->type = global.get();
+			node->name = QString::fromStdString(global_variable.name());
+			node->type = global_variable.type();
 			node->location.type = DataInspectorLocation::EE_MEMORY;
-			node->location.address = variable.storage.global_address;
-			bool addressInRange = (u32)variable.storage.global_address >= minAddress && (u32)variable.storage.global_address < maxAddress;
+			node->location.address = global_variable.address().value;
+			bool addressInRange = global_variable.address().value >= minAddress && global_variable.address().value < maxAddress;
 			bool containsFilterString = filter.isEmpty() || node->name.toLower().contains(filter);
 			if (addressInRange && containsFilterString)
 			{
@@ -295,26 +308,29 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
 	{
 		std::unique_ptr<DataInspectorNode> functionNode = std::make_unique<DataInspectorNode>();
 
-		const ccc::ast::FunctionDefinition* function = functionFromAddress(frame.entry);
+		ccc::FunctionHandle handle = m_database.functions.first_handle_from_starting_address(frame.entry);
+		const ccc::Function* function = m_database.functions.symbol_from_handle(handle);
 		if (function)
 		{
-			functionNode->name = QString::fromStdString(function->name);
-			for (const std::unique_ptr<ccc::ast::Variable>& local : function->locals)
+			functionNode->name = QString::fromStdString(function->name());
+			for (const ccc::LocalVariable& local_variable : m_database.local_variables.optional_span(function->local_variables()))
 			{
-				if (local->storage.type == ccc::ast::VariableStorageType::REGISTER && frame.sp == sp)
+				const ccc::RegisterStorage* register_storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage);
+				if (register_storage && frame.sp == sp)
 				{
+					
 					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
-					localNode->name = QString::fromStdString(local->name);
-					localNode->type = local.get();
+					localNode->name = QString::fromStdString(local_variable.name());
+					localNode->type = local_variable.type();
 					localNode->location.type = DataInspectorLocation::EE_REGISTER;
-					localNode->location.address = local->storage.dbx_register_number;
+					localNode->location.address = register_storage->dbx_register_number;
 					functionNode->children.emplace_back(std::move(localNode));
 				}
-				else if (local->storage.type == ccc::ast::VariableStorageType::STACK)
+				else if (std::holds_alternative<ccc::StackStorage>(local_variable.storage))
 				{
 					std::unique_ptr<DataInspectorNode> localNode = std::make_unique<DataInspectorNode>();
-					localNode->name = QString::fromStdString(local->name);
-					localNode->type = local.get();
+					localNode->name = QString::fromStdString(local_variable.name());
+					localNode->type = local_variable.type();
 					localNode->location.type = DataInspectorLocation::EE_MEMORY;
 					localNode->location.address = frame.sp;
 					functionNode->children.emplace_back(std::move(localNode));
@@ -336,23 +352,4 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
 		child->parent = root.get();
 
 	return root;
-}
-
-const ccc::ast::FunctionDefinition* DataInspectorWindow::functionFromAddress(u32 entry)
-{
-	if (entry != (u32)-1)
-	{
-		for (const std::unique_ptr<ccc::ast::SourceFile>& sourceFile : m_symbolTable.source_files)
-		{
-			for (std::unique_ptr<ccc::ast::Node>& node : sourceFile->functions)
-			{
-				const ccc::ast::FunctionDefinition& function = node->as<ccc::ast::FunctionDefinition>();
-				if (function.address_range.low == entry)
-				{
-					return &function;
-				}
-			}
-		}
-	}
-	return nullptr;
 }

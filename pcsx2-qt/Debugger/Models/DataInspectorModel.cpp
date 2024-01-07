@@ -2,13 +2,11 @@
 
 DataInspectorModel::DataInspectorModel(
 	std::unique_ptr<DataInspectorNode> initialRoot,
-	const ccc::HighSymbolTable& symbolTable,
-	const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
+	const ccc::SymbolDatabase& database,
 	QObject* parent)
 	: QAbstractItemModel(parent)
 	, m_root(std::move(initialRoot))
-	, m_symbolTable(symbolTable)
-	, m_typeNameToDeduplicatedTypeIndex(typeNameToDeduplicatedTypeIndex)
+	, m_database(database)
 {
 }
 
@@ -101,15 +99,15 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		}
 		case LIVENESS:
 		{
-			if (node->type && node->type->descriptor == ccc::ast::VARIABLE)
-			{
-				const ccc::ast::Variable& variable = node->type->as<ccc::ast::Variable>();
-				if (variable.storage.type != ccc::ast::VariableStorageType::GLOBAL)
-				{
-					bool alive = pc >= variable.block.low && pc < variable.block.high;
-					return alive ? "Alive" : "Dead";
-				}
-			}
+			//if (node->type && node->type->descriptor == ccc::ast::VARIABLE)
+			//{
+			//	const ccc::ast::Variable& variable = node->type->as<ccc::ast::Variable>();
+			//	if (variable.storage.type != ccc::ast::VariableStorageType::GLOBAL)
+			//	{
+			//		bool alive = pc >= variable.block.low && pc < variable.block.high;
+			//		return alive ? "Alive" : "Dead";
+			//	}
+			//}
 			return QVariant();
 		}
 		default:
@@ -122,7 +120,7 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 	if (!node->type)
 		return QVariant();
 
-	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
 
 	QVariant result;
 	switch (type.descriptor)
@@ -132,32 +130,32 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
 			switch (builtIn.bclass)
 			{
-				case ccc::BuiltInClass::UNSIGNED_8:
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
 					return (qulonglong)node->location.read8();
-				case ccc::BuiltInClass::SIGNED_8:
+				case ccc::ast::BuiltInClass::SIGNED_8:
 					return (qlonglong)node->location.read8();
-				case ccc::BuiltInClass::UNQUALIFIED_8:
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 					return (qulonglong)node->location.read8();
-				case ccc::BuiltInClass::BOOL_8:
+				case ccc::ast::BuiltInClass::BOOL_8:
 					return (bool)node->location.read8();
-				case ccc::BuiltInClass::UNSIGNED_16:
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
 					return (qulonglong)node->location.read16();
-				case ccc::BuiltInClass::SIGNED_16:
+				case ccc::ast::BuiltInClass::SIGNED_16:
 					return (qlonglong)node->location.read16();
-				case ccc::BuiltInClass::UNSIGNED_32:
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
 					return (qulonglong)node->location.read32();
-				case ccc::BuiltInClass::SIGNED_32:
+				case ccc::ast::BuiltInClass::SIGNED_32:
 					return (qlonglong)node->location.read32();
-				case ccc::BuiltInClass::FLOAT_32:
+				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
 					u32 value = node->location.read32();
 					return *reinterpret_cast<float*>(&value);
 				}
-				case ccc::BuiltInClass::UNSIGNED_64:
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
 					return (qulonglong)node->location.read64();
-				case ccc::BuiltInClass::SIGNED_64:
+				case ccc::ast::BuiltInClass::SIGNED_64:
 					return (qlonglong)node->location.read64();
-				case ccc::BuiltInClass::FLOAT_64:
+				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
 					u64 value = node->location.read64();
 					return *reinterpret_cast<double*>(&value);
@@ -189,7 +187,7 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 	if (!node->type)
 		return false;
 
-	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
 	switch (type.descriptor)
 	{
 		case ccc::ast::BUILTIN:
@@ -198,43 +196,43 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 
 			switch (builtIn.bclass)
 			{
-				case ccc::BuiltInClass::UNSIGNED_8:
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
 					node->location.write8((u8)value.toULongLong());
 					break;
-				case ccc::BuiltInClass::SIGNED_8:
+				case ccc::ast::BuiltInClass::SIGNED_8:
 					node->location.write8((u8)value.toLongLong());
 					break;
-				case ccc::BuiltInClass::UNQUALIFIED_8:
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 					node->location.write8((u8)value.toULongLong());
 					break;
-				case ccc::BuiltInClass::BOOL_8:
+				case ccc::ast::BuiltInClass::BOOL_8:
 					node->location.write8((u8)value.toBool());
 					break;
-				case ccc::BuiltInClass::UNSIGNED_16:
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
 					node->location.write16((u16)value.toULongLong());
 					break;
-				case ccc::BuiltInClass::SIGNED_16:
+				case ccc::ast::BuiltInClass::SIGNED_16:
 					node->location.write16((u16)value.toLongLong());
 					break;
-				case ccc::BuiltInClass::UNSIGNED_32:
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
 					node->location.write32((u32)value.toULongLong());
 					break;
-				case ccc::BuiltInClass::SIGNED_32:
+				case ccc::ast::BuiltInClass::SIGNED_32:
 					node->location.write32((u32)value.toLongLong());
 					break;
-				case ccc::BuiltInClass::FLOAT_32:
+				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
 					float f = value.toFloat();
 					node->location.write32(*reinterpret_cast<u32*>(&f));
 					break;
 				}
-				case ccc::BuiltInClass::UNSIGNED_64:
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
 					node->location.write64((u64)value.toULongLong());
 					break;
-				case ccc::BuiltInClass::SIGNED_64:
+				case ccc::ast::BuiltInClass::SIGNED_64:
 					node->location.write64((u64)value.toLongLong());
 					break;
-				case ccc::BuiltInClass::FLOAT_64:
+				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
 					double d = value.toDouble();
 					node->location.write64(*reinterpret_cast<u64*>(&d));
@@ -273,7 +271,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 	if (!parentNode->type)
 		return;
 
-	const ccc::ast::Node& parentType = resolvePhysicalType(*parentNode->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+	const ccc::ast::Node& parentType = resolvePhysicalType(*parentNode->type, m_database);
 
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 	switch (parentType.descriptor)
@@ -313,7 +311,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 				std::unique_ptr<DataInspectorNode> childNode = std::make_unique<DataInspectorNode>();
 				childNode->name = QString::fromStdString(field->name);
 				childNode->type = field.get();
-				childNode->location = parentNode->location.addOffset(field->relative_offset_bytes);
+				childNode->location = parentNode->location.addOffset(field->offset_bytes);
 				children.emplace_back(std::move(childNode));
 			}
 			break;
@@ -404,7 +402,7 @@ void DataInspectorModel::reset(std::unique_ptr<DataInspectorNode> newRoot)
 
 bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 {
-	const ccc::ast::Node& physicalType = resolvePhysicalType(type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+	const ccc::ast::Node& physicalType = resolvePhysicalType(type, m_database);
 
 	bool result = false;
 	switch (physicalType.descriptor)
@@ -418,12 +416,6 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type) const
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
 			result = true;
-			break;
-		}
-		case ccc::ast::SOURCE_FILE:
-		{
-			const ccc::ast::SourceFile& sourceFile = physicalType.as<ccc::ast::SourceFile>();
-			result = !sourceFile.globals.empty();
 			break;
 		}
 		case ccc::ast::STRUCT_OR_UNION:
@@ -463,14 +455,11 @@ QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
 	{
 		case ccc::ast::TYPE_NAME:
 		{
-			const ccc::ast::TypeName& typeName = type.as<ccc::ast::TypeName>();
-			result = QString::fromStdString(typeName.type_name);
-			break;
-		}
-		case ccc::ast::VARIABLE:
-		{
-			const ccc::ast::Variable& variable = type.as<ccc::ast::Variable>();
-			result = typeToString(*variable.type);
+			const ccc::ast::TypeName& type_name = type.as<ccc::ast::TypeName>();
+			const ccc::DataType* data_type = m_database.data_types.symbol_from_handle(type_name.data_type_handle);
+			if(data_type) {
+				result = QString::fromStdString(data_type->name());
+			}
 			break;
 		}
 		default:
@@ -482,21 +471,17 @@ QString DataInspectorModel::typeToString(const ccc::ast::Node& type) const
 	return result;
 }
 
-const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::HighSymbolTable& symbolTable, const std::map<std::string, s32>& nameToType)
+const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::SymbolDatabase& database)
 {
 	const ccc::ast::Node* result = &type;
-	if (result->descriptor == ccc::ast::VARIABLE)
-	{
-		result = result->as<ccc::ast::Variable>().type.get();
-	}
 	for (s32 i = 0; i < 10 && result->descriptor == ccc::ast::TYPE_NAME; i++)
 	{
-		s32 type_index = ccc::lookup_type(result->as<ccc::ast::TypeName>(), symbolTable, &nameToType);
-		if (type_index < 0)
+		const ccc::DataType* symbol = database.data_types.symbol_from_handle(type.as<ccc::ast::TypeName>().data_type_handle);
+		if (!symbol)
 		{
 			break;
 		}
-		result = symbolTable.deduplicated_types.at(type_index).get();
+		result = symbol->type();
 	}
 	return *result;
 }

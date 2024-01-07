@@ -1,5 +1,7 @@
-#ifndef _CCC_MDEBUG_H
-#define _CCC_MDEBUG_H
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
+
+#pragma once
 
 #include "util.h"
 
@@ -101,45 +103,43 @@ enum StabsCode {
 };
 
 struct Symbol {
-	const char* string;
-	s32 value;
-	SymbolType storage_type;
-	SymbolClass storage_class;
+	u32 value;
+	SymbolType symbol_type;
+	SymbolClass symbol_class;
 	u32 index;
-	bool is_stabs = false;
-	StabsCode code = STAB;
-};
-
-enum class SourceLanguage {
-	C,
-	CPP,
-	ASSEMBLY,
-	UNKNOWN
+	const char* string;
+	
+	bool is_stabs() const {
+		return (index & 0xfff00) == 0x8f300;
+	}
+	
+	StabsCode code() const {
+		return (StabsCode) (index - 0x8f300);
+	}
 };
 
 struct File {
-	std::string base_path;
-	std::string raw_path;
-	std::string full_path;
-	bool is_windows_path = false;
 	std::vector<Symbol> symbols;
-	SourceLanguage detected_language = SourceLanguage::UNKNOWN;
+	std::string working_dir; // The working directory of GCC.
+	std::string command_line_path; // The source file path passed on the command line to GCC.
+	std::string full_path; // The full combined path.
 };
 
-class SymbolTable {
+class SymbolTableReader {
 public:
-	Result<void> init(const std::vector<u8>& elf, s32 section_offset);
+	Result<void> init(std::span<const u8> elf, s32 section_offset);
 	
 	s32 file_count() const;
 	Result<File> parse_file(s32 index) const;
 	Result<std::vector<Symbol>> parse_external_symbols() const;
 	
-	void print_header(FILE* dest) const;
+	void print_header(FILE* out) const;
+	Result<void> print_symbols(FILE* out, bool print_locals, bool print_externals) const;
 
 protected:
 	bool m_ready = false;
 	
-	const std::vector<u8>* m_elf;
+	std::span<const u8> m_elf;
 	s32 m_section_offset;
 	
 	// If the .mdebug section was moved without updating its contents all the
@@ -151,8 +151,6 @@ protected:
 
 const char* symbol_type(SymbolType type);
 const char* symbol_class(SymbolClass symbol_class);
-const char* stabs_code(StabsCode code);
+const char* stabs_code_to_string(StabsCode code);
 
 }
-
-#endif

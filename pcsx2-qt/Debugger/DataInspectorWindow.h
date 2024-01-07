@@ -18,6 +18,7 @@
 #include <QtWidgets/QMainWindow>
 
 #include "Elfheader.h"
+#include "DebugTools/ccc/symbol_database.h"
 #include "Models/DataInspectorModel.h"
 #include "ui_DataInspectorWindow.h"
 
@@ -31,26 +32,20 @@ public:
 	void resetGlobals();
 	void resetStack();
 protected:
-	void loadMdebugSymbolTableAsync(
-		std::function<void(ccc::HighSymbolTable& symbolTable, std::vector<std::pair<ELF_SHR, std::string>>& elfSections)> successCallback,
-		std::function<void(QString errorMessage, const char* sourceFile, int sourceLine)> failureCallback);
-
+	static void reportErrorOnUiThread(const ccc::Error& error);
+	
 	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
 		bool groupBySection, bool groupByTranslationUnit, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalTranslationUnits(
-		u32 minAddress, u32 maxAddress, bool groupByTranlationUnit, const QString& filter);
+		u32 minAddress, u32 maxAddress, bool group_by_source_file, const QString& filter);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
-		const ccc::ast::SourceFile& sourceFile, u32 minAddress, u32 maxAddress, const QString& filter);
+		const ccc::SourceFile& source_file, u32 minAddress, u32 maxAddress, const QString& filter);
 	
 	std::unique_ptr<DataInspectorNode> populateStack();
-	const ccc::ast::FunctionDefinition* functionFromAddress(u32 entry);
 	
-	ccc::HighSymbolTable m_symbolTable;
-	std::vector<std::pair<ELF_SHR, std::string>> m_elfSections;
+	ccc::SymbolDatabase m_database;
 	DataInspectorModel* m_globalModel;
 	DataInspectorModel* m_stackModel;
 	Ui::DataInspectorWindow m_ui;
-
-	std::map<std::string, s32> m_typeNameToDeduplicatedTypeIndex;
 };

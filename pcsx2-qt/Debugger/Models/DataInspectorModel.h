@@ -19,7 +19,8 @@
 
 #include "common/Pcsx2Defs.h"
 #include "DebugTools/DebugInterface.h"
-#include "DebugTools/ccc/analysis.h"
+#include "DebugTools/ccc/ast.h"
+#include "DebugTools/ccc/symbol_database.h"
 #include "Debugger/DataInspectorNode.h"
 
 class DataInspectorModel : public QAbstractItemModel
@@ -39,8 +40,7 @@ public:
 
 	DataInspectorModel(
 		std::unique_ptr<DataInspectorNode> initialRoot,
-		const ccc::HighSymbolTable& symbolTable,
-		const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
+		const ccc::SymbolDatabase& database,
 		QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
@@ -64,8 +64,7 @@ protected:
 
 	std::unique_ptr<DataInspectorNode> m_root;
 	QString m_filter;
-	const ccc::HighSymbolTable& m_symbolTable;
-	const std::map<std::string, s32>& m_typeNameToDeduplicatedTypeIndex;
+	const ccc::SymbolDatabase& m_database;
 };
 
-const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::HighSymbolTable& symbolTable, const std::map<std::string, s32>& nameToType);
+const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::SymbolDatabase& database);

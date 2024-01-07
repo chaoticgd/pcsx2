@@ -1,17 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "DataInspectorValueColumnDelegate.h"
 
@@ -21,12 +9,10 @@
 #include "Int64SpinBox.h"
 
 DataInspectorValueColumnDelegate::DataInspectorValueColumnDelegate(
-	const ccc::HighSymbolTable& symbolTable,
-	const std::map<std::string, s32>& typeNameToDeduplicatedTypeIndex,
+	const ccc::SymbolDatabase& database,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
-	, m_symbolTable(symbolTable)
-	, m_typeNameToDeduplicatedTypeIndex(typeNameToDeduplicatedTypeIndex)
+	, m_database(database)
 {
 }
 
@@ -35,7 +21,7 @@ QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const Q
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
-		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:
@@ -44,29 +30,29 @@ QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const Q
 
 				switch (builtIn.bclass)
 				{
-					case ccc::BuiltInClass::UNSIGNED_8:
+					case ccc::ast::BuiltInClass::UNSIGNED_8:
 						return new UInt64SpinBox(0, UINT8_MAX, parent);
-					case ccc::BuiltInClass::SIGNED_8:
+					case ccc::ast::BuiltInClass::SIGNED_8:
 						return new Int64SpinBox(INT8_MIN, INT8_MAX, parent);
-					case ccc::BuiltInClass::UNQUALIFIED_8:
+					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 						return new UInt64SpinBox(0, UINT8_MAX, parent);
-					case ccc::BuiltInClass::BOOL_8:
+					case ccc::ast::BuiltInClass::BOOL_8:
 						return new QCheckBox(parent);
-					case ccc::BuiltInClass::UNSIGNED_16:
+					case ccc::ast::BuiltInClass::UNSIGNED_16:
 						return new UInt64SpinBox(0, INT16_MAX, parent);
-					case ccc::BuiltInClass::SIGNED_16:
+					case ccc::ast::BuiltInClass::SIGNED_16:
 						return new Int64SpinBox(INT16_MIN, INT16_MAX, parent);
-					case ccc::BuiltInClass::UNSIGNED_32:
+					case ccc::ast::BuiltInClass::UNSIGNED_32:
 						return new UInt64SpinBox(0, UINT32_MAX, parent);
-					case ccc::BuiltInClass::SIGNED_32:
+					case ccc::ast::BuiltInClass::SIGNED_32:
 						return new Int64SpinBox(INT32_MIN, INT32_MAX, parent);
-					case ccc::BuiltInClass::FLOAT_32:
+					case ccc::ast::BuiltInClass::FLOAT_32:
 						return new QDoubleSpinBox(parent);
-					case ccc::BuiltInClass::UNSIGNED_64:
+					case ccc::ast::BuiltInClass::UNSIGNED_64:
 						return new UInt64SpinBox(0, UINT64_MAX, parent);
-					case ccc::BuiltInClass::SIGNED_64:
+					case ccc::ast::BuiltInClass::SIGNED_64:
 						return new Int64SpinBox(INT64_MIN, INT64_MAX, parent);
-					case ccc::BuiltInClass::FLOAT_64:
+					case ccc::ast::BuiltInClass::FLOAT_64:
 						return new QDoubleSpinBox(parent);
 					default:
 					{
@@ -98,7 +84,7 @@ void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QMod
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
-		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:
@@ -107,42 +93,42 @@ void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QMod
 
 				switch (builtIn.bclass)
 				{
-					case ccc::BuiltInClass::UNSIGNED_8:
-					case ccc::BuiltInClass::UNQUALIFIED_8:
-					case ccc::BuiltInClass::UNSIGNED_16:
-					case ccc::BuiltInClass::UNSIGNED_32:
-					case ccc::BuiltInClass::UNSIGNED_64:
+					case ccc::ast::BuiltInClass::UNSIGNED_8:
+					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					case ccc::ast::BuiltInClass::UNSIGNED_16:
+					case ccc::ast::BuiltInClass::UNSIGNED_32:
+					case ccc::ast::BuiltInClass::UNSIGNED_64:
 					{
 						UInt64SpinBox* spinBox = qobject_cast<UInt64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						spinBox->setValue(index.data().toULongLong());
 						break;
 					}
-					case ccc::BuiltInClass::SIGNED_8:
-					case ccc::BuiltInClass::SIGNED_16:
-					case ccc::BuiltInClass::SIGNED_32:
-					case ccc::BuiltInClass::SIGNED_64:
+					case ccc::ast::BuiltInClass::SIGNED_8:
+					case ccc::ast::BuiltInClass::SIGNED_16:
+					case ccc::ast::BuiltInClass::SIGNED_32:
+					case ccc::ast::BuiltInClass::SIGNED_64:
 					{
 						Int64SpinBox* spinBox = qobject_cast<Int64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						spinBox->setValue(index.data().toLongLong());
 						break;
 					}
-					case ccc::BuiltInClass::BOOL_8:
+					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
 						Q_ASSERT(checkBox);
 						checkBox->setChecked(index.data().toBool());
 						break;
 					}
-					case ccc::BuiltInClass::FLOAT_32:
+					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						spinBox->setValue(index.data().toFloat());
 						break;
 					}
-					case ccc::BuiltInClass::FLOAT_64:
+					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
@@ -181,7 +167,7 @@ void DataInspectorValueColumnDelegate::setModelData(QWidget* editor, QAbstractIt
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (node->type)
 	{
-		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_symbolTable, m_typeNameToDeduplicatedTypeIndex);
+		const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:
@@ -190,41 +176,41 @@ void DataInspectorValueColumnDelegate::setModelData(QWidget* editor, QAbstractIt
 
 				switch (builtIn.bclass)
 				{
-					case ccc::BuiltInClass::UNSIGNED_8:
-					case ccc::BuiltInClass::UNQUALIFIED_8:
-					case ccc::BuiltInClass::UNSIGNED_16:
-					case ccc::BuiltInClass::UNSIGNED_32:
-					case ccc::BuiltInClass::UNSIGNED_64:
+					case ccc::ast::BuiltInClass::UNSIGNED_8:
+					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					case ccc::ast::BuiltInClass::UNSIGNED_16:
+					case ccc::ast::BuiltInClass::UNSIGNED_32:
+					case ccc::ast::BuiltInClass::UNSIGNED_64:
 					{
 						UInt64SpinBox* spinBox = qobject_cast<UInt64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						model->setData(index, spinBox->value(), Qt::EditRole);
 						break;
 					}
-					case ccc::BuiltInClass::SIGNED_8:
-					case ccc::BuiltInClass::SIGNED_16:
-					case ccc::BuiltInClass::SIGNED_32:
-					case ccc::BuiltInClass::SIGNED_64:
+					case ccc::ast::BuiltInClass::SIGNED_8:
+					case ccc::ast::BuiltInClass::SIGNED_16:
+					case ccc::ast::BuiltInClass::SIGNED_32:
+					case ccc::ast::BuiltInClass::SIGNED_64:
 					{
 						Int64SpinBox* spinBox = qobject_cast<Int64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						model->setData(index, spinBox->value(), Qt::EditRole);
 						break;
 					}
-					case ccc::BuiltInClass::BOOL_8:
+					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
 						model->setData(index, checkBox->isChecked(), Qt::EditRole);
 						break;
 					}
-					case ccc::BuiltInClass::FLOAT_32:
+					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
 						model->setData(index, spinBox->value(), Qt::EditRole);
 						break;
 					}
-					case ccc::BuiltInClass::FLOAT_64:
+					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);

@@ -1,4 +1,7 @@
-#include "mdebug.h"
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
+
+#include "mdebug_section.h"
 
 namespace ccc::mdebug {
 
@@ -76,7 +79,7 @@ CCC_PACKED_STRUCT(ProcedureDescriptor,
 
 CCC_PACKED_STRUCT(SymbolHeader,
 	/* 0x0 */ u32 iss;
-	/* 0x4 */ s32 value;
+	/* 0x4 */ u32 value;
 	/* 0x8:00 */ u32 st : 6;
 	/* 0x8:06 */ u32 sc : 5;
 	/* 0x8:11 */ u32 reserved : 1;
@@ -90,14 +93,16 @@ CCC_PACKED_STRUCT(ExternalSymbolHeader,
 	/* 0x4 */ SymbolHeader symbol;
 )
 
+static void print_symbol(FILE* out, const Symbol& symbol);
 static s32 get_corruption_fixing_fudge_offset(s32 section_offset, const SymbolicHeader& hdrr);
-static Result<Symbol> parse_symbol(const SymbolHeader& header, const std::vector<u8>& elf, s32 strings_offset);
+static Result<Symbol> get_symbol(const SymbolHeader& header, std::span<const u8> elf, s32 strings_offset);
 
-Result<void> SymbolTable::init(const std::vector<u8>& elf, s32 section_offset) {
-	m_elf = &elf;
+Result<void> SymbolTableReader::init(std::span<const u8> elf, s32 section_offset)
+{
+	m_elf = elf;
 	m_section_offset = section_offset;
 	
-	m_hdrr = get_packed<SymbolicHeader>(*m_elf, m_section_offset);
+	m_hdrr = get_packed<SymbolicHeader>(m_elf, m_section_offset);
 	CCC_CHECK(m_hdrr != nullptr, "MIPS debug section header out of bounds.");
 	CCC_CHECK(m_hdrr->magic == 0x7009, "Invalid symbolic header.");
 	
@@ -108,79 +113,73 @@ Result<void> SymbolTable::init(const std::vector<u8>& elf, s32 section_offset) {
 	return Result<void>();
 }
 	
-s32 SymbolTable::file_count() const {
+s32 SymbolTableReader::file_count() const
+{
 	CCC_ASSERT(m_ready);
 	return m_hdrr->file_descriptor_count;
 }
 
-Result<File> SymbolTable::parse_file(s32 index) const {
+Result<File> SymbolTableReader::parse_file(s32 index) const
+{
 	CCC_ASSERT(m_ready);
 	
 	File file;
 	
 	u64 fd_offset = m_hdrr->file_descriptors_offset + index * sizeof(FileDescriptor);
-	const FileDescriptor* fd_header = get_packed<FileDescriptor>(*m_elf, fd_offset + m_fudge_offset);
+	const FileDescriptor* fd_header = get_packed<FileDescriptor>(m_elf, fd_offset + m_fudge_offset);
 	CCC_CHECK(fd_header != nullptr, "MIPS debug file descriptor out of bounds.");
 	CCC_CHECK(fd_header->f_big_endian == 0, "Not little endian or bad file descriptor table.");
 	
 	s32 raw_path_offset = m_hdrr->local_strings_offset + fd_header->strings_offset + fd_header->file_path_string_offset + m_fudge_offset;
-	Result<const char*> raw_path = get_string(*m_elf, raw_path_offset);
-	CCC_RETURN_IF_ERROR(raw_path);
-	file.raw_path = *raw_path;
-	
-	// Try to detect the source language.
-	std::string lower_name = file.raw_path;
-	for(char& c : lower_name) c = tolower(c);
-	if(lower_name.ends_with(".c")) {
-		file.detected_language = SourceLanguage::C;
-	} else if(lower_name.ends_with(".cpp") || lower_name.ends_with(".cc") || lower_name.ends_with(".cxx")) {
-		file.detected_language = SourceLanguage::CPP;
-	} else if(lower_name.ends_with(".s") || lower_name.ends_with(".asm")) {
-		file.detected_language = SourceLanguage::ASSEMBLY;
+	const char* command_line_path = get_string(m_elf, raw_path_offset);
+	if(command_line_path) {
+		file.command_line_path = command_line_path;
 	}
 	
 	// Parse local symbols.
 	for(s64 j = 0; j < fd_header->symbol_count; j++) {
 		u64 symbol_offset = m_hdrr->local_symbols_offset + (fd_header->isym_base + j) * sizeof(SymbolHeader) + m_fudge_offset;
-		const SymbolHeader* symbol_header = get_packed<SymbolHeader>(*m_elf, symbol_offset);
+		const SymbolHeader* symbol_header = get_packed<SymbolHeader>(m_elf, symbol_offset);
 		CCC_CHECK(symbol_header != nullptr, "Symbol header out of bounds.");
 		
 		s32 strings_offset = m_hdrr->local_strings_offset + fd_header->strings_offset + m_fudge_offset;
-		Result<Symbol> sym = parse_symbol(*symbol_header, *m_elf, strings_offset);
+		Result<Symbol> sym = get_symbol(*symbol_header, m_elf, strings_offset);
 		CCC_RETURN_IF_ERROR(sym);
 		
 		bool string_offset_equal = (s32) symbol_header->iss == fd_header->file_path_string_offset;
-		if(file.base_path.empty() && string_offset_equal && sym->is_stabs && sym->code == N_SO && file.symbols.size() > 2) {
-			const Symbol& base_path = file.symbols.back();
-			if(base_path.is_stabs && base_path.code == N_SO) {
-				file.base_path = base_path.string;
+		if(file.working_dir.empty() && string_offset_equal && sym->is_stabs() && sym->code() == N_SO && file.symbols.size() > 2) {
+			const Symbol& working_dir = file.symbols.back();
+			if(working_dir.is_stabs() && working_dir.code() == N_SO) {
+				file.working_dir = working_dir.string;
 			}
 		}
 		
 		file.symbols.emplace_back(std::move(*sym));
 	}
 	
-	file.full_path = merge_paths(file.base_path, file.raw_path);
+	file.full_path = merge_paths(file.working_dir, file.command_line_path);
 	
 	return file;
 }
 
-Result<std::vector<Symbol>> SymbolTable::parse_external_symbols() const {
+Result<std::vector<Symbol>> SymbolTableReader::parse_external_symbols() const
+{
 	CCC_ASSERT(m_ready);
 	
 	std::vector<Symbol> external_symbols;
 	for(s64 i = 0; i < m_hdrr->external_symbols_count; i++) {
 		u64 sym_offset = m_hdrr->external_symbols_offset + i * sizeof(ExternalSymbolHeader);
-		const ExternalSymbolHeader* external_header = get_packed<ExternalSymbolHeader>(*m_elf, sym_offset + m_fudge_offset);
+		const ExternalSymbolHeader* external_header = get_packed<ExternalSymbolHeader>(m_elf, sym_offset + m_fudge_offset);
 		CCC_CHECK(external_header != nullptr, "External header out of bounds.");
-		Result<Symbol> sym = parse_symbol(external_header->symbol, *m_elf, m_hdrr->external_strings_offset + m_fudge_offset);
+		Result<Symbol> sym = get_symbol(external_header->symbol, m_elf, m_hdrr->external_strings_offset + m_fudge_offset);
 		CCC_RETURN_IF_ERROR(sym);
 		external_symbols.emplace_back(std::move(*sym));
 	}
 	return external_symbols;
 }
 
-void SymbolTable::print_header(FILE* dest) const {
+void SymbolTableReader::print_header(FILE* dest) const
+{
 	CCC_ASSERT(m_ready);
 	
 	fprintf(dest, "Symbolic Header, magic = %hx, vstamp = %hx:\n",
@@ -192,47 +191,97 @@ void SymbolTable::print_header(FILE* dest) const {
 	fprintf(dest, "  Line Numbers                0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->line_numbers_offset,
 		(u32) m_hdrr->line_numbers_size_bytes,
-		(u32) m_hdrr->line_number_count);
+		m_hdrr->line_number_count);
 	fprintf(dest, "  Dense Numbers               0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->dense_numbers_offset,
 		(u32) m_hdrr->dense_numbers_count * 8,
-		(u32) m_hdrr->dense_numbers_count);
+		m_hdrr->dense_numbers_count);
 	fprintf(dest, "  Procedure Descriptors       0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->procedure_descriptors_offset,
 		(u32) m_hdrr->procedure_descriptor_count * (u32) sizeof(ProcedureDescriptor),
-		(u32) m_hdrr->procedure_descriptor_count);
+		m_hdrr->procedure_descriptor_count);
 	fprintf(dest, "  Local Symbols               0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->local_symbols_offset,
 		(u32) m_hdrr->local_symbol_count * (u32) sizeof(SymbolHeader),
-		(u32) m_hdrr->local_symbol_count);
-	fprintf(dest, "  Optimization Symbols        0x%-8x          "  "-                   "  "%-8d\n",
+		m_hdrr->local_symbol_count);
+	fprintf(dest, "  Optimization Symbols        0x%-8x          "  "-                   " "%-8d\n",
 		(u32) m_hdrr->optimization_symbols_offset,
-		(u32) m_hdrr->optimization_symbols_count);
+		m_hdrr->optimization_symbols_count);
 	fprintf(dest, "  Auxiliary Symbols           0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->auxiliary_symbols_offset,
 		(u32) m_hdrr->auxiliary_symbol_count * 4,
-		(u32) m_hdrr->auxiliary_symbol_count);
-	fprintf(dest, "  Local Strings               0x%-8x          "  "-                   "  "%-8d\n",
+		m_hdrr->auxiliary_symbol_count);
+	fprintf(dest, "  Local Strings               0x%-8x          "  "0x%-8x          "  "-\n",
 		(u32) m_hdrr->local_strings_offset,
 		(u32) m_hdrr->local_strings_size_bytes);
-	fprintf(dest, "  External Strings            0x%-8x          "  "-                   "  "%-8d\n",
+	fprintf(dest, "  External Strings            0x%-8x          "  "0x%-8x          "  "-\n",
 		(u32) m_hdrr->external_strings_offset,
 		(u32) m_hdrr->external_strings_size_bytes);
 	fprintf(dest, "  File Descriptors            0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->file_descriptors_offset,
 		(u32) m_hdrr->file_descriptor_count * (u32) sizeof(FileDescriptor),
-		(u32) m_hdrr->file_descriptor_count);
+		m_hdrr->file_descriptor_count);
 	fprintf(dest, "  Relative Files Descriptors  0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->relative_file_descriptors_offset,
 		(u32) m_hdrr->relative_file_descriptor_count * 4,
-		(u32) m_hdrr->relative_file_descriptor_count);
+		m_hdrr->relative_file_descriptor_count);
 	fprintf(dest, "  External Symbols            0x%-8x          "  "0x%-8x          "  "%-8d\n",
 		(u32) m_hdrr->external_symbols_offset,
 		(u32) m_hdrr->external_symbols_count * 16,
-		(u32) m_hdrr->external_symbols_count);
+		m_hdrr->external_symbols_count);
 }
 
-static s32 get_corruption_fixing_fudge_offset(s32 section_offset, const SymbolicHeader& hdrr) {
+Result<void> SymbolTableReader::print_symbols(FILE* out, bool print_locals, bool print_externals) const
+{
+	if(print_locals) {
+		s32 count = file_count();
+		for(s32 i = 0; i < count; i++) {
+			Result<File> file = parse_file(i);
+			CCC_RETURN_IF_ERROR(file);
+			
+			fprintf(out, "FILE %s:\n", file->command_line_path.c_str());
+			for(const Symbol& symbol : file->symbols) {
+				print_symbol(out, symbol);
+			}
+		}
+	}
+	if(print_externals) {
+		fprintf(out, "EXTERNAL SYMBOLS:\n");
+		Result<std::vector<Symbol>> external_symbols = parse_external_symbols();
+		CCC_RETURN_IF_ERROR(external_symbols);
+		for(const Symbol& symbol : *external_symbols) {
+			print_symbol(out, symbol);
+		}
+	}
+	return Result<void>();
+}
+
+static void print_symbol(FILE* out, const Symbol& symbol) {
+	fprintf(out, "    %8x ", symbol.value);
+	const char* symbol_type_str = symbol_type(symbol.symbol_type);
+	if(symbol_type_str) {
+		fprintf(out, "%-11s ", symbol_type_str);
+	} else {
+		fprintf(out, "ST(%7d) ", (u32) symbol.symbol_type);
+	}
+	const char* symbol_class_str = symbol_class(symbol.symbol_class);
+	if(symbol_class_str) {
+		fprintf(out, "%-4s ", symbol_class_str);
+	} else if ((u32) symbol.symbol_class == 0) {
+		fprintf(out, "         ");
+	} else {
+		fprintf(out, "SC(%4d) ", (u32) symbol.symbol_class);
+	}
+	if(symbol.is_stabs()) {
+		fprintf(out, "%-8s ", stabs_code_to_string(symbol.code()));
+	} else {
+		fprintf(out, "SI(%4d) ", symbol.index);
+	}
+	fprintf(out, "%s\n", symbol.string);
+}
+
+static s32 get_corruption_fixing_fudge_offset(s32 section_offset, const SymbolicHeader& hdrr)
+{
 	// Test for corruption.
 	s32 right_after_header = INT32_MAX;
 	if(hdrr.line_numbers_offset > 0) right_after_header = std::min(hdrr.line_numbers_offset, right_after_header);
@@ -264,28 +313,28 @@ static s32 get_corruption_fixing_fudge_offset(s32 section_offset, const Symbolic
 	return fudge_offset;
 }
 
-static Result<Symbol> parse_symbol(const SymbolHeader& header, const std::vector<u8>& elf, s32 strings_offset) {
+static Result<Symbol> get_symbol(const SymbolHeader& header, std::span<const u8> elf, s32 strings_offset)
+{
 	Symbol symbol;
 	
-	Result<const char*> string = get_string(elf, strings_offset + header.iss);
-	CCC_RETURN_IF_ERROR(string);
-	symbol.string = *string;
+	const char* string = get_string(elf, strings_offset + header.iss);
+	CCC_CHECK(string, "Symbol has invalid string.");
+	symbol.string = string;
 	
 	symbol.value = header.value;
-	symbol.storage_type = (SymbolType) header.st;
-	symbol.storage_class = (SymbolClass) header.sc;
+	symbol.symbol_type = (SymbolType) header.st;
+	symbol.symbol_class = (SymbolClass) header.sc;
 	symbol.index = header.index;
-	if((symbol.index & 0xfff00) == 0x8f300) {
-		symbol.is_stabs = true;
-		symbol.code = (StabsCode) (symbol.index - 0x8f300);
-		CCC_CHECK(stabs_code(symbol.code) != nullptr, "Bad stabs symbol code '%x'.", symbol.code);
-	} else {
-		symbol.is_stabs = false;
+	
+	if(symbol.is_stabs()) {
+		CCC_CHECK(stabs_code_to_string(symbol.code()) != nullptr, "Bad stabs symbol code '%x'.", symbol.code());
 	}
+	
 	return symbol;
 }
 
-const char* symbol_type(SymbolType type) {
+const char* symbol_type(SymbolType type)
+{
 	switch(type) {
 		case SymbolType::NIL: return "NIL";
 		case SymbolType::GLOBAL: return "GLOBAL";
@@ -305,7 +354,8 @@ const char* symbol_type(SymbolType type) {
 	return nullptr;
 }
 
-const char* symbol_class(SymbolClass symbol_class) {
+const char* symbol_class(SymbolClass symbol_class)
+{
 	switch(symbol_class) {
 		case SymbolClass::NIL: return "NIL";
 		case SymbolClass::TEXT: return "TEXT";
@@ -339,7 +389,8 @@ const char* symbol_class(SymbolClass symbol_class) {
 	return nullptr;
 }
 
-const char* stabs_code(StabsCode code) {
+const char* stabs_code_to_string(StabsCode code)
+{
 	switch(code) {
 		case STAB: return "STAB";
 		case N_GSYM: return "GSYM";
