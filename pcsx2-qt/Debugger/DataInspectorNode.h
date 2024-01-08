@@ -45,7 +45,7 @@ struct DataInspectorLocation
 struct DataInspectorNode
 {
 	QString name;
-	const ccc::ast::Node* type = nullptr;
+	ccc::NodeHandle type;
 	DataInspectorLocation location;
 	DataInspectorNode* parent = nullptr;
 	std::vector<std::unique_ptr<DataInspectorNode>> children;

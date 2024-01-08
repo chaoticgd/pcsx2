@@ -229,7 +229,6 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 				node->name = QString::fromStdString(source_file.command_line_path);
 			else
 				node->name = QString::fromStdString(source_file.name());
-			node->type = source_file.type();
 			node->children = populateGlobalVariables(source_file, min_address, max_address, filter);
 
 			if (!node->children.empty())
@@ -265,7 +264,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> DataInspectorWindow::populateGlo
 		{
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 			node->name = QString::fromStdString(global_variable.name());
-			node->type = global_variable.type();
+			node->type = ccc::NodeHandle(global_variable, global_variable.type());
 			node->location.type = DataInspectorLocation::EE_MEMORY;
 			node->location.address = global_variable.address().value;
 			bool addressInRange = global_variable.address().value >= min_address && global_variable.address().value < max_address;
@@ -321,7 +320,7 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
 					
 					std::unique_ptr<DataInspectorNode> local_node = std::make_unique<DataInspectorNode>();
 					local_node->name = QString::fromStdString(local_variable.name());
-					local_node->type = local_variable.type();
+					local_node->type = ccc::NodeHandle(local_variable, local_variable.type());
 					local_node->location.type = DataInspectorLocation::EE_REGISTER;
 					local_node->location.address = register_storage->dbx_register_number;
 					function_node->children.emplace_back(std::move(local_node));
@@ -330,7 +329,7 @@ std::unique_ptr<DataInspectorNode> DataInspectorWindow::populateStack()
 				{
 					std::unique_ptr<DataInspectorNode> local_node = std::make_unique<DataInspectorNode>();
 					local_node->name = QString::fromStdString(local_variable.name());
-					local_node->type = local_variable.type();
+					local_node->type = ccc::NodeHandle(local_variable, local_variable.type());
 					local_node->location.type = DataInspectorLocation::EE_MEMORY;
 					local_node->location.address = frame.sp;
 					function_node->children.emplace_back(std::move(local_node));

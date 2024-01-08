@@ -66,10 +66,12 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 		return true;
 
 	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
-	if (!parent_node->type)
+
+	const ccc::ast::Node* type = parent_node->type.lookup_node(m_database);
+	if (!type)
 		return true;
 
-	return nodeHasChildren(*parent_node->type);
+	return nodeHasChildren(*type);
 }
 
 QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
@@ -93,9 +95,11 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		}
 		case TYPE:
 		{
-			if (!node->type)
+			const ccc::ast::Node* type = node->type.lookup_node(m_database);
+			if (!type)
 				return QVariant();
-			return typeToString(*node->type);
+
+			return typeToString(*type);
 		}
 		case LIVENESS:
 		{
@@ -117,10 +121,11 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 
 	Q_ASSERT(index.column() == VALUE);
 
-	if (!node->type)
+	const ccc::ast::Node* logical_type = node->type.lookup_node(m_database);
+	if (!logical_type)
 		return QVariant();
 
-	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
+	const ccc::ast::Node& type = resolvePhysicalType(*logical_type, m_database);
 
 	QVariant result;
 	switch (type.descriptor)
@@ -184,10 +189,12 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 		return false;
 
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
-	if (!node->type)
+
+	const ccc::ast::Node* logical_type = node->type.lookup_node(m_database);
+	if (!logical_type)
 		return false;
 
-	const ccc::ast::Node& type = resolvePhysicalType(*node->type, m_database);
+	const ccc::ast::Node& type = resolvePhysicalType(*logical_type, m_database);
 	switch (type.descriptor)
 	{
 		case ccc::ast::BUILTIN:
@@ -268,10 +275,12 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		return;
 
 	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
-	if (!parent_node->type)
+
+	const ccc::ast::Node* logical_parent_type = parent_node->type.lookup_node(m_database);
+	if (!logical_parent_type)
 		return;
 
-	const ccc::ast::Node& parent_type = resolvePhysicalType(*parent_node->type, m_database);
+	const ccc::ast::Node& parent_type = resolvePhysicalType(*logical_parent_type, m_database);
 
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 	switch (parent_type.descriptor)
@@ -283,7 +292,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			{
 				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("[%1]").arg(i);
-				element->type = array.element_type.get();
+				element->type = parent_node->type.handle_for_child(array.element_type.get());
 				element->location = parent_node->location.addOffset(i * array.element_type->computed_size_bytes);
 				children.emplace_back(std::move(element));
 			}
@@ -297,7 +306,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 				const ccc::ast::PointerOrReference& pointer_or_reference = parent_type.as<ccc::ast::PointerOrReference>();
 				std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
 				element->name = QString("*%1").arg(address);
-				element->type = pointer_or_reference.value_type.get();
+				element->type = parent_node->type.handle_for_child(pointer_or_reference.value_type.get());
 				element->location = parent_node->location.createAddress(address);
 				children.emplace_back(std::move(element));
 			}
@@ -310,7 +319,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 			{
 				std::unique_ptr<DataInspectorNode> child_node = std::make_unique<DataInspectorNode>();
 				child_node->name = QString::fromStdString(field->name);
-				child_node->type = field.get();
+				child_node->type = parent_node->type.handle_for_child(field.get());
 				child_node->location = parent_node->location.addOffset(field->offset_bytes);
 				children.emplace_back(std::move(child_node));
 			}
@@ -342,10 +351,12 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 		return false;
 
 	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
-	if (!parent_node->type)
+
+	const ccc::ast::Node* parent_type = parent_node->type.lookup_node(m_database);
+	if (!parent_type)
 		return false;
 
-	return nodeHasChildren(*parent_node->type) && !parent_node->children_fetched;
+	return nodeHasChildren(*parent_type) && !parent_node->children_fetched;
 }
 
 Qt::ItemFlags DataInspectorModel::flags(const QModelIndex& index) const

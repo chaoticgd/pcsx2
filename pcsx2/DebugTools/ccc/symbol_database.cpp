@@ -199,10 +199,10 @@ Result<SymbolType*> SymbolList<SymbolType>::create_symbol(
 			int demangler_flags = 0;
 			if(importer_flags & DEMANGLE_PARAMETERS) demangler_flags |= DMGL_PARAMS;
 			if(importer_flags & DEMANGLE_RETURN_TYPE) demangler_flags |= DMGL_RET_POSTFIX;
-			const char* demangled_name_ptr = demangler.cplus_demangle(name.c_str(), demangler_flags);
+			char* demangled_name_ptr = demangler.cplus_demangle(name.c_str(), demangler_flags);
 			if(demangled_name_ptr) {
 				demangled_name = demangled_name_ptr;
-				free((void*) demangled_name_ptr);
+				free(reinterpret_cast<void*>(demangled_name_ptr));
 			}
 		}
 	}
@@ -503,7 +503,7 @@ const std::string& Function::mangled_name() const
 	}
 }
 
-const void Function::set_mangled_name(std::string mangled)
+void Function::set_mangled_name(std::string mangled)
 {
 	m_mangled_name = std::move(mangled);
 }
@@ -517,7 +517,7 @@ const std::string& GlobalVariable::mangled_name() const
 	}
 }
 
-const void GlobalVariable::set_mangled_name(std::string mangled)
+void GlobalVariable::set_mangled_name(std::string mangled)
 {
 	m_mangled_name = std::move(mangled);
 }
@@ -547,6 +547,15 @@ void SourceFile::set_globals_variables(
 }
 
 // *****************************************************************************
+
+s32 SymbolDatabase::symbol_count() const
+{
+	s32 sum = 0;
+	#define CCC_X(SymbolType, symbol_list) sum += symbol_list.size();
+	CCC_FOR_EACH_SYMBOL_TYPE_DO_X
+	#undef CCC_X
+	return sum;
+}
 
 bool SymbolDatabase::symbol_exists_with_starting_address(Address address) const
 {
@@ -673,14 +682,22 @@ bool SymbolDatabase::destroy_function(FunctionHandle handle)
 
 // *****************************************************************************
 
+NodeHandle::NodeHandle() {}
+
 template <typename SymbolType>
-NodeHandle::NodeHandle(SymbolType& symbol, const ast::Node* node)
+NodeHandle::NodeHandle(const SymbolType& symbol, const ast::Node* node)
 	: m_descriptor(SymbolType::DESCRIPTOR)
 	, m_symbol_handle(symbol.handle().value)
 	, m_node(node)
 	, m_generation(symbol.generation()) {}
 
-const ast::Node* NodeHandle::lookup_node(SymbolDatabase& database) const {
+bool NodeHandle::valid() const
+{
+	return m_symbol_handle != (u32) -1;
+}
+
+const ast::Node* NodeHandle::lookup_node(const SymbolDatabase& database) const
+{
 	const Symbol* symbol = lookup_symbol(database);
 	if(symbol && symbol->generation() == m_generation) {
 		return m_node;
@@ -689,7 +706,8 @@ const ast::Node* NodeHandle::lookup_node(SymbolDatabase& database) const {
 	}
 }
 
-const Symbol* NodeHandle::lookup_symbol(SymbolDatabase& database) const {
+const Symbol* NodeHandle::lookup_symbol(const SymbolDatabase& database) const
+{
 	switch(m_descriptor) {
 		#define CCC_X(SymbolType, symbol_list) \
 			case SymbolType::DESCRIPTOR: \
@@ -700,7 +718,17 @@ const Symbol* NodeHandle::lookup_symbol(SymbolDatabase& database) const {
 	return nullptr;
 }
 
-#define CCC_X(SymbolType, symbol_list) template NodeHandle::NodeHandle(SymbolType& symbol, const ast::Node* node);
+NodeHandle NodeHandle::handle_for_child(const ast::Node* child_node) const
+{
+	NodeHandle child_handle;
+	child_handle.m_descriptor = m_descriptor;
+	child_handle.m_symbol_handle = m_symbol_handle;
+	child_handle.m_node = child_node;
+	child_handle.m_generation = m_generation;
+	return child_handle;
+}
+
+#define CCC_X(SymbolType, symbol_list) template NodeHandle::NodeHandle(const SymbolType& symbol, const ast::Node* node);
 CCC_FOR_EACH_SYMBOL_TYPE_DO_X
 #undef CCC_X
 
