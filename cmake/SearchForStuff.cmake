@@ -90,7 +90,7 @@ endif(WIN32)
 find_package(Threads REQUIRED)
 
 # Also need SDL2.
-find_package(SDL2 2.0.20 REQUIRED)
+find_package(SDL2 2.28.5 REQUIRED)
 
 set(ACTUALLY_ENABLE_TESTS ${ENABLE_TESTS})
 if(ENABLE_TESTS)
