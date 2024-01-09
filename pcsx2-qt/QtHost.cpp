@@ -638,20 +638,6 @@ void EmuThread::setELFOverride(const QString& path)
 	VMManager::SetELFOverride(path.toStdString());
 }
 
-void EmuThread::getELFPath(std::string* out)
-{
-	if (!isOnEmuThread())
-	{
-		QMetaObject::invokeMethod(this, "getELFPath", Qt::QueuedConnection, Q_ARG(std::string*, out));
-		return;
-	}
-
-	if (!VMManager::HasValidVM())
-		return;
-
-	*out = VMManager::GetELFPath();
-}
-
 void EmuThread::changeGSDump(const QString& path)
 {
 	if (!isOnEmuThread())
@@ -1772,7 +1758,6 @@ void QtHost::RegisterTypes()
 	qRegisterMetaType<CDVD_SourceType>();
 	qRegisterMetaType<const GameList::Entry*>();
 	qRegisterMetaType<Achievements::LoginRequestReason>();
-	qRegisterMetaType<std::string*>();
 }
 
 bool QtHost::RunSetupWizard()

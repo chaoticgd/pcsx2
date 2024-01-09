@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "common/Pcsx2Defs.h"
-
 class Error;
 class IsoReader;
 
@@ -119,6 +117,7 @@ public:
 	~ElfObject();
 
 	__fi const std::vector<u8>& GetData() const { return data; }
+	__fi std::vector<u8> ReleaseData() const { return data; }
 	__fi const ELF_HEADER& GetHeader() const { return *reinterpret_cast<const ELF_HEADER*>(data.data()); }
 	__fi u32 GetSize() const { return static_cast<u32>(data.size()); }
 
@@ -126,7 +125,6 @@ public:
 	bool OpenIsoFile(std::string srcfile, IsoReader& isor, bool isPSXElf_, Error* error);
 
 	void LoadHeaders();
-	std::vector<std::pair<ELF_SHR, std::string>> GetSectionHeaders();
 
 	bool HasProgramHeaders() const;
 	bool HasSectionHeaders() const;

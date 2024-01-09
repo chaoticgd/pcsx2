@@ -32,19 +32,16 @@ public:
 	void resetGlobals();
 	void resetStack();
 protected:
-	static void reportErrorOnUiThread(const ccc::Error& error);
-	
 	void createGUI();
 	std::unique_ptr<DataInspectorNode> populateGlobalSections(
-		bool group_by_section, bool group_by_source_file, const QString& filter);
+		bool group_by_section, bool group_by_source_file, const QString& filter, const ccc::SymbolDatabase& database);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalTranslationUnits(
-		u32 min_address, u32 max_address, bool group_by_source_file, const QString& filter);
+		u32 min_address, u32 max_address, bool group_by_source_file, const QString& filter, const ccc::SymbolDatabase& database);
 	std::vector<std::unique_ptr<DataInspectorNode>> populateGlobalVariables(
-		const ccc::SourceFile& source_file, u32 min_address, u32 max_address, const QString& filter);
+		const ccc::SourceFile& source_file, u32 min_address, u32 max_address, const QString& filter, const ccc::SymbolDatabase& database);
 	
-	std::unique_ptr<DataInspectorNode> populateStack();
+	std::unique_ptr<DataInspectorNode> populateStack(const ccc::SymbolDatabase& database);
 	
-	ccc::SymbolDatabase m_database;
 	DataInspectorModel* m_global_model;
 	DataInspectorModel* m_stackModel;
 	Ui::DataInspectorWindow m_ui;

@@ -3,10 +3,95 @@
 
 #include "SymbolMap.h"
 
+#include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
 
-#include <algorithm>
+#include "ccc/elf.h"
+#include "ccc/importer_flags.h"
+#include "ccc/symbol_file.h"
+
+SymbolGuardian R5900SymbolGuardian;
+SymbolGuardian R3000SymbolGuardian;
+
+static void error_callback(const ccc::Error& error, ccc::ErrorSeverity severity)
+{
+	Console.Error("%s", error.message.c_str());
+}
+
+SymbolGuardian::SymbolGuardian()
+{
+	ccc::set_custom_error_callback(error_callback);
+	Clear();
+}
+
+bool SymbolGuardian::Read(std::function<void(const ccc::SymbolDatabase&)> callback) const
+{
+	if (!m_big_symbol_lock.try_lock_shared())
+		return false;
+	callback(m_database);
+	m_big_symbol_lock.unlock_shared();
+	return true;
+}
+
+void SymbolGuardian::ReadWrite(std::function<void(ccc::SymbolDatabase&)> callback)
+{
+	std::unique_lock lock(m_big_symbol_lock);
+	callback(m_database);
+}
+
+void SymbolGuardian::Clear()
+{
+	std::unique_lock lock(m_big_symbol_lock);
+	m_database.clear();
+	m_symbol_tables.clear();
+
+	ccc::Result<ccc::SymbolSource*> source = m_database.symbol_sources.create_symbol("User Defined", ccc::SymbolSourceHandle());
+	CCC_EXIT_IF_ERROR(source);
+	m_user_defined = (*source)->handle();
+}
+
+void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf)
+{
+	std::unique_lock lock(m_big_symbol_lock);
+
+	// Delete any previously loaded symbols tables.
+	for (ccc::SymbolSourceRange sources : m_symbol_tables)
+	{
+		m_database.destroy_symbols_from_sources(sources);
+	}
+	m_symbol_tables.clear();
+
+	ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(elf));
+	if (!parsed_elf.success())
+	{
+		// TODO: This isn't actually fatal, so rename the function.
+		ccc::report_fatal_error(parsed_elf.error());
+		return;
+	}
+
+	std::unique_ptr<ccc::SymbolFile> symbol_file = std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf));
+
+	ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = symbol_file->get_all_symbol_tables();
+	if (!symbol_tables.success())
+	{
+		ccc::report_fatal_error(symbol_tables.error());
+		return;
+	}
+
+	// TODO: Add GNU demangler.
+	ccc::DemanglerFunctions demangler;
+
+	ccc::Result<ccc::SymbolSourceRange> symbol_sources = ccc::import_symbol_tables(
+		m_database, *symbol_tables, ccc::NO_IMPORTER_FLAGS, demangler);
+	if (!symbol_sources.success())
+	{
+		ccc::report_fatal_error(symbol_sources.error());
+		return;
+	}
+
+	m_symbol_tables.emplace_back(*symbol_sources);
+}
 
 SymbolMap R5900SymbolMap;
 SymbolMap R3000SymbolMap;

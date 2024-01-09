@@ -744,6 +744,11 @@ SymbolMap& R5900DebugInterface::GetSymbolMap() const
 	return R5900SymbolMap;
 }
 
+SymbolGuardian& R5900DebugInterface::GetSymbolGuardian() const
+{
+	return R5900SymbolGuardian;
+}
+
 std::vector<std::unique_ptr<BiosThread>> R5900DebugInterface::GetThreadList() const
 {
 	return getEEThreads();
@@ -1061,6 +1066,11 @@ u32 R3000DebugInterface::getCycles()
 SymbolMap& R3000DebugInterface::GetSymbolMap() const
 {
 	return R3000SymbolMap;
+}
+
+SymbolGuardian& R3000DebugInterface::GetSymbolGuardian() const
+{
+	return R3000SymbolGuardian;
 }
 
 std::vector<std::unique_ptr<BiosThread>> R3000DebugInterface::GetThreadList() const

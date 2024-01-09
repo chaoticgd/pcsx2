@@ -163,9 +163,6 @@ namespace VMManager
 	/// Changes the ELF to boot ("ELF override"). The VM will be reset.
 	bool SetELFOverride(std::string path);
 
-	/// Returns the file path of the currently loaded ELF file.
-	std::string GetELFPath();
-
 	/// Changes the current GS dump being played back.
 	bool ChangeGSDump(const std::string& path);
 

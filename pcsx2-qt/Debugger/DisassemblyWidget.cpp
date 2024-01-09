@@ -721,6 +721,10 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 
 	const std::string addressSymbol = m_cpu->GetSymbolMap().GetLabelName(address);
 
+	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
+		//database.symbol_exists_with_starting_address(Address address)
+	});
+
 	const auto demangler = demangler::CDemangler::createGcc();
 
 	QString lineString("  %1  %2 %3  %4 %5");

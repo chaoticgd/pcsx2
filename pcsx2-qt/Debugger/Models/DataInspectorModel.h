@@ -40,7 +40,7 @@ public:
 
 	DataInspectorModel(
 		std::unique_ptr<DataInspectorNode> initial_root,
-		const ccc::SymbolDatabase& database,
+		const SymbolGuardian& guardian,
 		QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
@@ -58,13 +58,13 @@ public:
 	void reset(std::unique_ptr<DataInspectorNode> new_root);
 
 protected:
-	bool nodeHasChildren(const ccc::ast::Node& type) const;
+	bool nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
 	QModelIndex indexFromNode(const DataInspectorNode& node) const;
-	QString typeToString(const ccc::ast::Node& type) const;
+	QString typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
 
 	std::unique_ptr<DataInspectorNode> m_root;
 	QString m_filter;
-	const ccc::SymbolDatabase& m_database;
+	const SymbolGuardian& m_guardian;
 };
 
 const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::SymbolDatabase& database);

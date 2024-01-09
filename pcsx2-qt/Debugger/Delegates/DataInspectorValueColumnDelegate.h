@@ -13,7 +13,7 @@ class DataInspectorValueColumnDelegate : public QStyledItemDelegate
 
 public:
 	DataInspectorValueColumnDelegate(
-		const ccc::SymbolDatabase& database,
+		const SymbolGuardian& guardian,
 		QObject* parent = nullptr);
 
 	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -21,5 +21,5 @@ public:
 	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
 
 protected:
-	const ccc::SymbolDatabase& m_database;
+	const SymbolGuardian& m_guardian;
 };

@@ -4,12 +4,44 @@
 #pragma once
 
 #include <vector>
-#include <set>
 #include <map>
 #include <string>
 #include <mutex>
 
+#include <functional>
+#include <shared_mutex>
+
 #include "common/Pcsx2Types.h"
+#include "DebugTools/ccc/symbol_database.h"
+
+struct SymbolGuardian
+{
+public:
+	SymbolGuardian();
+	SymbolGuardian(const SymbolGuardian& rhs) = delete;
+	SymbolGuardian(SymbolGuardian&& rhs) = delete;
+	SymbolGuardian& operator=(const SymbolGuardian& rhs) = delete;
+	SymbolGuardian& operator=(SymbolGuardian&& rhs) = delete;
+
+	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const;
+	void ReadWrite(std::function<void(ccc::SymbolDatabase&)> callback);
+
+	// Delete all symbols, including user-defined symbols. It is important to do
+	// it this way rather than assigning a new SymbolDatabase object so we
+	// don't get dangling symbol handles.
+	void Clear();
+
+	void LoadSymbolTables(std::vector<u8> elf);
+
+protected:
+	ccc::SymbolDatabase m_database;
+	ccc::SymbolSourceHandle m_user_defined;
+	std::vector<ccc::SymbolSourceRange> m_symbol_tables;
+	mutable std::shared_mutex m_big_symbol_lock;
+};
+
+extern SymbolGuardian R5900SymbolGuardian;
+extern SymbolGuardian R3000SymbolGuardian;
 
 enum SymbolType
 {
