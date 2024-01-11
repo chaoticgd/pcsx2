@@ -65,8 +65,7 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf)
 	ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(elf));
 	if (!parsed_elf.success())
 	{
-		// TODO: This isn't actually fatal, so rename the function.
-		ccc::report_fatal_error(parsed_elf.error());
+		ccc::report_error(parsed_elf.error());
 		return;
 	}
 
@@ -75,7 +74,7 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf)
 	ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = symbol_file->get_all_symbol_tables();
 	if (!symbol_tables.success())
 	{
-		ccc::report_fatal_error(symbol_tables.error());
+		ccc::report_error(symbol_tables.error());
 		return;
 	}
 
@@ -86,7 +85,7 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf)
 		m_database, *symbol_tables, ccc::NO_IMPORTER_FLAGS, demangler);
 	if (!symbol_sources.success())
 	{
-		ccc::report_fatal_error(symbol_sources.error());
+		ccc::report_error(symbol_sources.error());
 		return;
 	}
 
