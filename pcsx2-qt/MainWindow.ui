@@ -139,7 +139,6 @@
     <addaction name="menuDebugSwitchRenderer"/>
     <addaction name="separator"/>
     <addaction name="actionDebugger"/>
-    <addaction name="actionDataInspector"/>
     <addaction name="separator"/>
     <addaction name="actionEnableLogTimestamps"/>
     <addaction name="separator"/>
@@ -883,15 +882,6 @@
    </property>
    <property name="text">
     <string>Open Debugger</string>
-   </property>
-  </action>
-  <action name="actionDataInspector">
-   <property name="icon">
-    <iconset theme="heart-circle-line">
-     <normaloff>.</normaloff>.</iconset>
-   </property>
-   <property name="text">
-    <string>Open Data Inspector</string>
    </property>
   </action>
   <action name="actionReloadPatches">

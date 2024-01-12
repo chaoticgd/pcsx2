@@ -5,7 +5,6 @@
 
 #include "common/WindowInfo.h"
 
-#include <QtCore/QPointer>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenu>
@@ -16,7 +15,6 @@
 #include "Settings/ControllerSettingsWindow.h"
 #include "Settings/SettingsWindow.h"
 #include "Debugger/DebuggerWindow.h"
-#include "Debugger/DataInspectorWindow.h"
 #include "ui_MainWindow.h"
 
 class QProgressBar;
@@ -101,9 +99,6 @@ public:
 	void rescanFile(const std::string& path);
 
 	void openDebugger();
-	void openDataInspector();
-	
-	DataInspectorWindow* getDataInspectorWindow();
 
 public Q_SLOTS:
 	void checkForUpdates(bool display_message, bool force_check);
@@ -285,7 +280,6 @@ private:
 	AutoUpdaterDialog* m_auto_updater_dialog = nullptr;
 
 	DebuggerWindow* m_debugger_window = nullptr;
-	QPointer<DataInspectorWindow> m_data_inspector_window = nullptr;
 
 	QProgressBar* m_status_progress_widget = nullptr;
 	QLabel* m_status_verbose_widget = nullptr;

@@ -71,13 +71,15 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 	if (!parent_node->type.valid())
 		return result;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* type = parent_node->type.lookup_node(database);
 		if (!type)
-			return result;
+			return;
 
 		result = nodeHasChildren(*type, database);
 	});
+	
+	return result;
 }
 
 QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
@@ -102,10 +104,10 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 		case TYPE:
 		{
 			QVariant result;
-			m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+			m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::ast::Node* type = node->type.lookup_node(database);
 				if (!type)
-					return QVariant();
+					return;
 
 				result = typeToString(*type, database);
 			});
@@ -136,10 +138,10 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 	if (!node->type.valid())
 		return result;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
-			return QVariant();
+			return;
 
 		const ccc::ast::Node& type = resolvePhysicalType(*logical_type, database);
 
@@ -224,7 +226,7 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 	if (node->type.valid())
 		return result;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
@@ -318,7 +320,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		return;
 
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_parent_type = parent_node->type.lookup_node(database);
 		if (!logical_parent_type)
 			return;
@@ -399,7 +401,7 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 	if (!parent_node->type.valid())
 		return result;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* parent_type = parent_node->type.lookup_node(database);
 		if (!parent_type)
 			return;

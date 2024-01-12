@@ -28,6 +28,7 @@
 #include <QtCore/QRegularExpressionMatchIterator>
 #include <QtCore/QStringList>
 #include <QtWidgets/QScrollBar>
+#include "GlobalVariablesWidget.h"
 
 using namespace QtUtils;
 using namespace MipsStackWalk;
@@ -146,6 +147,9 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	connect(m_ui.savedAddressesList->model(), &QAbstractItemModel::dataChanged,	[savedAddressesTableView](const QModelIndex& topLeft) {
 		savedAddressesTableView->resizeColumnToContents(topLeft.column());
 	});
+	
+	m_globals_tab = new GlobalVariablesWidget(m_cpu, this);
+	m_ui.tabWidget->addTab(m_globals_tab, tr("Globals"));
 }
 
 CpuWidget::~CpuWidget() = default;

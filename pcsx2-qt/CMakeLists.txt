@@ -154,12 +154,12 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/DebuggerWindow.cpp
 	Debugger/DebuggerWindow.h
 	Debugger/DebuggerWindow.ui
-	Debugger/DataInspectorWindow.cpp
-	Debugger/DataInspectorWindow.h
-	Debugger/DataInspectorWindow.ui
 	Debugger/DisassemblyWidget.cpp
 	Debugger/DisassemblyWidget.h
 	Debugger/DisassemblyWidget.ui
+	Debugger/GlobalVariablesWidget.cpp
+	Debugger/GlobalVariablesWidget.h
+	Debugger/GlobalVariablesWidget.ui
 	Debugger/MemoryViewWidget.cpp
 	Debugger/MemoryViewWidget.h
 	Debugger/MemoryViewWidget.ui

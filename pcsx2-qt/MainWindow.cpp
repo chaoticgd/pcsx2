@@ -432,7 +432,6 @@ void MainWindow::connectVMThreadSignals(EmuThread* thread)
 	connect(m_ui.actionToolbarFullscreen, &QAction::triggered, thread, &EmuThread::toggleFullscreen);
 	connect(m_ui.actionToggleSoftwareRendering, &QAction::triggered, thread, &EmuThread::toggleSoftwareRendering);
 	connect(m_ui.actionDebugger, &QAction::triggered, this, &MainWindow::openDebugger);
-	connect(m_ui.actionDataInspector, &QAction::triggered, this, &MainWindow::openDataInspector);
 	connect(m_ui.actionReloadPatches, &QAction::triggered, thread, &EmuThread::reloadPatches);
 }
 
@@ -2429,25 +2428,10 @@ DebuggerWindow* MainWindow::getDebuggerWindow()
 	return m_debugger_window;
 }
 
-DataInspectorWindow* MainWindow::getDataInspectorWindow()
-{
-	return m_data_inspector_window.get();
-}
-
 void MainWindow::openDebugger()
 {
 	DebuggerWindow* dwnd = getDebuggerWindow();
 	dwnd->isVisible() ? dwnd->hide() : dwnd->show();
-}
-
-void MainWindow::openDataInspector()
-{
-	if(!m_data_inspector_window) {
-		m_data_inspector_window = new DataInspectorWindow(nullptr);
-		m_data_inspector_window->show();
-	} else {
-		delete m_data_inspector_window.get();
-	}
 }
 
 void MainWindow::doControllerSettings(ControllerSettingsWindow::Category category)
