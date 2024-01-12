@@ -23,6 +23,8 @@ target_sources(pcsx2-qt PRIVATE
 	EarlyHardwareCheck.cpp
 	Int64SpinBox.h
 	Int64SpinBox.cpp
+	LogWindow.cpp
+	LogWindow.h
 	MainWindow.cpp
 	MainWindow.h
 	MainWindow.ui
