@@ -1150,7 +1150,7 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 )
 
 target_link_libraries(PCSX2_FLAGS INTERFACE
-	demangler
+	demanglegnu
 	simpleini
 )
 

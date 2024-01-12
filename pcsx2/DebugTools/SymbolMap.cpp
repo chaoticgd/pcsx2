@@ -7,6 +7,7 @@
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
 
+#include "demangle.h"
 #include "ccc/elf.h"
 #include "ccc/importer_flags.h"
 #include "ccc/symbol_file.h"
@@ -78,11 +79,14 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf)
 		return;
 	}
 
-	// TODO: Add GNU demangler.
 	ccc::DemanglerFunctions demangler;
+	demangler.cplus_demangle = cplus_demangle;
+	demangler.cplus_demangle_opname = cplus_demangle_opname;
+
+	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
 
 	ccc::Result<ccc::SymbolSourceRange> symbol_sources = ccc::import_symbol_tables(
-		m_database, *symbol_tables, ccc::NO_IMPORTER_FLAGS, demangler);
+		m_database, *symbol_tables, importer_flags, demangler);
 	if (!symbol_sources.success())
 	{
 		ccc::report_error(symbol_sources.error());
