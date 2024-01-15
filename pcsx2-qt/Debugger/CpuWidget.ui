@@ -116,63 +116,7 @@
             <number>0</number>
            </property>
            <item>
-            <widget class="QTreeWidget" name="treeModules">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="contextMenuPolicy">
-              <enum>Qt::CustomContextMenu</enum>
-             </property>
-             <property name="indentation">
-              <number>8</number>
-             </property>
-             <property name="sortingEnabled">
-              <bool>true</bool>
-             </property>
-             <property name="columnCount">
-              <number>3</number>
-             </property>
-             <column>
-              <property name="text">
-               <string>Module</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Version</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Count</string>
-              </property>
-             </column>
-            </widget>
-           </item>
-           <item>
-            <widget class="QListWidget" name="listFunctions">
-             <property name="contextMenuPolicy">
-              <enum>Qt::CustomContextMenu</enum>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_5">
-             <item>
-              <widget class="QPushButton" name="btnRefreshFunctions">
-               <property name="text">
-                <string>Refresh</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="txtFuncSearch">
-               <property name="placeholderText">
-                <string>Filter</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="FunctionTreeWidget" name="functionTreeWidget" native="true"/>
            </item>
           </layout>
          </widget>
@@ -625,6 +569,16 @@
          </item>
         </layout>
        </widget>
+       <widget class="QWidget" name="tabGlobalVariables">
+        <attribute name="title">
+         <string>Globals</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="GlobalVariableTreeWidget" name="globalVariableTreeWidget" native="true"/>
+         </item>
+        </layout>
+       </widget>
       </widget>
      </item>
     </layout>
@@ -648,6 +602,18 @@
    <class>MemoryViewWidget</class>
    <extends>QWidget</extends>
    <header>pcsx2-qt/Debugger/MemoryViewWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>GlobalVariableTreeWidget</class>
+   <extends>QWidget</extends>
+   <header>pcsx2-qt/Debugger/SymbolTreeWidgets.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>FunctionTreeWidget</class>
+   <extends>QWidget</extends>
+   <header>pcsx2-qt/Debugger/SymbolTreeWidgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

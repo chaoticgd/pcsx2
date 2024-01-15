@@ -44,10 +44,20 @@ struct DataInspectorLocation
 
 struct DataInspectorNode
 {
+public:
 	QString name;
 	ccc::NodeHandle type;
 	DataInspectorLocation location;
-	DataInspectorNode* parent = nullptr;
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
 	bool children_fetched = false;
+	
+	const DataInspectorNode* parent() const;
+	
+	const std::vector<std::unique_ptr<DataInspectorNode>>& children() const;
+	void set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
+	void insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
+	void emplace_child(std::unique_ptr<DataInspectorNode> new_child);
+
+protected:
+	DataInspectorNode* m_parent = nullptr;
+	std::vector<std::unique_ptr<DataInspectorNode>> m_children;
 };

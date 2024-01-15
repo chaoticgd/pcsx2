@@ -159,15 +159,15 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/DisassemblyWidget.cpp
 	Debugger/DisassemblyWidget.h
 	Debugger/DisassemblyWidget.ui
-	Debugger/GlobalVariablesWidget.cpp
-	Debugger/GlobalVariablesWidget.h
-	Debugger/GlobalVariablesWidget.ui
 	Debugger/MemoryViewWidget.cpp
 	Debugger/MemoryViewWidget.h
 	Debugger/MemoryViewWidget.ui
 	Debugger/RegisterWidget.cpp
 	Debugger/RegisterWidget.h
 	Debugger/RegisterWidget.ui
+	Debugger/SymbolTreeWidgets.cpp
+	Debugger/SymbolTreeWidgets.h
+	Debugger/SymbolTreeWidget.ui
 	Debugger/BreakpointDialog.cpp
 	Debugger/BreakpointDialog.h
 	Debugger/BreakpointDialog.ui

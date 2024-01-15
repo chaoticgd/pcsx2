@@ -25,7 +25,6 @@
 #include <QtCore/QRegularExpressionMatchIterator>
 #include <QtCore/QStringList>
 #include <QtWidgets/QScrollBar>
-#include "GlobalVariablesWidget.h"
 
 using namespace QtUtils;
 using namespace MipsStackWalk;
@@ -89,14 +88,6 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 		i++;
 	}
 
-	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, [this](int i) {if(i == 1){updateFunctionList(true);} });
-	connect(m_ui.listFunctions, &QListWidget::customContextMenuRequested, this, &CpuWidget::onFuncListContextMenu);
-	connect(m_ui.listFunctions, &QListWidget::itemDoubleClicked, this, &CpuWidget::onFuncListDoubleClick);
-	connect(m_ui.treeModules, &QTreeWidget::customContextMenuRequested, this, &CpuWidget::onModuleTreeContextMenu);
-	connect(m_ui.treeModules, &QTreeWidget::itemDoubleClicked, this, &CpuWidget::onModuleTreeDoubleClick);
-	connect(m_ui.btnRefreshFunctions, &QPushButton::clicked, [this] { updateFunctionList(); });
-	connect(m_ui.txtFuncSearch, &QLineEdit::textChanged, [this] { updateFunctionList(); });
-
 	m_ui.listSearchResults->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_ui.btnSearch, &QPushButton::clicked, this, &CpuWidget::onSearchButtonClicked);
 	connect(m_ui.btnFilterSearch, &QPushButton::clicked, this, &CpuWidget::onSearchButtonClicked);
@@ -116,15 +107,6 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	m_ui.registerWidget->SetCpu(&cpu);
 	m_ui.memoryviewWidget->SetCpu(&cpu);
 
-	if (cpu.getCpuType() == BREAKPOINT_EE)
-	{
-		m_ui.treeModules->setVisible(false);
-	}
-	else
-	{
-		m_ui.treeModules->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::ResizeToContents);
-		m_ui.listFunctions->setVisible(false);
-	}
 	this->repaint();
 
 	// Ensures we don't retrigger the load results function unintentionally
@@ -143,9 +125,9 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	connect(m_ui.savedAddressesList->model(), &QAbstractItemModel::dataChanged, [savedAddressesTableView](const QModelIndex& topLeft) {
 		savedAddressesTableView->resizeColumnToContents(topLeft.column());
 	});
-
-	m_globals_tab = new GlobalVariablesWidget(m_cpu, this);
-	m_ui.tabWidget->addTab(m_globals_tab, tr("Globals"));
+	
+	m_ui.functionTreeWidget->setCPU(&cpu);
+	m_ui.globalVariableTreeWidget->setCPU(&cpu);
 }
 
 CpuWidget::~CpuWidget() = default;
@@ -656,38 +638,6 @@ void CpuWidget::contextRemoveSearchResult()
 	delete rowToRemove;
 }
 
-void CpuWidget::updateFunctionList(bool whenEmpty)
-{
-	if (!m_cpu.isAlive())
-		return;
-
-	SymbolGuardian& guardian = m_cpu.GetSymbolGuardian();
-	guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
-		if (whenEmpty && m_ui.listFunctions->count())
-			return;
-
-		m_ui.listFunctions->clear();
-
-		QString filter = m_ui.txtFuncSearch->text();
-
-		for (const ccc::Function& function : database.functions)
-		{
-			ccc::Address address = function.address();
-			if (!address.valid())
-				continue;
-
-			QString name = QString::fromStdString(function.name());
-			if (!filter.isEmpty() && !name.contains(filter, Qt::CaseInsensitive))
-				continue;
-
-			QListWidgetItem* item = new QListWidgetItem();
-			item->setText(QString("%0 %1").arg(FilledQStringFromValue(address.value, 16)).arg(name));
-			item->setData(Qt::UserRole, address.value);
-			m_ui.listFunctions->addItem(item);
-		}
-	});
-}
-
 void CpuWidget::updateThreads()
 {
 	m_threadModel.refreshData();
@@ -736,163 +686,6 @@ void CpuWidget::onThreadListDoubleClick(const QModelIndex& index)
 	}
 }
 
-void CpuWidget::onFuncListContextMenu(QPoint pos)
-{
-	if (!m_funclistContextMenu)
-		m_funclistContextMenu = new QMenu(m_ui.listFunctions);
-	else
-		m_funclistContextMenu->clear();
-
-	if (m_ui.listFunctions->selectedItems().count() && m_ui.listFunctions->selectedItems().first()->data(Qt::UserRole).isValid())
-	{
-		QAction* copyName = new QAction(tr("Copy Function Name"), m_ui.listFunctions);
-		connect(copyName, &QAction::triggered, [this] {
-			// We only store the address in the widget item
-			// Resolve the function name by fetching the symbolmap and filtering the address
-
-			const QListWidgetItem* selectedItem = m_ui.listFunctions->selectedItems().first();
-			const QString functionName = QString(m_cpu.GetSymbolMap().GetLabelName(selectedItem->data(Qt::UserRole).toUInt()).c_str());
-			QApplication::clipboard()->setText(functionName);
-		});
-		m_funclistContextMenu->addAction(copyName);
-
-		QAction* copyAddress = new QAction(tr("Copy Function Address"), m_ui.listFunctions);
-		connect(copyAddress, &QAction::triggered, [this] {
-			const QString addressString = FilledQStringFromValue(m_ui.listFunctions->selectedItems().first()->data(Qt::UserRole).toUInt(), 16);
-			QApplication::clipboard()->setText(addressString);
-		});
-
-		m_funclistContextMenu->addAction(copyAddress);
-
-		m_funclistContextMenu->addSeparator();
-
-		QAction* gotoDisasm = new QAction(tr("Go to in Disassembly"), m_ui.listFunctions);
-		connect(gotoDisasm, &QAction::triggered, [this] {
-			m_ui.disassemblyWidget->gotoAddress(m_ui.listFunctions->selectedItems().first()->data(Qt::UserRole).toUInt());
-		});
-
-		m_funclistContextMenu->addAction(gotoDisasm);
-
-		QAction* gotoMemory = new QAction(tr("Go to in Memory View"), m_ui.listFunctions);
-		connect(gotoMemory, &QAction::triggered, [this] {
-			m_ui.memoryviewWidget->gotoAddress(m_ui.listFunctions->selectedItems().first()->data(Qt::UserRole).toUInt());
-		});
-
-		m_funclistContextMenu->addAction(gotoMemory);
-
-		m_funclistContextMenu->addSeparator();
-	}
-	//: "Demangling" is the opposite of "Name mangling", which is a process where a compiler takes function names and combines them with other characteristics of the function (e.g. what types of data it accepts) to ensure they stay unique even when multiple functions exist with the same name (but different inputs / const-ness). See here: https://en.wikipedia.org/wiki/Name_mangling#C++
-	QAction* demangleAction = new QAction(tr("Demangle Symbols"), m_ui.listFunctions);
-	demangleAction->setCheckable(true);
-	demangleAction->setChecked(m_demangleFunctions);
-
-	connect(demangleAction, &QAction::triggered, [this] {
-		m_demangleFunctions = !m_demangleFunctions;
-		m_ui.disassemblyWidget->setDemangle(m_demangleFunctions);
-		updateFunctionList();
-	});
-
-	m_funclistContextMenu->addAction(demangleAction);
-
-	if (m_cpu.getCpuType() == BREAKPOINT_IOP)
-	{
-		QAction* moduleViewAction = new QAction(tr("Module Tree"), m_ui.listFunctions);
-		moduleViewAction->setCheckable(true);
-		moduleViewAction->setChecked(m_moduleView);
-
-		connect(moduleViewAction, &QAction::triggered, [this] {
-			m_moduleView = !m_moduleView;
-			m_ui.treeModules->setVisible(m_moduleView);
-			m_ui.listFunctions->setVisible(!m_moduleView);
-			updateFunctionList();
-		});
-
-		m_funclistContextMenu->addAction(moduleViewAction);
-	}
-	m_funclistContextMenu->popup(m_ui.listFunctions->viewport()->mapToGlobal(pos));
-}
-
-void CpuWidget::onFuncListDoubleClick(QListWidgetItem* item)
-{
-	m_ui.disassemblyWidget->gotoAddress(item->data(Qt::UserRole).toUInt());
-}
-
-void CpuWidget::onModuleTreeContextMenu(QPoint pos)
-{
-	if (!m_moduleTreeContextMenu)
-		m_moduleTreeContextMenu = new QMenu(m_ui.treeModules);
-	else
-		m_moduleTreeContextMenu->clear();
-
-	if (m_ui.treeModules->selectedItems().count() && m_ui.treeModules->selectedItems().first()->data(0, Qt::UserRole).isValid())
-	{
-		QAction* copyName = new QAction(tr("Copy Function Name"), m_ui.treeModules);
-		connect(copyName, &QAction::triggered, [this] {
-			QApplication::clipboard()->setText(m_cpu.GetSymbolMap().GetLabelName(m_ui.treeModules->selectedItems().first()->data(0, Qt::UserRole).toUInt()).c_str());
-		});
-		m_moduleTreeContextMenu->addAction(copyName);
-
-		QAction* copyAddress = new QAction(tr("Copy Function Address"), m_ui.treeModules);
-		connect(copyAddress, &QAction::triggered, [this] {
-			const QString addressString = FilledQStringFromValue(m_ui.treeModules->selectedItems().first()->data(0, Qt::UserRole).toUInt(), 16);
-			QApplication::clipboard()->setText(addressString);
-		});
-		m_moduleTreeContextMenu->addAction(copyAddress);
-
-		m_moduleTreeContextMenu->addSeparator();
-
-		QAction* gotoDisasm = new QAction(tr("Go to in Disassembly"), m_ui.treeModules);
-		connect(gotoDisasm, &QAction::triggered, [this] {
-			m_ui.disassemblyWidget->gotoAddress(m_ui.treeModules->selectedItems().first()->data(0, Qt::UserRole).toUInt());
-		});
-		m_moduleTreeContextMenu->addAction(gotoDisasm);
-
-		QAction* gotoMemory = new QAction(tr("Go to in Memory View"), m_ui.treeModules);
-		connect(gotoMemory, &QAction::triggered, [this] {
-			m_ui.memoryviewWidget->gotoAddress(m_ui.treeModules->selectedItems().first()->data(0, Qt::UserRole).toUInt());
-		});
-		m_moduleTreeContextMenu->addAction(gotoMemory);
-	}
-
-	//: "Demangling" is the opposite of "Name mangling", which is a process where a compiler takes function names and combines them with other characteristics of the function (e.g. what types of data it accepts) to ensure they stay unique even when multiple functions exist with the same name (but different inputs / const-ness). See here: https://en.wikipedia.org/wiki/Name_mangling#C++
-	QAction* demangleAction = new QAction(tr("Demangle Symbols"), m_ui.treeModules);
-	demangleAction->setCheckable(true);
-	demangleAction->setChecked(m_demangleFunctions);
-
-	connect(demangleAction, &QAction::triggered, [this] {
-		m_demangleFunctions = !m_demangleFunctions;
-		m_ui.disassemblyWidget->setDemangle(m_demangleFunctions);
-		updateFunctionList();
-	});
-
-	m_moduleTreeContextMenu->addSeparator();
-
-	m_moduleTreeContextMenu->addAction(demangleAction);
-
-	QAction* moduleViewAction = new QAction(tr("Module Tree"), m_ui.treeModules);
-	moduleViewAction->setCheckable(true);
-	moduleViewAction->setChecked(m_moduleView);
-
-	connect(moduleViewAction, &QAction::triggered, [this] {
-		m_moduleView = !m_moduleView;
-		m_ui.treeModules->setVisible(m_moduleView);
-		m_ui.listFunctions->setVisible(!m_moduleView);
-		updateFunctionList();
-	});
-
-	m_moduleTreeContextMenu->addAction(moduleViewAction);
-
-	m_moduleTreeContextMenu->popup(m_ui.treeModules->viewport()->mapToGlobal(pos));
-}
-
-void CpuWidget::onModuleTreeDoubleClick(QTreeWidgetItem* item)
-{
-	if (item->data(0, Qt::UserRole).isValid())
-	{
-		m_ui.disassemblyWidget->gotoAddress(item->data(0, Qt::UserRole).toUInt());
-	}
-}
 void CpuWidget::updateStackFrames()
 {
 	m_stackModel.refreshData();

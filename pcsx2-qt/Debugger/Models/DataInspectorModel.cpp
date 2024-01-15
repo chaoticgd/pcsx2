@@ -21,7 +21,7 @@ QModelIndex DataInspectorModel::index(int row, int column, const QModelIndex& pa
 	else
 		parent_node = m_root.get();
 
-	DataInspectorNode* child_node = parent_node->children.at(row).get();
+	const DataInspectorNode* child_node = parent_node->children().at(row).get();
 	if (!child_node)
 		return QModelIndex();
 
@@ -34,7 +34,7 @@ QModelIndex DataInspectorModel::parent(const QModelIndex& index) const
 		return QModelIndex();
 
 	DataInspectorNode* child_node = static_cast<DataInspectorNode*>(index.internalPointer());
-	DataInspectorNode* parent_node = child_node->parent;
+	const DataInspectorNode* parent_node = child_node->parent();
 	if (!parent_node)
 		return QModelIndex();
 
@@ -52,7 +52,7 @@ int DataInspectorModel::rowCount(const QModelIndex& parent) const
 	else
 		node = m_root.get();
 
-	return (int)node->children.size();
+	return (int)node->children().size();
 }
 
 int DataInspectorModel::columnCount(const QModelIndex& parent) const
@@ -381,11 +381,8 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		return;
 	}
 
-	for (std::unique_ptr<DataInspectorNode>& child_node : children)
-		child_node->parent = parent_node;
-
 	beginInsertRows(parent, 0, children.size() - 1);
-	parent_node->children = std::move(children);
+	parent_node->set_children(std::move(children));
 	parent_node->children_fetched = true;
 	endInsertRows();
 }
@@ -499,10 +496,10 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::
 QModelIndex DataInspectorModel::indexFromNode(const DataInspectorNode& node) const
 {
 	int row = 0;
-	if (node.parent)
+	if (node.parent())
 	{
-		for (int i = 0; i < (int)node.parent->children.size(); i++)
-			if (node.parent->children[i].get() == &node)
+		for (int i = 0; i < (int)node.parent()->children().size(); i++)
+			if (node.parent()->children()[i].get() == &node)
 				row = i;
 	}
 	else

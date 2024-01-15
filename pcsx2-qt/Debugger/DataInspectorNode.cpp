@@ -303,3 +303,35 @@ void DataInspectorLocation::write128(u128 value)
 		}
 	}
 }
+
+const DataInspectorNode* DataInspectorNode::parent() const
+{
+	return m_parent;
+}
+
+const std::vector<std::unique_ptr<DataInspectorNode>>& DataInspectorNode::children() const
+{
+	return m_children;
+}
+
+void DataInspectorNode::set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children)
+{
+	for(std::unique_ptr<DataInspectorNode>& child : new_children)
+		child->m_parent = this;
+	m_children = std::move(new_children);
+}
+
+void DataInspectorNode::insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children)
+{
+	for(std::unique_ptr<DataInspectorNode>& child : new_children)
+		child->m_parent = this;
+	m_children.insert(m_children.end(),
+		std::make_move_iterator(new_children.begin()),
+		std::make_move_iterator(new_children.end()));
+}
+
+void DataInspectorNode::emplace_child(std::unique_ptr<DataInspectorNode> new_child)
+{
+	new_child->m_parent = this;
+	m_children.emplace_back(std::move(new_child));
+}
