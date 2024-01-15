@@ -128,6 +128,9 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	
 	m_ui.functionTreeWidget->setCPU(&cpu);
 	m_ui.globalVariableTreeWidget->setCPU(&cpu);
+	
+	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_ui.functionTreeWidget, &SymbolTreeWidget::update);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.globalVariableTreeWidget, &SymbolTreeWidget::update);
 }
 
 CpuWidget::~CpuWidget() = default;

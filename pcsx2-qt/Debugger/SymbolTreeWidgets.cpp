@@ -3,6 +3,7 @@
 
 #include "SymbolTreeWidgets.h"
 
+#include <QtGui/QClipboard>
 #include <QtWidgets/QMenu>
 
 #include "Delegates/DataInspectorValueColumnDelegate.h"
@@ -12,15 +13,48 @@ SymbolTreeWidget::SymbolTreeWidget(QWidget* parent)
 {
 	m_ui.setupUi(this);
 
+	m_context_menu = new QMenu(this);
+	
+	m_context_menu->addAction(m_ui.actionCopyName);
+	connect(m_ui.actionCopyName, &QAction::triggered, [this]() {
+		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::NAME);
+		QVariant data = m_model->data(index, Qt::DisplayRole);
+		if(data.isValid())
+			QApplication::clipboard()->setText(data.toString());
+	});
+	
+	m_context_menu->addAction(m_ui.actionCopyLocation);
+	connect(m_ui.actionCopyLocation, &QAction::triggered, [this]() {
+		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::LOCATION);
+		QVariant data = m_model->data(index, Qt::DisplayRole);
+		if(data.isValid())
+			QApplication::clipboard()->setText(data.toString());
+	});
+	
+	m_context_menu->addSeparator();
+	
+	m_context_menu->addAction(m_ui.actionGoToInDisassembly);
+	connect(m_ui.actionGoToInDisassembly, &QAction::triggered, [this]() {
+	});
+	
+	m_context_menu->addAction(m_ui.actionGoToInMemoryView);
+	connect(m_ui.actionGoToInMemoryView, &QAction::triggered, [this]() {
+	});
+	
+	m_context_menu->addSeparator();
+	
+	m_context_menu->addAction(m_ui.actionGroupBySection);
+	m_context_menu->addAction(m_ui.actionGroupBySourceFile);
+
 	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
 	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
 	connect(m_ui.actionGroupBySection, &QAction::toggled, this, &SymbolTreeWidget::update);
 	connect(m_ui.actionGroupBySourceFile, &QAction::toggled, this, &SymbolTreeWidget::update);
 
-	QMenu* menu = new QMenu(this);
-	menu->addAction(m_ui.actionGroupBySection);
-	menu->addAction(m_ui.actionGroupBySourceFile);
-	m_ui.moreButton->setMenu(menu);
+	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
+		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
+	});
 }
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
@@ -151,13 +185,9 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 
 	std::span<const ccc::Function> functions;
 	if (filters.source_file.has_value() && *filters.source_file)
-	{
 		functions = database.functions.span((*filters.source_file)->functions());
-	}
 	else
-	{
 		functions = database.functions;
-	}
 
 	for (const ccc::Function& function : functions)
 	{
@@ -190,13 +220,9 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 
 	std::span<const ccc::GlobalVariable> global_variables;
 	if (filters.source_file.has_value() && *filters.source_file)
-	{
 		global_variables = database.global_variables.span((*filters.source_file)->global_variables());
-	}
 	else
-	{
 		global_variables = database.global_variables;
-	}
 
 	for (const ccc::GlobalVariable& global_variable : global_variables)
 	{
@@ -233,9 +259,6 @@ bool SymbolFilters::test(const ccc::Symbol& test_symbol, ccc::SourceFileHandle t
 				return false;
 		}
 	}
-
-	if (!source_file.has_value() && *source_file == nullptr && test_source_file.valid())
-		return false;
 
 	if (test_symbol.address().value < min_address || test_symbol.address().value > max_address)
 		return false;

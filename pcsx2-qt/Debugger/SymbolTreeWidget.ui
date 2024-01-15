@@ -45,31 +45,29 @@
        </property>
       </widget>
      </item>
-     <item>
-      <widget class="QPushButton" name="moreButton">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>26</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="flat">
-        <bool>false</bool>
-       </property>
-      </widget>
-     </item>
     </layout>
    </item>
   </layout>
+  <action name="actionCopyName">
+   <property name="text">
+    <string>Copy Name</string>
+   </property>
+  </action>
+  <action name="actionCopyLocation">
+   <property name="text">
+    <string>Copy Location</string>
+   </property>
+  </action>
+  <action name="actionGoToInDisassembly">
+   <property name="text">
+    <string>Go to in Disassembly</string>
+   </property>
+  </action>
+  <action name="actionGoToInMemoryView">
+   <property name="text">
+    <string>Go to in Memory View</string>
+   </property>
+  </action>
   <action name="actionGroupBySection">
    <property name="checkable">
     <bool>true</bool>

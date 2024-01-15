@@ -42,6 +42,7 @@ protected:
 
 	DebugInterface* m_cpu = nullptr;
 	DataInspectorModel* m_model = nullptr;
+	QMenu* m_context_menu = nullptr;
 };
 
 class FunctionTreeWidget : public SymbolTreeWidget
