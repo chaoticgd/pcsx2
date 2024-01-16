@@ -538,7 +538,7 @@ const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc:
 	const ccc::ast::Node* result = &type;
 	for (s32 i = 0; i < 10 && result->descriptor == ccc::ast::TYPE_NAME; i++)
 	{
-		const ccc::DataType* symbol = database.data_types.symbol_from_handle(type.as<ccc::ast::TypeName>().data_type_handle);
+		const ccc::DataType* symbol = database.data_types.symbol_from_handle(result->as<ccc::ast::TypeName>().data_type_handle);
 		if (!symbol)
 		{
 			break;
