@@ -26,17 +26,18 @@ public:
 	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const;
 	void ReadWrite(std::function<void(ccc::SymbolDatabase&)> callback);
 
+	void LoadSymbolTables(std::vector<u8> elf, std::string file_name);
+
 	// Delete all symbols, including user-defined symbols. It is important to do
 	// it this way rather than assigning a new SymbolDatabase object so we
 	// don't get dangling symbol handles.
 	void Clear();
-
-	void LoadSymbolTables(std::vector<u8> elf);
+	void ClearIrxModules();
 
 protected:
 	ccc::SymbolDatabase m_database;
 	ccc::SymbolSourceHandle m_user_defined;
-	std::vector<ccc::SymbolSourceRange> m_symbol_tables;
+	ccc::ModuleHandle m_main_elf;
 	mutable std::shared_mutex m_big_symbol_lock;
 };
 
@@ -63,21 +64,6 @@ struct SymbolEntry
 	std::string name;
 	u32 address;
 	u32 size;
-};
-
-struct ModuleVersion
-{
-	u8 major;
-	u8 minor;
-
-	friend auto operator<=>(const ModuleVersion&, const ModuleVersion&) = default;
-};
-
-struct ModuleInfo
-{
-	std::string name;
-	ModuleVersion version;
-	std::vector<SymbolEntry> exports;
 };
 
 enum DataType
@@ -123,15 +109,6 @@ public:
 
 	// Module functions for IOP symbols
 
-	bool AddModule(const std::string& name, ModuleVersion version);
-	void AddModuleExport(const std::string& module, ModuleVersion version, const std::string& name, u32 address, u32 size);
-	std::vector<ModuleInfo> GetModules() const;
-	void RemoveModule(const std::string& name, ModuleVersion version);
-	// Clears any modules and their associated exports
-	// Prefer this over Clear() so we don't clear user defined functions
-	// In the future we should mark functions as user defined
-	void ClearModules();
-
 	static const u32 INVALID_ADDRESS = (u32)-1;
 
 	bool IsEmpty() const { return functions.empty() && labels.empty() && data.empty(); };
@@ -160,20 +137,9 @@ private:
 		u32 size;
 	};
 
-	struct ModuleEntry
-	{
-		std::string name;
-		ModuleVersion version;
-		// This is duplicated data from the function map
-		// The issue is that multiple exports can point to the same address
-		// The address we use as a key... We should use a multimap in the future
-		std::vector<FunctionEntry> exports;
-	};
-
 	std::map<u32, FunctionEntry> functions;
 	std::map<u32, LabelEntry> labels;
 	std::map<u32, DataEntry> data;
-	std::multimap<std::string, ModuleEntry> modules;
 
 	mutable std::recursive_mutex m_lock;
 };

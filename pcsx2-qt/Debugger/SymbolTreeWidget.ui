@@ -48,42 +48,6 @@
     </layout>
    </item>
   </layout>
-  <action name="actionCopyName">
-   <property name="text">
-    <string>Copy Name</string>
-   </property>
-  </action>
-  <action name="actionCopyLocation">
-   <property name="text">
-    <string>Copy Location</string>
-   </property>
-  </action>
-  <action name="actionGoToInDisassembly">
-   <property name="text">
-    <string>Go to in Disassembly</string>
-   </property>
-  </action>
-  <action name="actionGoToInMemoryView">
-   <property name="text">
-    <string>Go to in Memory View</string>
-   </property>
-  </action>
-  <action name="actionGroupBySection">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Group by section</string>
-   </property>
-  </action>
-  <action name="actionGroupBySourceFile">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Group by source file</string>
-   </property>
-  </action>
  </widget>
  <resources/>
  <connections/>

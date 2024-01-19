@@ -314,24 +314,32 @@ const std::vector<std::unique_ptr<DataInspectorNode>>& DataInspectorNode::childr
 	return m_children;
 }
 
+bool DataInspectorNode::children_fetched() const
+{
+	return m_children_fetched;
+}
+
 void DataInspectorNode::set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children)
 {
-	for(std::unique_ptr<DataInspectorNode>& child : new_children)
+	for (std::unique_ptr<DataInspectorNode>& child : new_children)
 		child->m_parent = this;
 	m_children = std::move(new_children);
+	m_children_fetched = true;
 }
 
 void DataInspectorNode::insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children)
 {
-	for(std::unique_ptr<DataInspectorNode>& child : new_children)
+	for (std::unique_ptr<DataInspectorNode>& child : new_children)
 		child->m_parent = this;
 	m_children.insert(m_children.end(),
 		std::make_move_iterator(new_children.begin()),
 		std::make_move_iterator(new_children.end()));
+	m_children_fetched = true;
 }
 
 void DataInspectorNode::emplace_child(std::unique_ptr<DataInspectorNode> new_child)
 {
 	new_child->m_parent = this;
 	m_children.emplace_back(std::move(new_child));
+	m_children_fetched = true;
 }

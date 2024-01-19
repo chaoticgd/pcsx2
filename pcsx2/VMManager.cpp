@@ -1088,7 +1088,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
-	R5900SymbolGuardian.LoadSymbolTables(elfo.ReleaseData());
+	R5900SymbolGuardian.LoadSymbolTables(elfo.ReleaseData(), s_elf_path);
 }
 
 void VMManager::ClearELFInfo()

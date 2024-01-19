@@ -78,7 +78,7 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 
 		result = nodeHasChildren(*type, database);
 	});
-	
+
 	return result;
 }
 
@@ -375,16 +375,11 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		}
 	});
 
-	if (children.empty())
-	{
-		parent_node->children_fetched = true;
-		return;
-	}
-
-	beginInsertRows(parent, 0, children.size() - 1);
+	if (!children.empty())
+		beginInsertRows(parent, 0, children.size() - 1);
 	parent_node->set_children(std::move(children));
-	parent_node->children_fetched = true;
-	endInsertRows();
+	if (!children.empty())
+		endInsertRows();
 }
 
 bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
@@ -403,7 +398,7 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 		if (!parent_type)
 			return;
 
-		result = nodeHasChildren(*parent_type, database) && !parent_node->children_fetched;
+		result = nodeHasChildren(*parent_type, database) && !parent_node->children_fetched();
 	});
 
 	return result;

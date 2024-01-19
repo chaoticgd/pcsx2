@@ -13,43 +13,70 @@ SymbolTreeWidget::SymbolTreeWidget(QWidget* parent)
 {
 	m_ui.setupUi(this);
 
+	setupMenu();
+}
+
+SymbolTreeWidget::~SymbolTreeWidget() = default;
+
+void SymbolTreeWidget::setupMenu()
+{
 	m_context_menu = new QMenu(this);
-	
-	m_context_menu->addAction(m_ui.actionCopyName);
-	connect(m_ui.actionCopyName, &QAction::triggered, [this]() {
+
+	QAction* copy_name = new QAction("Copy Name", this);
+	connect(copy_name, &QAction::triggered, [this]() {
+		if (!m_model)
+			return;
+
 		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::NAME);
 		QVariant data = m_model->data(index, Qt::DisplayRole);
-		if(data.isValid())
+		if (data.isValid())
 			QApplication::clipboard()->setText(data.toString());
 	});
-	
-	m_context_menu->addAction(m_ui.actionCopyLocation);
-	connect(m_ui.actionCopyLocation, &QAction::triggered, [this]() {
+	m_context_menu->addAction(copy_name);
+
+	QAction* copy_location = new QAction("Copy Location", this);
+	connect(copy_location, &QAction::triggered, [this]() {
+		if (!m_model)
+			return;
+
 		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::LOCATION);
 		QVariant data = m_model->data(index, Qt::DisplayRole);
-		if(data.isValid())
+		if (data.isValid())
 			QApplication::clipboard()->setText(data.toString());
 	});
-	
+	m_context_menu->addAction(copy_location);
+
 	m_context_menu->addSeparator();
-	
-	m_context_menu->addAction(m_ui.actionGoToInDisassembly);
-	connect(m_ui.actionGoToInDisassembly, &QAction::triggered, [this]() {
+
+	QAction* go_to_in_disassembly = new QAction("Go to in Disassembly", this);
+	connect(go_to_in_disassembly, &QAction::triggered, [this]() {
 	});
-	
-	m_context_menu->addAction(m_ui.actionGoToInMemoryView);
-	connect(m_ui.actionGoToInMemoryView, &QAction::triggered, [this]() {
+	m_context_menu->addAction(go_to_in_disassembly);
+
+	QAction* go_to_in_memory_view = new QAction("Go to in Memory View", this);
+	connect(go_to_in_memory_view, &QAction::triggered, [this]() {
 	});
-	
+	m_context_menu->addAction(go_to_in_memory_view);
+
 	m_context_menu->addSeparator();
-	
-	m_context_menu->addAction(m_ui.actionGroupBySection);
-	m_context_menu->addAction(m_ui.actionGroupBySourceFile);
+
+	m_group_by_module = new QAction("Group by module", this);
+	m_group_by_module->setCheckable(true);
+	m_context_menu->addAction(m_group_by_module);
+
+	m_group_by_section = new QAction("Group by section", this);
+	m_group_by_section->setCheckable(true);
+	m_context_menu->addAction(m_group_by_section);
+
+	m_group_by_source_file = new QAction("Group by source file", this);
+	m_group_by_source_file->setCheckable(true);
+	m_context_menu->addAction(m_group_by_source_file);
 
 	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
 	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
-	connect(m_ui.actionGroupBySection, &QAction::toggled, this, &SymbolTreeWidget::update);
-	connect(m_ui.actionGroupBySourceFile, &QAction::toggled, this, &SymbolTreeWidget::update);
+	connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
+	connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
+	connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
 
 	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
@@ -57,25 +84,30 @@ SymbolTreeWidget::SymbolTreeWidget(QWidget* parent)
 	});
 }
 
-SymbolTreeWidget::~SymbolTreeWidget() = default;
-
 void SymbolTreeWidget::setCPU(DebugInterface* cpu)
 {
 	m_cpu = cpu;
+
+	if (m_cpu->getCpuType() == BREAKPOINT_IOP)
+		m_group_by_module->setChecked(true);
 }
 
 void SymbolTreeWidget::update()
 {
 	Q_ASSERT(m_cpu);
+
 	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
-
 	guardian.Read([&](const ccc::SymbolDatabase& database) {
-		bool group_by_section = m_ui.actionGroupBySection->isChecked();
-		bool group_by_source_file = m_ui.actionGroupBySourceFile->isChecked();
-		QString filter = m_ui.filterBox->text().toLower();
+		SymbolFilters filters;
+		filters.group_by_module = m_group_by_module->isChecked();
+		filters.group_by_section = m_group_by_section->isChecked();
+		filters.group_by_source_file = m_group_by_source_file->isChecked();
+		filters.string = m_ui.filterBox->text();
 
-		auto initialRoot = populateSections(group_by_section, group_by_source_file, filter, database);
-		m_model = new DataInspectorModel(std::move(initialRoot), guardian, this);
+		std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
+		root->set_children(populateModules(filters, database));
+
+		m_model = new DataInspectorModel(std::move(root), guardian, this);
 		m_ui.treeView->setModel(m_model);
 
 		auto delegate = new DataInspectorValueColumnDelegate(guardian, this);
@@ -84,78 +116,118 @@ void SymbolTreeWidget::update()
 	});
 }
 
-std::unique_ptr<DataInspectorNode> SymbolTreeWidget::populateSections(
-	bool group_by_section, bool group_by_source_file, const QString& filter, const ccc::SymbolDatabase& database) const
+std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateModules(
+	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
-	root->children_fetched = true;
+	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
-	if (group_by_section)
+	filters.module_handle = ccc::ModuleHandle();
+
+	if (filters.group_by_module)
+	{
+		auto module_children = populateSections(filters, database);
+		if (!module_children.empty())
+		{
+			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			node->name = "(unknown module)";
+			node->set_children(std::move(module_children));
+			children.emplace_back(std::move(node));
+		}
+
+		for (const ccc::Module& module_symbol : database.modules)
+		{
+			filters.module_handle = module_symbol.handle();
+
+			auto module_children = populateSections(filters, database);
+			if (!module_children.empty())
+			{
+				std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+				node->name = QString::fromStdString(module_symbol.name());
+				if (module_symbol.is_irx)
+				{
+					node->name += " v";
+					node->name += QString::number(module_symbol.version_major);
+					node->name += ".";
+					node->name += QString::number(module_symbol.version_minor);
+				}
+				node->set_children(std::move(module_children));
+				children.emplace_back(std::move(node));
+			}
+		}
+	}
+	else
+	{
+		children = populateSections(filters, database);
+	}
+
+	return children;
+}
+
+std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSections(
+	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
+{
+	std::vector<std::unique_ptr<DataInspectorNode>> children;
+
+	if (filters.group_by_section)
 	{
 		for (const ccc::Section& section : database.sections)
 		{
 			if (section.address().valid())
 			{
-				u32 min_address = section.address().value;
-				u32 max_address = section.address().value + section.size();
-				auto section_children = populateSourceFiles(
-					min_address, max_address, group_by_source_file, filter, database);
+				filters.min_address = section.address().value;
+				filters.max_address = section.address().value + section.size();
+				auto section_children = populateSourceFiles(filters, database);
 				if (!section_children.empty())
 				{
 					std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 					node->name = QString::fromStdString(section.name());
 					node->set_children(std::move(section_children));
-					root->emplace_child(std::move(node));
+					children.emplace_back(std::move(node));
 				}
 			}
 		}
 	}
 	else
 	{
-		root->set_children(populateSourceFiles(0, UINT32_MAX, group_by_source_file, filter, database));
+		filters.min_address = 0;
+		filters.max_address = UINT32_MAX;
+		children = populateSourceFiles(filters, database);
 	}
 
-	return root;
+	return children;
 }
 
 std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSourceFiles(
-	u32 min_address, u32 max_address, bool group_by_source_file, const QString& filter, const ccc::SymbolDatabase& database) const
+	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
-	SymbolFilters filters;
-	filters.min_address = min_address;
-	filters.max_address = max_address;
-	filters.string = filter;
+	filters.source_file = nullptr;
 
-	if (group_by_source_file)
+	if (filters.group_by_source_file)
 	{
-		filters.source_file = nullptr;
-
+		auto source_file_children = populateSymbols(filters, database);
+		if (!source_file_children.empty())
 		{
 			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
 			node->name = "(unknown source file)";
-			node->set_children(populateSymbols(filters, database));
-
-			if (!node->children().empty())
-			{
-				children.emplace_back(std::move(node));
-			}
+			node->set_children(std::move(source_file_children));
+			children.emplace_back(std::move(node));
 		}
 
 		for (const ccc::SourceFile& source_file : database.source_files)
 		{
 			filters.source_file = &source_file;
 
-			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
-			if (!source_file.command_line_path.empty())
-				node->name = QString::fromStdString(source_file.command_line_path);
-			else
-				node->name = QString::fromStdString(source_file.name());
-			node->set_children(populateSymbols(filters, database));
-
-			if (!node->children().empty())
+			auto source_file_children = populateSymbols(filters, database);
+			if (!source_file_children.empty())
 			{
+				std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+				if (!source_file.command_line_path.empty())
+					node->name = QString::fromStdString(source_file.command_line_path);
+				else
+					node->name = QString::fromStdString(source_file.name());
+				node->set_children(populateSymbols(filters, database));
 				children.emplace_back(std::move(node));
 			}
 		}
@@ -184,8 +256,8 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 	std::vector<std::unique_ptr<DataInspectorNode>> variables;
 
 	std::span<const ccc::Function> functions;
-	if (filters.source_file.has_value() && *filters.source_file)
-		functions = database.functions.span((*filters.source_file)->functions());
+	if (filters.group_by_source_file && filters.source_file)
+		functions = database.functions.span(filters.source_file->functions());
 	else
 		functions = database.functions;
 
@@ -219,8 +291,8 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 	std::vector<std::unique_ptr<DataInspectorNode>> variables;
 
 	std::span<const ccc::GlobalVariable> global_variables;
-	if (filters.source_file.has_value() && *filters.source_file)
-		global_variables = database.global_variables.span((*filters.source_file)->global_variables());
+	if (filters.group_by_source_file && filters.source_file)
+		global_variables = database.global_variables.span(filters.source_file->global_variables());
 	else
 		global_variables = database.global_variables;
 
@@ -246,11 +318,14 @@ bool SymbolFilters::test(const ccc::Symbol& test_symbol, ccc::SourceFileHandle t
 	if (!test_symbol.address().valid())
 		return false;
 
-	if (source_file.has_value())
+	if (group_by_module && test_symbol.module_handle() != module_handle)
+		return false;
+
+	if (group_by_source_file)
 	{
-		if (*source_file)
+		if (source_file)
 		{
-			if ((*source_file)->handle() != test_source_file)
+			if (test_source_file != source_file->handle())
 				return false;
 		}
 		else

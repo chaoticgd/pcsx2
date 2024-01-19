@@ -48,11 +48,11 @@ public:
 	QString name;
 	ccc::NodeHandle type;
 	DataInspectorLocation location;
-	bool children_fetched = false;
 	
 	const DataInspectorNode* parent() const;
 	
 	const std::vector<std::unique_ptr<DataInspectorNode>>& children() const;
+	bool children_fetched() const;
 	void set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
 	void insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
 	void emplace_child(std::unique_ptr<DataInspectorNode> new_child);
@@ -60,4 +60,5 @@ public:
 protected:
 	DataInspectorNode* m_parent = nullptr;
 	std::vector<std::unique_ptr<DataInspectorNode>> m_children;
+	bool m_children_fetched = false;
 };
