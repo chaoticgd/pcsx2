@@ -79,11 +79,11 @@ u8 DataInspectorLocation::read8()
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r5900Debug.getRegister(EECAT_GPR, address)._u8[0];
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r3000Debug.getRegister(IOPCAT_GPR, address)._u8[0];
 			break;
 		case EE_MEMORY:
@@ -102,11 +102,11 @@ u16 DataInspectorLocation::read16()
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r5900Debug.getRegister(EECAT_GPR, address)._u16[0];
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r3000Debug.getRegister(IOPCAT_GPR, address)._u16[0];
 			break;
 		case EE_MEMORY:
@@ -125,11 +125,11 @@ u32 DataInspectorLocation::read32()
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r5900Debug.getRegister(EECAT_GPR, address)._u32[0];
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r3000Debug.getRegister(IOPCAT_GPR, address)._u32[0];
 			break;
 		case EE_MEMORY:
@@ -148,11 +148,11 @@ u64 DataInspectorLocation::read64()
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r5900Debug.getRegister(EECAT_GPR, address)._u64[0];
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r3000Debug.getRegister(IOPCAT_GPR, address)._u64[0];
 			break;
 		case EE_MEMORY:
@@ -171,11 +171,11 @@ u128 DataInspectorLocation::read128()
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r5900Debug.getRegister(EECAT_GPR, address);
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				return r3000Debug.getRegister(IOPCAT_GPR, address);
 			break;
 		case EE_MEMORY:
@@ -194,11 +194,11 @@ void DataInspectorLocation::write8(u8 value)
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
 			break;
 		case EE_MEMORY:
@@ -217,11 +217,11 @@ void DataInspectorLocation::write16(u16 value)
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
 			break;
 		case EE_MEMORY:
@@ -240,11 +240,11 @@ void DataInspectorLocation::write32(u32 value)
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
 			break;
 		case EE_MEMORY:
@@ -263,11 +263,11 @@ void DataInspectorLocation::write64(u64 value)
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r5900Debug.setRegister(EECAT_GPR, address, u128::From64(value));
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From64(value));
 			break;
 		case EE_MEMORY:
@@ -286,11 +286,11 @@ void DataInspectorLocation::write128(u128 value)
 	switch (type)
 	{
 		case EE_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r5900Debug.setRegister(EECAT_GPR, address, value);
 			break;
 		case IOP_REGISTER:
-			if (address < 32) // TODO: Convert between DBX register numbers and PCSX2 scheme.
+			if (address < 32)
 				r3000Debug.setRegister(IOPCAT_GPR, address, value);
 			break;
 		case EE_MEMORY:
