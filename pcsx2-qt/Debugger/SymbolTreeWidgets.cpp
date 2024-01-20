@@ -168,14 +168,25 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSectio
 {
 	std::vector<std::unique_ptr<DataInspectorNode>> children;
 
+	filters.section = ccc::SectionHandle();
+
 	if (filters.group_by_section)
 	{
+		auto section_children = populateSourceFiles(filters, database);
+		if (!section_children.empty())
+		{
+			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			node->name = "(unknown section)";
+			node->set_children(std::move(section_children));
+			children.emplace_back(std::move(node));
+		}
+
 		for (const ccc::Section& section : database.sections)
 		{
 			if (section.address().valid())
 			{
-				filters.min_address = section.address().value;
-				filters.max_address = section.address().value + section.size();
+				filters.section = section.handle();
+
 				auto section_children = populateSourceFiles(filters, database);
 				if (!section_children.empty())
 				{
@@ -189,8 +200,6 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSectio
 	}
 	else
 	{
-		filters.min_address = 0;
-		filters.max_address = UINT32_MAX;
 		children = populateSourceFiles(filters, database);
 	}
 
@@ -264,7 +273,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 	for (const ccc::Function& function : functions)
 	{
 		QString name;
-		if (!filters.test(function, function.source_file(), name))
+		if (!filters.test(function, function.source_file(), database, name))
 			continue;
 
 		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
@@ -299,7 +308,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 	for (const ccc::GlobalVariable& global_variable : global_variables)
 	{
 		QString name;
-		if (!filters.test(global_variable, global_variable.source_file(), name))
+		if (!filters.test(global_variable, global_variable.source_file(), database, name))
 			continue;
 
 		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
@@ -313,13 +322,32 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 	return variables;
 }
 
-bool SymbolFilters::test(const ccc::Symbol& test_symbol, ccc::SourceFileHandle test_source_file, QString& name_out) const
+bool SymbolFilters::test(
+	const ccc::Symbol& test_symbol,
+	ccc::SourceFileHandle test_source_file,
+	const ccc::SymbolDatabase& database,
+	QString& name_out) const
 {
 	if (!test_symbol.address().valid())
 		return false;
 
 	if (group_by_module && test_symbol.module_handle() != module_handle)
 		return false;
+
+	if (group_by_section)
+	{
+		const ccc::Section* test_section = database.sections.symbol_from_contained_address(test_symbol.address());
+		if (section.valid())
+		{
+			if (!test_section || test_section->handle() != section)
+				return false;
+		}
+		else
+		{
+			if (test_section)
+				return false;
+		}
+	}
 
 	if (group_by_source_file)
 	{
@@ -334,9 +362,6 @@ bool SymbolFilters::test(const ccc::Symbol& test_symbol, ccc::SourceFileHandle t
 				return false;
 		}
 	}
-
-	if (test_symbol.address().value < min_address || test_symbol.address().value > max_address)
-		return false;
 
 	name_out = QString::fromStdString(test_symbol.name());
 

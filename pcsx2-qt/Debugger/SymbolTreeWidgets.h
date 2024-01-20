@@ -88,9 +88,12 @@ struct SymbolFilters
 	QString string;
 	
 	ccc::ModuleHandle module_handle;
+	ccc::SectionHandle section;
 	const ccc::SourceFile* source_file = nullptr;
-	u32 min_address = 0;
-	u32 max_address = 0;
 
-	bool test(const ccc::Symbol& test_symbol, ccc::SourceFileHandle test_source_file, QString& name_out) const;
+	bool test(
+		const ccc::Symbol& test_symbol,
+		ccc::SourceFileHandle test_source_file,
+		const ccc::SymbolDatabase& database,
+		QString& name_out) const;
 };
