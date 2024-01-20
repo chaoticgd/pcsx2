@@ -107,6 +107,18 @@ void SymbolGuardian::ClearIrxModules()
 		m_database.destroy_symbols_from_modules(module);
 }
 
+std::string SymbolGuardian::FunctionNameFromAddress(u32 address) const
+{
+	std::string name;
+	Read([&](const ccc::SymbolDatabase& database) {
+		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
+		const ccc::Function* function = database.functions.symbol_from_handle(handle);
+		if(function)
+			name = function->name();
+	});
+	return name;
+}
+
 SymbolMap R5900SymbolMap;
 SymbolMap R3000SymbolMap;
 

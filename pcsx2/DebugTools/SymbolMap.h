@@ -34,6 +34,8 @@ public:
 	void Clear();
 	void ClearIrxModules();
 
+	std::string FunctionNameFromAddress(u32 address) const;
+
 protected:
 	ccc::SymbolDatabase m_database;
 	ccc::SymbolSourceHandle m_user_defined;
