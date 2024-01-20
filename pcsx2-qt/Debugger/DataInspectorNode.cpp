@@ -343,3 +343,15 @@ void DataInspectorNode::emplace_child(std::unique_ptr<DataInspectorNode> new_chi
 	m_children.emplace_back(std::move(new_child));
 	m_children_fetched = true;
 }
+
+void DataInspectorNode::sortChildrenRecursively()
+{
+	auto comparator = [](const std::unique_ptr<DataInspectorNode>& lhs, const std::unique_ptr<DataInspectorNode>& rhs) -> bool {
+		return lhs->location < rhs->location;
+	};
+
+	std::sort(m_children.begin(), m_children.end(), comparator);
+
+	for (std::unique_ptr<DataInspectorNode>& child : m_children)
+		child->sortChildrenRecursively();
+}

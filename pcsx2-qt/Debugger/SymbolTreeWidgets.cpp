@@ -106,6 +106,7 @@ void SymbolTreeWidget::update()
 
 		std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
 		root->set_children(populateModules(filters, database));
+		root->sortChildrenRecursively();
 
 		m_model = new DataInspectorModel(std::move(root), guardian, this);
 		m_ui.treeView->setModel(m_model);

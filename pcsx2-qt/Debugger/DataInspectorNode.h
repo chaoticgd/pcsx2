@@ -40,6 +40,8 @@ struct DataInspectorLocation
 	void write32(u32 value);
 	void write64(u64 value);
 	void write128(u128 value);
+	
+	friend auto operator<=>(const DataInspectorLocation& lhs, const DataInspectorLocation& rhs) = default;
 };
 
 struct DataInspectorNode
@@ -56,6 +58,8 @@ public:
 	void set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
 	void insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
 	void emplace_child(std::unique_ptr<DataInspectorNode> new_child);
+	
+	void sortChildrenRecursively();
 
 protected:
 	DataInspectorNode* m_parent = nullptr;
