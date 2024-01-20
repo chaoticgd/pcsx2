@@ -1,5 +1,5 @@
-// This file is part of the Chaos Compiler Collection.
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #pragma once
 
@@ -108,8 +108,8 @@ enum SymbolFlags {
 	NAME_NEEDS_DEMANGLING = 1 << 2
 };
 
-// A container base class for symbols of a given type that maintains maps of
-// their names.
+// A container class for symbols of a given type that maintains maps of their
+// names and addresses depending on the value of SymbolType::FLAGS.
 template <typename SymbolType>
 class SymbolList {
 public:

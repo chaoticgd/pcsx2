@@ -1,5 +1,5 @@
-// This file is part of the Chaos Compiler Collection.
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "elf_symtab.h"
 
@@ -85,12 +85,18 @@ Result<void> import_symbols(
 				break;
 			}
 			case SymbolType::OBJECT: {
-				Result<GlobalVariable*> global_variable = database.global_variables.create_symbol(
-					string, source, module_symbol, address, importer_flags, demangler);
-				CCC_RETURN_IF_ERROR(global_variable);
-				
-				if(*global_variable) {
-					(*global_variable)->set_size(symbol->size);
+				if(symbol->size != 0) {
+					Result<GlobalVariable*> global_variable = database.global_variables.create_symbol(
+						string, source, module_symbol, address, importer_flags, demangler);
+					CCC_RETURN_IF_ERROR(global_variable);
+					
+					if(*global_variable) {
+						(*global_variable)->set_size(symbol->size);
+					}
+				} else {
+					Result<Label*> label = database.labels.create_symbol(
+						string, source, module_symbol, address, importer_flags, demangler);
+					CCC_RETURN_IF_ERROR(label);
 				}
 				
 				break;
