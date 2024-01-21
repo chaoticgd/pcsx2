@@ -1853,17 +1853,21 @@ void GSState::CheckWriteOverlap(bool req_write, bool req_read)
 		const bool frame_required = (!(prev_ctx.TEST.ATE && prev_ctx.TEST.ATST == 0 && (prev_ctx.TEST.AFAIL == 2 || prev_ctx.TEST.AFAIL == 0)) && ((prev_ctx.FRAME.FBMSK & frame_mask) != frame_mask)) || prev_ctx.TEST.DATE;
 		if (frame_required)
 		{
+			const GSFlushReason reason = req_write ? (req_read ? GSFlushReason::LOCALTOLOCALMOVE : GSFlushReason::UPLOADDIRTYFRAME) : GSFlushReason::DOWNLOADFIFO;
+
 			if ((req_write && (blit.DBP == prev_ctx.FRAME.Block() || GSLocalMemory::HasOverlap(blit.DBP, blit.DBW, blit.DPSM, write_rect, prev_ctx.FRAME.Block(), prev_ctx.FRAME.FBW, prev_ctx.FRAME.PSM, temp_draw_rect))) ||
 				(req_read && (blit.DBP == prev_ctx.FRAME.Block() || GSLocalMemory::HasOverlap(blit.SBP, blit.SBW, blit.SPSM, read_rect, prev_ctx.FRAME.Block(), prev_ctx.FRAME.FBW, prev_ctx.FRAME.PSM, temp_draw_rect))))
-				Flush(GSFlushReason::UPLOADDIRTYFRAME);
+				Flush(reason);
 		}
 
 		const bool zbuf_required = (!(prev_ctx.TEST.ATE && prev_ctx.TEST.ATST == 0 && prev_ctx.TEST.AFAIL != 2) && !prev_ctx.ZBUF.ZMSK) || (prev_ctx.TEST.ZTE && prev_ctx.TEST.ZTST > ZTST_ALWAYS);
 		if (zbuf_required)
 		{
+			const GSFlushReason reason = req_write ? (req_read ? GSFlushReason::LOCALTOLOCALMOVE : GSFlushReason::UPLOADDIRTYZBUF) : GSFlushReason::DOWNLOADFIFO;
+
 			if ((req_write && (blit.DBP == prev_ctx.ZBUF.Block() || GSLocalMemory::HasOverlap(blit.DBP, blit.DBW, blit.DPSM, write_rect, prev_ctx.ZBUF.Block(), prev_ctx.FRAME.FBW, prev_ctx.ZBUF.PSM, temp_draw_rect))) ||
 				(req_read && (blit.DBP == prev_ctx.ZBUF.Block() || GSLocalMemory::HasOverlap(blit.SBP, blit.SBW, blit.SPSM, read_rect, prev_ctx.ZBUF.Block(), prev_ctx.FRAME.FBW, prev_ctx.ZBUF.PSM, temp_draw_rect))))
-				Flush(GSFlushReason::UPLOADDIRTYZBUF);
+				Flush(reason);
 		}
 	}
 
@@ -3337,6 +3341,12 @@ __forceinline void GSState::VertexKick(u32 skip)
 
 	pxAssert(m_vertex.tail < m_vertex.maxcount + 3);
 
+	if constexpr (prim == GS_INVALID)
+	{
+		m_vertex.tail = m_vertex.head;
+		return;
+	}
+
 	if (auto_flush && skip == 0 && m_index.tail > 0 && ((m_vertex.tail + 1) - m_vertex.head) >= n)
 	{
 		HandleAutoFlush<prim, index_swap>();
@@ -3454,7 +3464,6 @@ __forceinline void GSState::VertexKick(u32 skip)
 			case GS_LINELIST:
 			case GS_TRIANGLELIST:
 			case GS_SPRITE:
-			case GS_INVALID:
 				m_vertex.tail = head; // no need to check or grow the buffer length
 				break;
 			case GS_LINESTRIP:
@@ -3561,9 +3570,6 @@ __forceinline void GSState::VertexKick(u32 skip)
 			m_vertex.next = head + 2;
 			m_index.tail += 2;
 			break;
-		case GS_INVALID:
-			m_vertex.tail = head;
-			return;
 		default:
 			ASSUME(0);
 	}

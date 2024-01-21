@@ -158,6 +158,7 @@ private Q_SLOTS:
 	void onToolsOpenDataDirectoryTriggered();
 	void onToolsCoverDownloaderTriggered();
 	void onToolsEditCheatsPatchesTriggered(bool cheats);
+	void onCreateMemoryCardOpenRequested();
 	void updateTheme();
 	void reloadThemeSpecificImages();
 	void updateLanguage();
@@ -222,6 +223,7 @@ private:
 	void updateDisplayRelatedActions(bool has_surface, bool render_to_main, bool fullscreen);
 	void updateGameDependentActions();
 	void updateStatusBarWidgetVisibility();
+	void updateAdvancedSettingsVisibility();
 	void updateWindowTitle();
 	void updateWindowState(bool force_visible = false);
 	void setProgressBar(int current, int total);
