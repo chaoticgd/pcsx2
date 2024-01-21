@@ -85,7 +85,7 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf, std::string file_name
 void SymbolGuardian::Clear()
 {
 	std::unique_lock lock(m_big_symbol_lock);
-	
+
 	m_database.clear();
 	m_main_elf = ccc::ModuleHandle();
 
@@ -97,26 +97,67 @@ void SymbolGuardian::Clear()
 void SymbolGuardian::ClearIrxModules()
 {
 	std::unique_lock lock(m_big_symbol_lock);
-	
+
 	std::vector<ccc::ModuleHandle> irx_modules;
-	for(const ccc::Module& module : m_database.modules)
-		if(module.is_irx)
+	for (const ccc::Module& module : m_database.modules)
+		if (module.is_irx)
 			irx_modules.emplace_back(module.handle());
-	
-	for(ccc::ModuleHandle module : irx_modules)
+
+	for (ccc::ModuleHandle module : irx_modules)
 		m_database.destroy_symbols_from_modules(module);
 }
 
-std::string SymbolGuardian::FunctionNameFromAddress(u32 address) const
+bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
 {
-	std::string name;
+	bool exists = false;
+	Read([&](const ccc::SymbolDatabase& database) {
+		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
+		exists = handle.valid();
+	});
+	return exists;
+}
+
+bool SymbolGuardian::FunctionExistsThatContainsAddress(u32 address) const
+{
+	bool exists = false;
+	Read([&](const ccc::SymbolDatabase& database) {
+		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		exists = function != nullptr;
+	});
+	return exists;
+}
+
+FunctionStat SymbolGuardian::StatFunctionStartingAtAddress(u32 address) const
+{
+	FunctionStat stat;
 	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		const ccc::Function* function = database.functions.symbol_from_handle(handle);
-		if(function)
-			name = function->name();
+		if (function)
+		{
+			stat.handle = function->handle();
+			stat.name = function->name();
+			stat.address = function->address();
+			stat.size = function->size();
+		}
 	});
-	return name;
+	return stat;
+}
+
+FunctionStat SymbolGuardian::StatFunctionContainingAddress(u32 address) const
+{
+	FunctionStat stat;
+	Read([&](const ccc::SymbolDatabase& database) {
+		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		if (function)
+		{
+			stat.handle = function->handle();
+			stat.name = function->name();
+			stat.address = function->address();
+			stat.size = function->size();
+		}
+	});
+	return stat;
 }
 
 SymbolMap R5900SymbolMap;

@@ -14,6 +14,14 @@
 #include "common/Pcsx2Types.h"
 #include "DebugTools/ccc/symbol_database.h"
 
+struct FunctionStat
+{
+	ccc::FunctionHandle handle;
+	std::string name;
+	ccc::Address address;
+	u32 size = 0;
+};
+
 struct SymbolGuardian
 {
 public:
@@ -33,8 +41,16 @@ public:
 	// don't get dangling symbol handles.
 	void Clear();
 	void ClearIrxModules();
+	
+	bool FunctionExistsWithStartingAddress(u32 address) const;
+	bool FunctionExistsThatContainsAddress(u32 address) const;
+	
+	// Copy commonly used attributes of a function so they can be used by the
+	// calling thread without needing to keep the lock held.
+	FunctionStat StatFunctionStartingAtAddress(u32 address) const;
+	FunctionStat StatFunctionContainingAddress(u32 address) const;
 
-	std::string FunctionNameFromAddress(u32 address) const;
+	ccc::SymbolSourceHandle GetUserDefinedSymbolSource() const;
 
 protected:
 	ccc::SymbolDatabase m_database;

@@ -46,7 +46,7 @@ QVariant BreakpointModel::data(const QModelIndex& index, int role) const
 				case BreakpointColumns::OFFSET:
 					return QtUtils::FilledQStringFromValue(bp->addr, 16);
 				case BreakpointColumns::SIZE_LABEL:
-					return QString::fromStdString(m_cpu.GetSymbolGuardian().FunctionNameFromAddress(bp->addr));
+					return QString::fromStdString(m_cpu.GetSymbolGuardian().StatFunctionStartingAtAddress(bp->addr).name);
 				case BreakpointColumns::OPCODE:
 					// Note: Fix up the disassemblymanager so we can use it here, instead of calling a function through the disassemblyview (yuck)
 					return m_cpu.disasm(bp->addr, true).c_str();
@@ -99,7 +99,7 @@ QVariant BreakpointModel::data(const QModelIndex& index, int role) const
 				case BreakpointColumns::OFFSET:
 					return bp->addr;
 				case BreakpointColumns::SIZE_LABEL:
-					return QString::fromStdString(m_cpu.GetSymbolGuardian().FunctionNameFromAddress(bp->addr));
+					return QString::fromStdString(m_cpu.GetSymbolGuardian().StatFunctionStartingAtAddress(bp->addr).name);
 				case BreakpointColumns::OPCODE:
 					// Note: Fix up the disassemblymanager so we can use it here, instead of calling a function through the disassemblyview (yuck)
 					return m_cpu.disasm(bp->addr, true).c_str();
@@ -145,7 +145,7 @@ QVariant BreakpointModel::data(const QModelIndex& index, int role) const
 				case BreakpointColumns::OFFSET:
 					return QtUtils::FilledQStringFromValue(bp->addr, 16);
 				case BreakpointColumns::SIZE_LABEL:
-					return QString::fromStdString(m_cpu.GetSymbolGuardian().FunctionNameFromAddress(bp->addr));
+					return QString::fromStdString(m_cpu.GetSymbolGuardian().StatFunctionStartingAtAddress(bp->addr).name);
 				case BreakpointColumns::OPCODE:
 					// Note: Fix up the disassemblymanager so we can use it here, instead of calling a function through the disassemblyview (yuck)
 					return m_cpu.disasm(bp->addr, true).c_str();
