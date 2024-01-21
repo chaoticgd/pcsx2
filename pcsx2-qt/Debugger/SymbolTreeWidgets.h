@@ -22,15 +22,15 @@ public:
 	void update();
 
 protected:
-	explicit SymbolTreeWidget(QWidget* parent = nullptr);
-	
+	explicit SymbolTreeWidget(u32 flags, QWidget* parent = nullptr);
+
 	void setupMenu();
-	
+
 	// Builds up the tree for when symbols are grouped by the module that
 	// contains them, otherwise it just passes through to populateSections.
 	std::vector<std::unique_ptr<DataInspectorNode>> populateModules(
 		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
-	
+
 	// Builds up the tree for when symbols are grouped by the ELF section that
 	// contains them, otherwise it just passes through to populateSourceFiles.
 	std::vector<std::unique_ptr<DataInspectorNode>> populateSections(
@@ -49,11 +49,19 @@ protected:
 
 	DebugInterface* m_cpu = nullptr;
 	DataInspectorModel* m_model = nullptr;
-	
-	QMenu* m_context_menu;
-	QAction* m_group_by_module;
-	QAction* m_group_by_section;
-	QAction* m_group_by_source_file;
+
+	QMenu* m_context_menu = nullptr;
+	QAction* m_group_by_module = nullptr;
+	QAction* m_group_by_section = nullptr;
+	QAction* m_group_by_source_file = nullptr;
+
+	enum Flags
+	{
+		NO_SYMBOL_TREE_FLAGS = 0,
+		ENABLE_GROUPING = 1 << 0
+	};
+
+	Flags m_flags;
 };
 
 class FunctionTreeWidget : public SymbolTreeWidget
@@ -80,13 +88,25 @@ protected:
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 };
 
+class LocalVariableTreeWidget : public SymbolTreeWidget
+{
+	Q_OBJECT
+public:
+	explicit LocalVariableTreeWidget(QWidget* parent = nullptr);
+	virtual ~LocalVariableTreeWidget();
+
+protected:
+	std::vector<std::unique_ptr<DataInspectorNode>> populateSymbols(
+		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+};
+
 struct SymbolFilters
 {
 	bool group_by_module = false;
 	bool group_by_section = false;
 	bool group_by_source_file = false;
 	QString string;
-	
+
 	ccc::ModuleHandle module_handle;
 	ccc::SectionHandle section;
 	const ccc::SourceFile* source_file = nullptr;

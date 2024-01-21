@@ -8,7 +8,7 @@
 
 #include "Delegates/DataInspectorValueColumnDelegate.h"
 
-SymbolTreeWidget::SymbolTreeWidget(QWidget* parent)
+SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 	: QWidget(parent)
 {
 	m_ui.setupUi(this);
@@ -58,25 +58,29 @@ void SymbolTreeWidget::setupMenu()
 	});
 	m_context_menu->addAction(go_to_in_memory_view);
 
-	m_context_menu->addSeparator();
+	if (m_flags & ENABLE_GROUPING)
+	{
+		m_context_menu->addSeparator();
 
-	m_group_by_module = new QAction("Group by module", this);
-	m_group_by_module->setCheckable(true);
-	m_context_menu->addAction(m_group_by_module);
+		m_group_by_module = new QAction("Group by module", this);
+		m_group_by_module->setCheckable(true);
+		m_context_menu->addAction(m_group_by_module);
 
-	m_group_by_section = new QAction("Group by section", this);
-	m_group_by_section->setCheckable(true);
-	m_context_menu->addAction(m_group_by_section);
+		m_group_by_section = new QAction("Group by section", this);
+		m_group_by_section->setCheckable(true);
+		m_context_menu->addAction(m_group_by_section);
 
-	m_group_by_source_file = new QAction("Group by source file", this);
-	m_group_by_source_file->setCheckable(true);
-	m_context_menu->addAction(m_group_by_source_file);
+		m_group_by_source_file = new QAction("Group by source file", this);
+		m_group_by_source_file->setCheckable(true);
+		m_context_menu->addAction(m_group_by_source_file);
+
+		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
+	}
 
 	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
 	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
-	connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
-	connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
-	connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
 
 	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
@@ -88,20 +92,20 @@ void SymbolTreeWidget::setCPU(DebugInterface* cpu)
 {
 	m_cpu = cpu;
 
-	if (m_cpu->getCpuType() == BREAKPOINT_IOP)
+	if (m_group_by_module && m_cpu->getCpuType() == BREAKPOINT_IOP)
 		m_group_by_module->setChecked(true);
 }
 
 void SymbolTreeWidget::update()
 {
-	Q_ASSERT(m_cpu);
+	assert(m_cpu);
 
 	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
 	guardian.Read([&](const ccc::SymbolDatabase& database) {
 		SymbolFilters filters;
-		filters.group_by_module = m_group_by_module->isChecked();
-		filters.group_by_section = m_group_by_section->isChecked();
-		filters.group_by_source_file = m_group_by_source_file->isChecked();
+		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
+		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
+		filters.group_by_source_file = m_group_by_source_file && m_group_by_source_file->isChecked();
 		filters.string = m_ui.filterBox->text();
 
 		std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
@@ -251,7 +255,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSource
 }
 
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(parent)
+	: SymbolTreeWidget(ENABLE_GROUPING, parent)
 {
 	m_ui.treeView->hideColumn(DataInspectorModel::TYPE);
 	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
@@ -288,7 +292,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(parent)
+	: SymbolTreeWidget(ENABLE_GROUPING, parent)
 {
 	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
 }
@@ -317,6 +321,57 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 		node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location.type = DataInspectorLocation::EE_MEMORY;
 		node->location.address = global_variable.address().value;
+		variables.emplace_back(std::move(node));
+	}
+
+	return variables;
+}
+
+LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
+	: SymbolTreeWidget(NO_SYMBOL_TREE_FLAGS, parent)
+{
+	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
+}
+
+LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
+
+std::vector<std::unique_ptr<DataInspectorNode>> LocalVariableTreeWidget::populateSymbols(
+	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
+{
+	std::vector<std::unique_ptr<DataInspectorNode>> variables;
+
+	u32 program_counter = m_cpu->getPC();
+	u32 stack_pointer = m_cpu->getRegister(EECAT_GPR, 29);
+
+	const ccc::Function* function = database.functions.symbol_from_contained_address(program_counter);
+	if (!function)
+		return variables;
+
+	for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function->local_variables()))
+	{
+		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+		node->name = QString::fromStdString(local_variable.name());
+		node->type = ccc::NodeHandle(local_variable, local_variable.type());
+		
+		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))
+		{
+			if (!local_variable.address().valid())
+				continue;
+
+			node->location.type = DataInspectorLocation::EE_MEMORY;
+			node->location.address = stack_pointer + local_variable.address().value;
+		}
+		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
+		{
+			node->location.type = DataInspectorLocation::EE_REGISTER;
+			node->location.address = storage->dbx_register_number;
+		}
+		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
+		{
+			node->location.type = DataInspectorLocation::EE_MEMORY;
+			node->location.address = stack_pointer + storage->stack_pointer_offset;
+		}
+		
 		variables.emplace_back(std::move(node));
 	}
 
