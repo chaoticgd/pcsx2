@@ -151,8 +151,6 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/CpuWidget.cpp
 	Debugger/CpuWidget.h
 	Debugger/CpuWidget.ui
-	Debugger/DataInspectorNode.cpp
-	Debugger/DataInspectorNode.h
 	Debugger/DebuggerWindow.cpp
 	Debugger/DebuggerWindow.h
 	Debugger/DebuggerWindow.ui
@@ -181,6 +179,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/SavedAddressesModel.h
 	Debugger/SymbolTree/SymbolTreeModel.cpp
 	Debugger/SymbolTree/SymbolTreeModel.h
+	Debugger/SymbolTree/SymbolTreeNode.cpp
+	Debugger/SymbolTree/SymbolTreeNode.h
 	Debugger/SymbolTree/SymbolTreeValueDelegate.cpp
 	Debugger/SymbolTree/SymbolTreeValueDelegate.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp

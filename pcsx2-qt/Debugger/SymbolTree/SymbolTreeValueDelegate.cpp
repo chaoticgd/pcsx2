@@ -21,7 +21,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 {
 	QWidget* result = nullptr;
 
-	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
 		return result;
 
@@ -103,7 +103,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 
 void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
-	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
 		return;
 
@@ -192,7 +192,7 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 
 void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
-	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
 		return;
 

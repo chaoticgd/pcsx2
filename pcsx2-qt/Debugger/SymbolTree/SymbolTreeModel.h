@@ -21,7 +21,7 @@
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/ccc/ast.h"
 #include "DebugTools/ccc/symbol_database.h"
-#include "Debugger/DataInspectorNode.h"
+#include "SymbolTreeNode.h"
 
 class SymbolTreeModel : public QAbstractItemModel
 {
@@ -39,7 +39,7 @@ public:
 	};
 
 	SymbolTreeModel(
-		std::unique_ptr<DataInspectorNode> initial_root,
+		std::unique_ptr<SymbolTreeNode> initial_root,
 		const SymbolGuardian& guardian,
 		QObject* parent = nullptr);
 
@@ -55,14 +55,14 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-	void reset(std::unique_ptr<DataInspectorNode> new_root);
+	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
-	QModelIndex indexFromNode(const DataInspectorNode& node) const;
+	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
 	QString typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
 
-	std::unique_ptr<DataInspectorNode> m_root;
+	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;
 	const SymbolGuardian& m_guardian;
 };

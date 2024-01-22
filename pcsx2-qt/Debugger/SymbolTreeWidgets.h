@@ -28,21 +28,21 @@ protected:
 
 	// Builds up the tree for when symbols are grouped by the module that
 	// contains them, otherwise it just passes through to populateSections.
-	std::vector<std::unique_ptr<DataInspectorNode>> populateModules(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateModules(
 		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
 
 	// Builds up the tree for when symbols are grouped by the ELF section that
 	// contains them, otherwise it just passes through to populateSourceFiles.
-	std::vector<std::unique_ptr<DataInspectorNode>> populateSections(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSections(
 		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
 
 	// Builds up the tree for when symbols are grouped by the source file that
 	// contains them, otherwise it just passes through to populateSymbols.
-	std::vector<std::unique_ptr<DataInspectorNode>> populateSourceFiles(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSourceFiles(
 		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
 
 	// Generates a filtered list of symbols.
-	virtual std::vector<std::unique_ptr<DataInspectorNode>> populateSymbols(
+	virtual std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const = 0;
 
 	Ui::SymbolTreeWidget m_ui;
@@ -72,7 +72,7 @@ public:
 	virtual ~FunctionTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<DataInspectorNode>> populateSymbols(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 };
 
@@ -84,7 +84,7 @@ public:
 	virtual ~GlobalVariableTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<DataInspectorNode>> populateSymbols(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 };
 
@@ -96,7 +96,7 @@ public:
 	virtual ~LocalVariableTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<DataInspectorNode>> populateSymbols(
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 };
 

@@ -1,7 +1,7 @@
 #include "SymbolTreeModel.h"
 
 SymbolTreeModel::SymbolTreeModel(
-	std::unique_ptr<DataInspectorNode> initial_root,
+	std::unique_ptr<SymbolTreeNode> initial_root,
 	const SymbolGuardian& guardian,
 	QObject* parent)
 	: QAbstractItemModel(parent)
@@ -15,13 +15,13 @@ QModelIndex SymbolTreeModel::index(int row, int column, const QModelIndex& paren
 	if (!hasIndex(row, column, parent))
 		return QModelIndex();
 
-	DataInspectorNode* parent_node;
+	SymbolTreeNode* parent_node;
 	if (parent.isValid())
-		parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
+		parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	else
 		parent_node = m_root.get();
 
-	const DataInspectorNode* child_node = parent_node->children().at(row).get();
+	const SymbolTreeNode* child_node = parent_node->children().at(row).get();
 	if (!child_node)
 		return QModelIndex();
 
@@ -33,8 +33,8 @@ QModelIndex SymbolTreeModel::parent(const QModelIndex& index) const
 	if (!index.isValid())
 		return QModelIndex();
 
-	DataInspectorNode* child_node = static_cast<DataInspectorNode*>(index.internalPointer());
-	const DataInspectorNode* parent_node = child_node->parent();
+	SymbolTreeNode* child_node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	const SymbolTreeNode* parent_node = child_node->parent();
 	if (!parent_node)
 		return QModelIndex();
 
@@ -46,9 +46,9 @@ int SymbolTreeModel::rowCount(const QModelIndex& parent) const
 	if (parent.column() > 0)
 		return 0;
 
-	DataInspectorNode* node;
+	SymbolTreeNode* node;
 	if (parent.isValid())
-		node = static_cast<DataInspectorNode*>(parent.internalPointer());
+		node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	else
 		node = m_root.get();
 
@@ -67,7 +67,7 @@ bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 	if (!parent.isValid())
 		return result;
 
-	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
+	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	if (!parent_node->type.valid())
 		return result;
 
@@ -87,7 +87,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 	if (!index.isValid() || role != Qt::DisplayRole)
 		return QVariant();
 
-	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 
 	u32 pc = r5900Debug.getRegister(EECAT_GPR, 32);
 
@@ -222,7 +222,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 	if (!index.isValid())
 		return result;
 
-	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (node->type.valid())
 		return result;
 
@@ -315,11 +315,11 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 	if (!parent.isValid())
 		return;
 
-	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
+	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	if (!parent_node->type.valid())
 		return;
 
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_parent_type = parent_node->type.lookup_node(database);
 		if (!logical_parent_type)
@@ -334,7 +334,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 				const ccc::ast::Array& array = parent_type.as<ccc::ast::Array>();
 				for (s32 i = 0; i < array.element_count; i++)
 				{
-					std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
+					std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
 					element->name = QString("[%1]").arg(i);
 					element->type = parent_node->type.handle_for_child(array.element_type.get());
 					element->location = parent_node->location.addOffset(i * array.element_type->computed_size_bytes);
@@ -348,7 +348,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 				if (parent_node->location.cpu().isValidAddress(address))
 				{
 					const ccc::ast::PointerOrReference& pointer_or_reference = parent_type.as<ccc::ast::PointerOrReference>();
-					std::unique_ptr<DataInspectorNode> element = std::make_unique<DataInspectorNode>();
+					std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
 					element->name = QString("*%1").arg(address);
 					element->type = parent_node->type.handle_for_child(pointer_or_reference.value_type.get());
 					element->location = parent_node->location.createAddress(address);
@@ -361,7 +361,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 				const ccc::ast::StructOrUnion& structOrUnion = parent_type.as<ccc::ast::StructOrUnion>();
 				for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
 				{
-					std::unique_ptr<DataInspectorNode> child_node = std::make_unique<DataInspectorNode>();
+					std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
 					child_node->name = QString::fromStdString(field->name);
 					child_node->type = parent_node->type.handle_for_child(field.get());
 					child_node->location = parent_node->location.addOffset(field->offset_bytes);
@@ -389,7 +389,7 @@ bool SymbolTreeModel::canFetchMore(const QModelIndex& parent) const
 	if (!parent.isValid())
 		return result;
 
-	DataInspectorNode* parent_node = static_cast<DataInspectorNode*>(parent.internalPointer());
+	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	if (!parent_node->type.valid())
 		return result;
 
@@ -449,7 +449,7 @@ QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, i
 	return QVariant();
 }
 
-void SymbolTreeModel::reset(std::unique_ptr<DataInspectorNode> new_root)
+void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 {
 	beginResetModel();
 	m_root = std::move(new_root);
@@ -488,7 +488,7 @@ bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::Sym
 	return result;
 }
 
-QModelIndex SymbolTreeModel::indexFromNode(const DataInspectorNode& node) const
+QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
 {
 	int row = 0;
 	if (node.parent())

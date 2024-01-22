@@ -109,7 +109,7 @@ void SymbolTreeWidget::update()
 		filters.group_by_source_file = m_group_by_source_file && m_group_by_source_file->isChecked();
 		filters.string = m_ui.filterBox->text();
 
-		std::unique_ptr<DataInspectorNode> root = std::make_unique<DataInspectorNode>();
+		std::unique_ptr<SymbolTreeNode> root = std::make_unique<SymbolTreeNode>();
 		root->set_children(populateModules(filters, database));
 		root->sortChildrenRecursively();
 
@@ -122,10 +122,10 @@ void SymbolTreeWidget::update()
 	});
 }
 
-std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateModules(
+std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 
 	filters.module_handle = ccc::ModuleHandle();
 
@@ -134,7 +134,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateModule
 		auto module_children = populateSections(filters, database);
 		if (!module_children.empty())
 		{
-			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown module)";
 			node->set_children(std::move(module_children));
 			children.emplace_back(std::move(node));
@@ -147,7 +147,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateModule
 			auto module_children = populateSections(filters, database);
 			if (!module_children.empty())
 			{
-				std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 				node->name = QString::fromStdString(module_symbol.name());
 				if (module_symbol.is_irx)
 				{
@@ -169,10 +169,10 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateModule
 	return children;
 }
 
-std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSections(
+std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 
 	filters.section = ccc::SectionHandle();
 
@@ -181,7 +181,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSectio
 		auto section_children = populateSourceFiles(filters, database);
 		if (!section_children.empty())
 		{
-			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown section)";
 			node->set_children(std::move(section_children));
 			children.emplace_back(std::move(node));
@@ -196,7 +196,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSectio
 				auto section_children = populateSourceFiles(filters, database);
 				if (!section_children.empty())
 				{
-					std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+					std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 					node->name = QString::fromStdString(section.name());
 					node->set_children(std::move(section_children));
 					children.emplace_back(std::move(node));
@@ -212,10 +212,10 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSectio
 	return children;
 }
 
-std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSourceFiles(
+std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFiles(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 
 	filters.source_file = nullptr;
 
@@ -224,7 +224,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSource
 		auto source_file_children = populateSymbols(filters, database);
 		if (!source_file_children.empty())
 		{
-			std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown source file)";
 			node->set_children(std::move(source_file_children));
 			children.emplace_back(std::move(node));
@@ -237,7 +237,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSource
 			auto source_file_children = populateSymbols(filters, database);
 			if (!source_file_children.empty())
 			{
-				std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 				if (!source_file.command_line_path.empty())
 					node->name = QString::fromStdString(source_file.command_line_path);
 				else
@@ -265,10 +265,10 @@ FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
 
 FunctionTreeWidget::~FunctionTreeWidget() = default;
 
-std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymbols(
+std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
 
 	std::span<const ccc::Function> functions;
 	if (filters.group_by_source_file && filters.source_file)
@@ -282,7 +282,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 		if (!filters.test(function, function.source_file(), database, name))
 			continue;
 
-		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
 		node->location.type = DataInspectorLocation::EE_MEMORY;
 		node->location.address = function.address().value;
@@ -300,10 +300,10 @@ GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
 
 GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
 
-std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::populateSymbols(
+std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
 
 	std::span<const ccc::GlobalVariable> global_variables;
 	if (filters.group_by_source_file && filters.source_file)
@@ -317,7 +317,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 		if (!filters.test(global_variable, global_variable.source_file(), database, name))
 			continue;
 
-		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
 		node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location.type = DataInspectorLocation::EE_MEMORY;
@@ -336,10 +336,10 @@ LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
 
 LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
 
-std::vector<std::unique_ptr<DataInspectorNode>> LocalVariableTreeWidget::populateSymbols(
+std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<DataInspectorNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
 
 	u32 program_counter = m_cpu->getPC();
 	u32 stack_pointer = m_cpu->getRegister(EECAT_GPR, 29);
@@ -350,7 +350,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> LocalVariableTreeWidget::populat
 
 	for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function->local_variables()))
 	{
-		std::unique_ptr<DataInspectorNode> node = std::make_unique<DataInspectorNode>();
+		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = QString::fromStdString(local_variable.name());
 		node->type = ccc::NodeHandle(local_variable, local_variable.type());
 		

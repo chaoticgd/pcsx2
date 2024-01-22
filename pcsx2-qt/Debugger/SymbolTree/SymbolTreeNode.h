@@ -44,25 +44,25 @@ struct DataInspectorLocation
 	friend auto operator<=>(const DataInspectorLocation& lhs, const DataInspectorLocation& rhs) = default;
 };
 
-struct DataInspectorNode
+struct SymbolTreeNode
 {
 public:
 	QString name;
 	ccc::NodeHandle type;
 	DataInspectorLocation location;
 	
-	const DataInspectorNode* parent() const;
+	const SymbolTreeNode* parent() const;
 	
-	const std::vector<std::unique_ptr<DataInspectorNode>>& children() const;
+	const std::vector<std::unique_ptr<SymbolTreeNode>>& children() const;
 	bool children_fetched() const;
-	void set_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
-	void insert_children(std::vector<std::unique_ptr<DataInspectorNode>> new_children);
-	void emplace_child(std::unique_ptr<DataInspectorNode> new_child);
+	void set_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
+	void insert_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
+	void emplace_child(std::unique_ptr<SymbolTreeNode> new_child);
 	
 	void sortChildrenRecursively();
 
 protected:
-	DataInspectorNode* m_parent = nullptr;
-	std::vector<std::unique_ptr<DataInspectorNode>> m_children;
+	SymbolTreeNode* m_parent = nullptr;
+	std::vector<std::unique_ptr<SymbolTreeNode>> m_children;
 	bool m_children_fetched = false;
 };
