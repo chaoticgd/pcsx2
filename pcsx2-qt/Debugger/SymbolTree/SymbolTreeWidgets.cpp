@@ -125,7 +125,7 @@ void SymbolTreeWidget::update()
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
 	filters.module_handle = ccc::ModuleHandle();
 
@@ -137,7 +137,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown module)";
 			node->set_children(std::move(module_children));
-			children.emplace_back(std::move(node));
+			nodes.emplace_back(std::move(node));
 		}
 
 		for (const ccc::Module& module_symbol : database.modules)
@@ -156,22 +156,22 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 					node->name += QString(" v%1.%2").arg(major).arg(minor);
 				}
 				node->set_children(std::move(module_children));
-				children.emplace_back(std::move(node));
+				nodes.emplace_back(std::move(node));
 			}
 		}
 	}
 	else
 	{
-		children = populateSections(filters, database);
+		nodes = populateSections(filters, database);
 	}
 
-	return children;
+	return nodes;
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
 	filters.section = ccc::SectionHandle();
 
@@ -183,7 +183,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown section)";
 			node->set_children(std::move(section_children));
-			children.emplace_back(std::move(node));
+			nodes.emplace_back(std::move(node));
 		}
 
 		for (const ccc::Section& section : database.sections)
@@ -199,22 +199,22 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 				node->name = QString::fromStdString(section.name());
 				node->set_children(std::move(section_children));
-				children.emplace_back(std::move(node));
+				nodes.emplace_back(std::move(node));
 			}
 		}
 	}
 	else
 	{
-		children = populateSourceFiles(filters, database);
+		nodes = populateSourceFiles(filters, database);
 	}
 
-	return children;
+	return nodes;
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFiles(
 	SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> children;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
 	filters.source_file = nullptr;
 
@@ -226,7 +226,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown source file)";
 			node->set_children(std::move(source_file_children));
-			children.emplace_back(std::move(node));
+			nodes.emplace_back(std::move(node));
 		}
 
 		for (const ccc::SourceFile& source_file : database.source_files)
@@ -243,15 +243,15 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 			else
 				node->name = QString::fromStdString(source_file.name());
 			node->set_children(populateSymbols(filters, database));
-			children.emplace_back(std::move(node));
+			nodes.emplace_back(std::move(node));
 		}
 	}
 	else
 	{
-		children = populateSymbols(filters, database);
+		nodes = populateSymbols(filters, database);
 	}
 
-	return children;
+	return nodes;
 }
 
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
@@ -267,7 +267,7 @@ FunctionTreeWidget::~FunctionTreeWidget() = default;
 std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
 	std::span<const ccc::Function> functions;
 	if (filters.group_by_source_file && filters.source_file)
@@ -298,10 +298,10 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 			function_node->emplace_child(std::move(label_node));
 		}
 
-		variables.emplace_back(std::move(function_node));
+		nodes.emplace_back(std::move(function_node));
 	}
 
-	return variables;
+	return nodes;
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
@@ -315,13 +315,20 @@ GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
 std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
+	std::span<const ccc::Function> functions;
 	std::span<const ccc::GlobalVariable> global_variables;
 	if (filters.group_by_source_file && filters.source_file)
+	{
+		functions = database.functions.span(filters.source_file->functions());
 		global_variables = database.global_variables.span(filters.source_file->global_variables());
+	}
 	else
+	{
+		functions = database.functions;
 		global_variables = database.global_variables;
+	}
 
 	for (const ccc::GlobalVariable& global_variable : global_variables)
 	{
@@ -333,10 +340,40 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		node->name = std::move(name);
 		node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
-		variables.emplace_back(std::move(node));
+		nodes.emplace_back(std::move(node));
 	}
 
-	return variables;
+	// We also include static local variables in the global variable tree
+	// because they have global storage. Why not.
+	for (const ccc::Function& function : functions)
+	{
+		std::vector<std::unique_ptr<SymbolTreeNode>> local_variable_nodes;
+		for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function.local_variables()))
+		{
+			if(!std::holds_alternative<ccc::GlobalStorage>(local_variable.storage))
+				continue;
+			
+			QString name;
+			if (!filters.test(local_variable, function.source_file(), database, name))
+				continue;
+
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->name = std::move(name);
+			node->type = ccc::NodeHandle(local_variable, local_variable.type());
+			node->location = SymbolTreeLocation(m_cpu, local_variable.address().value);
+			local_variable_nodes.emplace_back(std::move(node));
+		}
+
+		if (local_variable_nodes.empty())
+			continue;
+
+		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
+		function_node->name = QString::fromStdString(function.name());
+		function_node->set_children(std::move(local_variable_nodes));
+		nodes.emplace_back(std::move(function_node));
+	}
+
+	return nodes;
 }
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
@@ -350,14 +387,14 @@ LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
 std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
 {
-	std::vector<std::unique_ptr<SymbolTreeNode>> variables;
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
 	u32 program_counter = m_cpu->getPC();
 	u32 stack_pointer = m_cpu->getRegister(EECAT_GPR, 29);
 
 	const ccc::Function* function = database.functions.symbol_from_contained_address(program_counter);
 	if (!function)
-		return variables;
+		return nodes;
 
 	for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function->local_variables()))
 	{
@@ -385,10 +422,10 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
 		}
 
-		variables.emplace_back(std::move(node));
+		nodes.emplace_back(std::move(node));
 	}
 
-	return variables;
+	return nodes;
 }
 
 bool SymbolFilters::test(
