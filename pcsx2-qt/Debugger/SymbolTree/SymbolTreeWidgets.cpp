@@ -284,8 +284,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
 
 		function_node->name = std::move(name);
-		function_node->location.type = SymbolTreeLocation::EE_MEMORY;
-		function_node->location.address = function.address().value;
+		function_node->location = SymbolTreeLocation(m_cpu, function.address().value);
 
 		for (auto pair : database.labels.handles_from_address_range(function.address_range()))
 		{
@@ -295,8 +294,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 
 			std::unique_ptr<SymbolTreeNode> label_node = std::make_unique<SymbolTreeNode>();
 			label_node->name = QString::fromStdString(label->name());
-			label_node->location.type = SymbolTreeLocation::EE_MEMORY;
-			label_node->location.address = label->address().value;
+			label_node->location = SymbolTreeLocation(m_cpu, label->address().value);
 			function_node->emplace_child(std::move(label_node));
 		}
 
@@ -334,8 +332,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
 		node->type = ccc::NodeHandle(global_variable, global_variable.type());
-		node->location.type = SymbolTreeLocation::EE_MEMORY;
-		node->location.address = global_variable.address().value;
+		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
 		variables.emplace_back(std::move(node));
 	}
 
@@ -373,18 +370,19 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 			if (!local_variable.address().valid())
 				continue;
 
-			node->location.type = SymbolTreeLocation::EE_MEMORY;
-			node->location.address = stack_pointer + local_variable.address().value;
+			node->location = SymbolTreeLocation(m_cpu, stack_pointer + local_variable.address().value);
 		}
 		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
 		{
-			node->location.type = SymbolTreeLocation::EE_REGISTER;
+			if (m_cpu->getCpuType() == BREAKPOINT_EE)
+				node->location.type = SymbolTreeLocation::EE_REGISTER;
+			else
+				node->location.type = SymbolTreeLocation::IOP_REGISTER;
 			node->location.address = storage->dbx_register_number;
 		}
 		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
 		{
-			node->location.type = SymbolTreeLocation::EE_MEMORY;
-			node->location.address = stack_pointer + storage->stack_pointer_offset;
+			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
 		}
 
 		variables.emplace_back(std::move(node));

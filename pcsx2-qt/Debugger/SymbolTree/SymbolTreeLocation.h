@@ -5,8 +5,8 @@
 
 #include <QString>
 
-#include "common/Pcsx2Defs.h"
-#include "DebugTools/ccc/ast.h"
+#include "common/Pcsx2Types.h"
+#include "DebugTools/DebugInterface.h"
 
 class DebugInterface;
 
@@ -21,6 +21,9 @@ struct SymbolTreeLocation
 		IOP_MEMORY,
 	} type = NONE;
 	u32 address = 0;
+	
+	SymbolTreeLocation();
+	SymbolTreeLocation(DebugInterface* cpu, u32 addr);
 	
 	QString name() const;
 	

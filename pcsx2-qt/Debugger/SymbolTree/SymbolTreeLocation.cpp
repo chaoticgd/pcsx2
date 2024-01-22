@@ -5,6 +5,14 @@
 
 #include "DebugTools/DebugInterface.h"
 
+SymbolTreeLocation::SymbolTreeLocation() = default;
+
+SymbolTreeLocation::SymbolTreeLocation(DebugInterface* cpu, u32 addr)
+	: type((cpu->getCpuType() == BREAKPOINT_EE) ? EE_MEMORY : IOP_MEMORY)
+	, address(addr)
+{
+}
+
 QString SymbolTreeLocation::name() const
 {
 	switch (type)
