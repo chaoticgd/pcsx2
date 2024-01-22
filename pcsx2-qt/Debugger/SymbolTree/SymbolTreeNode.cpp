@@ -43,12 +43,12 @@ void SymbolTreeNode::emplace_child(std::unique_ptr<SymbolTreeNode> new_child)
 	m_children_fetched = true;
 }
 
-void SymbolTreeNode::sortChildrenRecursively()
+void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 {
-	auto comparator = [](const std::unique_ptr<SymbolTreeNode>& lhs, const std::unique_ptr<SymbolTreeNode>& rhs) -> bool {
+	auto comparator = [&](const std::unique_ptr<SymbolTreeNode>& lhs, const std::unique_ptr<SymbolTreeNode>& rhs) -> bool {
 		// Sort the nodes that actually have type information to the top since
 		// these will be the most useful for editing.
-		if (lhs->type.valid() != rhs->type.valid())
+		if (sort_by_if_type_is_known && lhs->type.valid() != rhs->type.valid())
 			return lhs->type.valid() > rhs->type.valid();
 		// Next, sort nodes that have a valid location to the top.
 		return lhs->location < rhs->location;
@@ -57,5 +57,5 @@ void SymbolTreeNode::sortChildrenRecursively()
 	std::sort(m_children.begin(), m_children.end(), comparator);
 
 	for (std::unique_ptr<SymbolTreeNode>& child : m_children)
-		child->sortChildrenRecursively();
+		child->sortChildrenRecursively(sort_by_if_type_is_known);
 }

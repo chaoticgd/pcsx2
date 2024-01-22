@@ -25,7 +25,7 @@ public:
 	void insert_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
 	void emplace_child(std::unique_ptr<SymbolTreeNode> new_child);
 	
-	void sortChildrenRecursively();
+	void sortChildrenRecursively(bool sort_by_if_type_is_known);
 
 protected:
 	SymbolTreeNode* m_parent = nullptr;

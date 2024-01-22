@@ -59,7 +59,9 @@ void SymbolTreeWidget::setupMenu()
 	});
 	m_context_menu->addAction(go_to_in_memory_view);
 
-	if (m_flags & ENABLE_GROUPING)
+	m_context_menu->addSeparator();
+
+	if (m_flags & ALLOW_GROUPING)
 	{
 		m_context_menu->addSeparator();
 
@@ -78,6 +80,16 @@ void SymbolTreeWidget::setupMenu()
 		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
 		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
 		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
+	}
+
+	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
+	{
+		m_sort_by_if_type_is_known = new QAction("Sort by if type is known", this);
+		m_sort_by_if_type_is_known->setCheckable(true);
+		m_sort_by_if_type_is_known->setChecked(true);
+		m_context_menu->addAction(m_sort_by_if_type_is_known);
+
+		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
 	}
 
 	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
@@ -111,7 +123,7 @@ void SymbolTreeWidget::update()
 
 		std::unique_ptr<SymbolTreeNode> root = std::make_unique<SymbolTreeNode>();
 		root->set_children(populateModules(filters, database));
-		root->sortChildrenRecursively();
+		root->sortChildrenRecursively(m_sort_by_if_type_is_known && m_sort_by_if_type_is_known->isChecked());
 
 		m_model = new SymbolTreeModel(std::move(root), guardian, this);
 		m_ui.treeView->setModel(m_model);
@@ -255,7 +267,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 }
 
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ENABLE_GROUPING, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING, parent)
 {
 	m_ui.treeView->hideColumn(SymbolTreeModel::TYPE);
 	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
@@ -305,7 +317,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ENABLE_GROUPING, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN, parent)
 {
 	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
 }
@@ -338,7 +350,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
-		if(global_variable.type())
+		if (global_variable.type())
 			node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
 		nodes.emplace_back(std::move(node));
@@ -351,16 +363,16 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		std::vector<std::unique_ptr<SymbolTreeNode>> local_variable_nodes;
 		for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function.local_variables()))
 		{
-			if(!std::holds_alternative<ccc::GlobalStorage>(local_variable.storage))
+			if (!std::holds_alternative<ccc::GlobalStorage>(local_variable.storage))
 				continue;
-			
+
 			QString name;
 			if (!filters.test(local_variable, function.source_file(), database, name))
 				continue;
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = std::move(name);
-			if(local_variable.type())
+			if (local_variable.type())
 				node->type = ccc::NodeHandle(local_variable, local_variable.type());
 			node->location = SymbolTreeLocation(m_cpu, local_variable.address().value);
 			local_variable_nodes.emplace_back(std::move(node));
@@ -402,7 +414,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	{
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = QString::fromStdString(local_variable.name());
-		if(local_variable.type())
+		if (local_variable.type())
 			node->type = ccc::NodeHandle(local_variable, local_variable.type());
 
 		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))

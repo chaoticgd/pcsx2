@@ -54,11 +54,13 @@ protected:
 	QAction* m_group_by_module = nullptr;
 	QAction* m_group_by_section = nullptr;
 	QAction* m_group_by_source_file = nullptr;
+	QAction* m_sort_by_if_type_is_known = nullptr;
 
 	enum Flags
 	{
 		NO_SYMBOL_TREE_FLAGS = 0,
-		ENABLE_GROUPING = 1 << 0
+		ALLOW_GROUPING = 1 << 0,
+		ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN = 1 << 1
 	};
 
 	u32 m_flags;
