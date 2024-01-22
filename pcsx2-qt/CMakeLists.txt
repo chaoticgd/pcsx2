@@ -163,9 +163,6 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/RegisterWidget.cpp
 	Debugger/RegisterWidget.h
 	Debugger/RegisterWidget.ui
-	Debugger/SymbolTreeWidgets.cpp
-	Debugger/SymbolTreeWidgets.h
-	Debugger/SymbolTreeWidget.ui
 	Debugger/BreakpointDialog.cpp
 	Debugger/BreakpointDialog.h
 	Debugger/BreakpointDialog.ui
@@ -185,6 +182,9 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/SymbolTree/SymbolTreeNode.h
 	Debugger/SymbolTree/SymbolTreeValueDelegate.cpp
 	Debugger/SymbolTree/SymbolTreeValueDelegate.h
+	Debugger/SymbolTree/SymbolTreeWidgets.cpp
+	Debugger/SymbolTree/SymbolTreeWidgets.h
+	Debugger/SymbolTree/SymbolTreeWidget.ui
 	Tools/InputRecording/NewInputRecordingDlg.cpp
 	Tools/InputRecording/NewInputRecordingDlg.h
 	Tools/InputRecording/NewInputRecordingDlg.ui

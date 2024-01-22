@@ -4,7 +4,7 @@
 #pragma once
 
 #include <QWidget>
-#include "SymbolTree/SymbolTreeModel.h"
+#include "SymbolTreeModel.h"
 
 #include "ui_SymbolTreeWidget.h"
 

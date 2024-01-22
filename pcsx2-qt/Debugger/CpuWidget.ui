@@ -604,19 +604,19 @@
   <customwidget>
    <class>GlobalVariableTreeWidget</class>
    <extends>QWidget</extends>
-   <header>pcsx2-qt/Debugger/SymbolTreeWidgets.h</header>
+   <header>pcsx2-qt/Debugger/SymbolTree/SymbolTreeWidgets.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>FunctionTreeWidget</class>
    <extends>QWidget</extends>
-   <header>pcsx2-qt/Debugger/SymbolTreeWidgets.h</header>
+   <header>pcsx2-qt/Debugger/SymbolTree/SymbolTreeWidgets.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>LocalVariableTreeWidget</class>
    <extends>QWidget</extends>
-   <header>pcsx2-qt/Debugger/SymbolTreeWidgets.h</header>
+   <header>pcsx2-qt/Debugger/SymbolTree/SymbolTreeWidgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

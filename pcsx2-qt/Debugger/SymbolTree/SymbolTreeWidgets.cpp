@@ -6,7 +6,7 @@
 #include <QtGui/QClipboard>
 #include <QtWidgets/QMenu>
 
-#include "SymbolTree/SymbolTreeValueDelegate.h"
+#include "SymbolTreeValueDelegate.h"
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 	: QWidget(parent)
