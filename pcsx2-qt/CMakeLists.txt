@@ -177,10 +177,10 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/ThreadModel.h
 	Debugger/Models/StackModel.cpp
 	Debugger/Models/StackModel.h
-	Debugger/Models/DataInspectorModel.cpp
-	Debugger/Models/DataInspectorModel.h
 	Debugger/Models/SavedAddressesModel.cpp
 	Debugger/Models/SavedAddressesModel.h
+	Debugger/SymbolTree/SymbolTreeModel.cpp
+	Debugger/SymbolTree/SymbolTreeModel.h
 	Debugger/Delegates/DataInspectorValueColumnDelegate.cpp
 	Debugger/Delegates/DataInspectorValueColumnDelegate.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp

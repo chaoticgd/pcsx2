@@ -4,7 +4,7 @@
 #pragma once
 
 #include <QWidget>
-#include "Models/DataInspectorModel.h"
+#include "SymbolTree/SymbolTreeModel.h"
 
 #include "ui_SymbolTreeWidget.h"
 
@@ -48,7 +48,7 @@ protected:
 	Ui::SymbolTreeWidget m_ui;
 
 	DebugInterface* m_cpu = nullptr;
-	DataInspectorModel* m_model = nullptr;
+	SymbolTreeModel* m_model = nullptr;
 
 	QMenu* m_context_menu = nullptr;
 	QAction* m_group_by_module = nullptr;

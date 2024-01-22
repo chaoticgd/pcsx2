@@ -1,6 +1,6 @@
-#include "DataInspectorModel.h"
+#include "SymbolTreeModel.h"
 
-DataInspectorModel::DataInspectorModel(
+SymbolTreeModel::SymbolTreeModel(
 	std::unique_ptr<DataInspectorNode> initial_root,
 	const SymbolGuardian& guardian,
 	QObject* parent)
@@ -10,7 +10,7 @@ DataInspectorModel::DataInspectorModel(
 {
 }
 
-QModelIndex DataInspectorModel::index(int row, int column, const QModelIndex& parent) const
+QModelIndex SymbolTreeModel::index(int row, int column, const QModelIndex& parent) const
 {
 	if (!hasIndex(row, column, parent))
 		return QModelIndex();
@@ -28,7 +28,7 @@ QModelIndex DataInspectorModel::index(int row, int column, const QModelIndex& pa
 	return createIndex(row, column, child_node);
 }
 
-QModelIndex DataInspectorModel::parent(const QModelIndex& index) const
+QModelIndex SymbolTreeModel::parent(const QModelIndex& index) const
 {
 	if (!index.isValid())
 		return QModelIndex();
@@ -41,7 +41,7 @@ QModelIndex DataInspectorModel::parent(const QModelIndex& index) const
 	return indexFromNode(*parent_node);
 }
 
-int DataInspectorModel::rowCount(const QModelIndex& parent) const
+int SymbolTreeModel::rowCount(const QModelIndex& parent) const
 {
 	if (parent.column() > 0)
 		return 0;
@@ -55,12 +55,12 @@ int DataInspectorModel::rowCount(const QModelIndex& parent) const
 	return (int)node->children().size();
 }
 
-int DataInspectorModel::columnCount(const QModelIndex& parent) const
+int SymbolTreeModel::columnCount(const QModelIndex& parent) const
 {
 	return COLUMN_COUNT;
 }
 
-bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
+bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 {
 	bool result = true;
 
@@ -82,7 +82,7 @@ bool DataInspectorModel::hasChildren(const QModelIndex& parent) const
 	return result;
 }
 
-QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
+QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 {
 	if (!index.isValid() || role != Qt::DisplayRole)
 		return QVariant();
@@ -215,7 +215,7 @@ QVariant DataInspectorModel::data(const QModelIndex& index, int role) const
 	return result;
 }
 
-bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value, int role)
+bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
 	bool result = false;
 
@@ -310,7 +310,7 @@ bool DataInspectorModel::setData(const QModelIndex& index, const QVariant& value
 	return result;
 }
 
-void DataInspectorModel::fetchMore(const QModelIndex& parent)
+void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 {
 	if (!parent.isValid())
 		return;
@@ -382,7 +382,7 @@ void DataInspectorModel::fetchMore(const QModelIndex& parent)
 		endInsertRows();
 }
 
-bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
+bool SymbolTreeModel::canFetchMore(const QModelIndex& parent) const
 {
 	bool result = false;
 
@@ -404,7 +404,7 @@ bool DataInspectorModel::canFetchMore(const QModelIndex& parent) const
 	return result;
 }
 
-Qt::ItemFlags DataInspectorModel::flags(const QModelIndex& index) const
+Qt::ItemFlags SymbolTreeModel::flags(const QModelIndex& index) const
 {
 	if (!index.isValid())
 		return Qt::NoItemFlags;
@@ -417,7 +417,7 @@ Qt::ItemFlags DataInspectorModel::flags(const QModelIndex& index) const
 	return flags;
 }
 
-QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation, int role) const
+QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
 	if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
 		return QVariant();
@@ -449,14 +449,14 @@ QVariant DataInspectorModel::headerData(int section, Qt::Orientation orientation
 	return QVariant();
 }
 
-void DataInspectorModel::reset(std::unique_ptr<DataInspectorNode> new_root)
+void SymbolTreeModel::reset(std::unique_ptr<DataInspectorNode> new_root)
 {
 	beginResetModel();
 	m_root = std::move(new_root);
 	endResetModel();
 }
 
-bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
+bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
 {
 	const ccc::ast::Node& physical_type = resolvePhysicalType(type, database);
 
@@ -488,7 +488,7 @@ bool DataInspectorModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::
 	return result;
 }
 
-QModelIndex DataInspectorModel::indexFromNode(const DataInspectorNode& node) const
+QModelIndex SymbolTreeModel::indexFromNode(const DataInspectorNode& node) const
 {
 	int row = 0;
 	if (node.parent())
@@ -503,7 +503,7 @@ QModelIndex DataInspectorModel::indexFromNode(const DataInspectorNode& node) con
 	return createIndex(row, 0, &node);
 }
 
-QString DataInspectorModel::typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
+QString SymbolTreeModel::typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
 {
 	QString result;
 

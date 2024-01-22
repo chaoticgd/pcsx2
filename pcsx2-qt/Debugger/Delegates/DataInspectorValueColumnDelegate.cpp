@@ -7,6 +7,7 @@
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDoubleSpinBox>
 #include "Int64SpinBox.h"
+#include "Debugger/SymbolTree/SymbolTreeModel.h"
 
 DataInspectorValueColumnDelegate::DataInspectorValueColumnDelegate(
 	const SymbolGuardian& guardian,

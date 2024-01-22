@@ -28,7 +28,7 @@ void SymbolTreeWidget::setupMenu()
 		if (!m_model)
 			return;
 
-		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::NAME);
+		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::NAME);
 		QVariant data = m_model->data(index, Qt::DisplayRole);
 		if (data.isValid())
 			QApplication::clipboard()->setText(data.toString());
@@ -40,7 +40,7 @@ void SymbolTreeWidget::setupMenu()
 		if (!m_model)
 			return;
 
-		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(DataInspectorModel::LOCATION);
+		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::LOCATION);
 		QVariant data = m_model->data(index, Qt::DisplayRole);
 		if (data.isValid())
 			QApplication::clipboard()->setText(data.toString());
@@ -113,11 +113,11 @@ void SymbolTreeWidget::update()
 		root->set_children(populateModules(filters, database));
 		root->sortChildrenRecursively();
 
-		m_model = new DataInspectorModel(std::move(root), guardian, this);
+		m_model = new SymbolTreeModel(std::move(root), guardian, this);
 		m_ui.treeView->setModel(m_model);
 
 		auto delegate = new DataInspectorValueColumnDelegate(guardian, this);
-		m_ui.treeView->setItemDelegateForColumn(DataInspectorModel::VALUE, delegate);
+		m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
 		m_ui.treeView->setAlternatingRowColors(true);
 	});
 }
@@ -258,9 +258,9 @@ std::vector<std::unique_ptr<DataInspectorNode>> SymbolTreeWidget::populateSource
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ENABLE_GROUPING, parent)
 {
-	m_ui.treeView->hideColumn(DataInspectorModel::TYPE);
-	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
-	m_ui.treeView->hideColumn(DataInspectorModel::VALUE);
+	m_ui.treeView->hideColumn(SymbolTreeModel::TYPE);
+	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
+	m_ui.treeView->hideColumn(SymbolTreeModel::VALUE);
 }
 
 FunctionTreeWidget::~FunctionTreeWidget() = default;
@@ -295,7 +295,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> FunctionTreeWidget::populateSymb
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ENABLE_GROUPING, parent)
 {
-	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
+	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
 }
 
 GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
@@ -331,7 +331,7 @@ std::vector<std::unique_ptr<DataInspectorNode>> GlobalVariableTreeWidget::popula
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(NO_SYMBOL_TREE_FLAGS, parent)
 {
-	m_ui.treeView->hideColumn(DataInspectorModel::LIVENESS);
+	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
 }
 
 LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;

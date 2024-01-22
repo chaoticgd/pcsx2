@@ -23,7 +23,7 @@
 #include "DebugTools/ccc/symbol_database.h"
 #include "Debugger/DataInspectorNode.h"
 
-class DataInspectorModel : public QAbstractItemModel
+class SymbolTreeModel : public QAbstractItemModel
 {
 	Q_OBJECT
 
@@ -38,7 +38,7 @@ public:
 		COLUMN_COUNT = 5
 	};
 
-	DataInspectorModel(
+	SymbolTreeModel(
 		std::unique_ptr<DataInspectorNode> initial_root,
 		const SymbolGuardian& guardian,
 		QObject* parent = nullptr);

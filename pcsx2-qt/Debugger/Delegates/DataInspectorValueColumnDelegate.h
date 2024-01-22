@@ -5,7 +5,7 @@
 
 #include <QtWidgets/QStyledItemDelegate>
 
-#include "Debugger/Models/DataInspectorModel.h"
+#include "DebugTools/SymbolMap.h"
 
 class DataInspectorValueColumnDelegate : public QStyledItemDelegate
 {
