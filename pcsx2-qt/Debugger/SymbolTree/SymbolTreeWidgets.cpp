@@ -102,7 +102,7 @@ void SymbolTreeWidget::update()
 	assert(m_cpu);
 
 	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
-	guardian.Read([&](const ccc::SymbolDatabase& database) {
+	guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
@@ -151,10 +151,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 				node->name = QString::fromStdString(module_symbol.name());
 				if (module_symbol.is_irx)
 				{
-					node->name += " v";
-					node->name += QString::number(module_symbol.version_major);
-					node->name += ".";
-					node->name += QString::number(module_symbol.version_minor);
+					s32 major = module_symbol.version_major;
+					s32 minor = module_symbol.version_minor;
+					node->name += QString(" v%1.%2").arg(major).arg(minor);
 				}
 				node->set_children(std::move(module_children));
 				children.emplace_back(std::move(node));
@@ -194,13 +193,13 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 				filters.section = section.handle();
 
 				auto section_children = populateSourceFiles(filters, database);
-				if (!section_children.empty())
-				{
-					std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
-					node->name = QString::fromStdString(section.name());
-					node->set_children(std::move(section_children));
-					children.emplace_back(std::move(node));
-				}
+				if (section_children.empty())
+					continue;
+
+				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+				node->name = QString::fromStdString(section.name());
+				node->set_children(std::move(section_children));
+				children.emplace_back(std::move(node));
 			}
 		}
 	}
@@ -235,16 +234,16 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 			filters.source_file = &source_file;
 
 			auto source_file_children = populateSymbols(filters, database);
-			if (!source_file_children.empty())
-			{
-				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
-				if (!source_file.command_line_path.empty())
-					node->name = QString::fromStdString(source_file.command_line_path);
-				else
-					node->name = QString::fromStdString(source_file.name());
-				node->set_children(populateSymbols(filters, database));
-				children.emplace_back(std::move(node));
-			}
+			if (source_file_children.empty())
+				continue;
+
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			if (!source_file.command_line_path.empty())
+				node->name = QString::fromStdString(source_file.command_line_path);
+			else
+				node->name = QString::fromStdString(source_file.name());
+			node->set_children(populateSymbols(filters, database));
+			children.emplace_back(std::move(node));
 		}
 	}
 	else

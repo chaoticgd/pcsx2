@@ -6,7 +6,6 @@
 #include <QString>
 
 #include "common/Pcsx2Defs.h"
-#include "DebugTools/ccc/ast.h"
 #include "SymbolTreeLocation.h"
 
 class DebugInterface;
