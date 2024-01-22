@@ -338,7 +338,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
-		node->type = ccc::NodeHandle(global_variable, global_variable.type());
+		if(global_variable.type())
+			node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
 		nodes.emplace_back(std::move(node));
 	}
@@ -359,7 +360,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = std::move(name);
-			node->type = ccc::NodeHandle(local_variable, local_variable.type());
+			if(local_variable.type())
+				node->type = ccc::NodeHandle(local_variable, local_variable.type());
 			node->location = SymbolTreeLocation(m_cpu, local_variable.address().value);
 			local_variable_nodes.emplace_back(std::move(node));
 		}
@@ -400,7 +402,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	{
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = QString::fromStdString(local_variable.name());
-		node->type = ccc::NodeHandle(local_variable, local_variable.type());
+		if(local_variable.type())
+			node->type = ccc::NodeHandle(local_variable, local_variable.type());
 
 		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))
 		{

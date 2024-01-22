@@ -14,11 +14,11 @@ struct SymbolTreeLocation
 {
 	enum
 	{
-		NONE,
 		EE_REGISTER,
 		IOP_REGISTER,
 		EE_MEMORY,
 		IOP_MEMORY,
+		NONE // Put NONE last so it sorts last.
 	} type = NONE;
 	u32 address = 0;
 	
