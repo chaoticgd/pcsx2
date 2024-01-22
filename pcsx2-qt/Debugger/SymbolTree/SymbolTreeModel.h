@@ -60,7 +60,8 @@ public:
 protected:
 	bool nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
 	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
-	QString typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
+	
+	QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database) const;
 
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;

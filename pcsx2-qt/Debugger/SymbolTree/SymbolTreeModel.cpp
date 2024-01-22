@@ -109,7 +109,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				if (!type)
 					return;
 
-				result = typeToString(*type, database);
+				result = typeToString(type, database);
 			});
 			return result;
 		}
@@ -503,15 +503,48 @@ QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
 	return createIndex(row, 0, &node);
 }
 
-QString SymbolTreeModel::typeToString(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
+QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database) const
 {
-	QString result;
+	std::vector<char> pointer_chars;
+	std::vector<s32> array_indices;
 
-	switch (type.descriptor)
+	// Traverse through arrays, pointers and references, keeping track of what
+	// needs to be appended after the type name.
+	bool done_finding_arrays_pointers = false;
+	while (!done_finding_arrays_pointers)
+	{
+		switch (type->descriptor)
+		{
+			case ccc::ast::ARRAY:
+			{
+				const ccc::ast::Array& array = type->as<ccc::ast::Array>();
+				array_indices.emplace_back(array.element_count);
+				type = array.element_type.get();
+				break;
+			}
+			case ccc::ast::POINTER_OR_REFERENCE:
+			{
+				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
+				pointer_chars.emplace_back(pointer_or_reference.is_pointer ? '*' : '&');
+				type = pointer_or_reference.value_type.get();
+				break;
+			}
+			default:
+			{
+				done_finding_arrays_pointers = true;
+				break;
+			}
+		}
+	}
+
+	QString result;
+	
+	// Append the actual type name, or at the very least the node type.
+	switch (type->descriptor)
 	{
 		case ccc::ast::TYPE_NAME:
 		{
-			const ccc::ast::TypeName& type_name = type.as<ccc::ast::TypeName>();
+			const ccc::ast::TypeName& type_name = type->as<ccc::ast::TypeName>();
 			const ccc::DataType* data_type = database.data_types.symbol_from_handle(type_name.data_type_handle);
 			if (data_type)
 			{
@@ -521,9 +554,16 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node& type, const ccc::Sym
 		}
 		default:
 		{
-			result = ccc::ast::node_type_to_string(type);
+			result = ccc::ast::node_type_to_string(*type);
 		}
 	}
+	
+	// Append pointer characters and array indices at the end.
+	for(size_t i = pointer_chars.size(); i > 0; i--)
+		result += pointer_chars[i - 1];
+
+	for(s32 index : array_indices)
+		result += QString("[%1]").arg(index);
 
 	return result;
 }
