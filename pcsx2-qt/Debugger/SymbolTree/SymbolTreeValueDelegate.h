@@ -7,12 +7,12 @@
 
 #include "DebugTools/SymbolMap.h"
 
-class DataInspectorValueColumnDelegate : public QStyledItemDelegate
+class SymbolTreeValueDelegate : public QStyledItemDelegate
 {
 	Q_OBJECT
 
 public:
-	DataInspectorValueColumnDelegate(
+	SymbolTreeValueDelegate(
 		const SymbolGuardian& guardian,
 		QObject* parent = nullptr);
 

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
 // SPDX-License-Identifier: LGPL-3.0+
 
-#include "DataInspectorValueColumnDelegate.h"
+#include "SymbolTreeValueDelegate.h"
 
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
@@ -9,7 +9,7 @@
 #include "Int64SpinBox.h"
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
 
-DataInspectorValueColumnDelegate::DataInspectorValueColumnDelegate(
+SymbolTreeValueDelegate::SymbolTreeValueDelegate(
 	const SymbolGuardian& guardian,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
@@ -17,7 +17,7 @@ DataInspectorValueColumnDelegate::DataInspectorValueColumnDelegate(
 {
 }
 
-QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
 	QWidget* result = nullptr;
 
@@ -101,7 +101,7 @@ QWidget* DataInspectorValueColumnDelegate::createEditor(QWidget* parent, const Q
 	return result;
 }
 
-void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (!node->type.valid())
@@ -190,7 +190,7 @@ void DataInspectorValueColumnDelegate::setEditorData(QWidget* editor, const QMod
 	});
 }
 
-void DataInspectorValueColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
 	DataInspectorNode* node = static_cast<DataInspectorNode*>(index.internalPointer());
 	if (!node->type.valid())

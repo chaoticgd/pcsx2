@@ -181,8 +181,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/SavedAddressesModel.h
 	Debugger/SymbolTree/SymbolTreeModel.cpp
 	Debugger/SymbolTree/SymbolTreeModel.h
-	Debugger/Delegates/DataInspectorValueColumnDelegate.cpp
-	Debugger/Delegates/DataInspectorValueColumnDelegate.h
+	Debugger/SymbolTree/SymbolTreeValueDelegate.cpp
+	Debugger/SymbolTree/SymbolTreeValueDelegate.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp
 	Tools/InputRecording/NewInputRecordingDlg.h
 	Tools/InputRecording/NewInputRecordingDlg.ui

@@ -6,7 +6,7 @@
 #include <QtGui/QClipboard>
 #include <QtWidgets/QMenu>
 
-#include "Delegates/DataInspectorValueColumnDelegate.h"
+#include "SymbolTree/SymbolTreeValueDelegate.h"
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 	: QWidget(parent)
@@ -116,7 +116,7 @@ void SymbolTreeWidget::update()
 		m_model = new SymbolTreeModel(std::move(root), guardian, this);
 		m_ui.treeView->setModel(m_model);
 
-		auto delegate = new DataInspectorValueColumnDelegate(guardian, this);
+		auto delegate = new SymbolTreeValueDelegate(guardian, this);
 		m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
 		m_ui.treeView->setAlternatingRowColors(true);
 	});
