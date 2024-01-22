@@ -131,6 +131,8 @@ void SymbolTreeWidget::update()
 		auto delegate = new SymbolTreeValueDelegate(guardian, this);
 		m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
 		m_ui.treeView->setAlternatingRowColors(true);
+		
+		configureColumnVisibility();
 	});
 }
 
@@ -269,9 +271,6 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING, parent)
 {
-	m_ui.treeView->hideColumn(SymbolTreeModel::TYPE);
-	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
-	m_ui.treeView->hideColumn(SymbolTreeModel::VALUE);
 }
 
 FunctionTreeWidget::~FunctionTreeWidget() = default;
@@ -316,10 +315,18 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 	return nodes;
 }
 
+void FunctionTreeWidget::configureColumnVisibility()
+{
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::NAME, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LOCATION, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::TYPE, true);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LIVENESS, true);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::VALUE, true);
+}
+
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN, parent)
 {
-	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
 }
 
 GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
@@ -390,10 +397,18 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 	return nodes;
 }
 
+void GlobalVariableTreeWidget::configureColumnVisibility()
+{
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::NAME, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LOCATION, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::TYPE, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LIVENESS, true);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::VALUE, false);
+}
+
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(NO_SYMBOL_TREE_FLAGS, parent)
 {
-	m_ui.treeView->hideColumn(SymbolTreeModel::LIVENESS);
 }
 
 LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
@@ -441,6 +456,15 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	}
 
 	return nodes;
+}
+
+void LocalVariableTreeWidget::configureColumnVisibility()
+{
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::NAME, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LOCATION, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::TYPE, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LIVENESS, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::VALUE, false);
 }
 
 bool SymbolFilters::test(
