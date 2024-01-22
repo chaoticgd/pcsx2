@@ -284,7 +284,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
-		node->location.type = DataInspectorLocation::EE_MEMORY;
+		node->location.type = SymbolTreeLocation::EE_MEMORY;
 		node->location.address = function.address().value;
 		variables.emplace_back(std::move(node));
 	}
@@ -320,7 +320,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
 		node->type = ccc::NodeHandle(global_variable, global_variable.type());
-		node->location.type = DataInspectorLocation::EE_MEMORY;
+		node->location.type = SymbolTreeLocation::EE_MEMORY;
 		node->location.address = global_variable.address().value;
 		variables.emplace_back(std::move(node));
 	}
@@ -359,17 +359,17 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 			if (!local_variable.address().valid())
 				continue;
 
-			node->location.type = DataInspectorLocation::EE_MEMORY;
+			node->location.type = SymbolTreeLocation::EE_MEMORY;
 			node->location.address = stack_pointer + local_variable.address().value;
 		}
 		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
 		{
-			node->location.type = DataInspectorLocation::EE_REGISTER;
+			node->location.type = SymbolTreeLocation::EE_REGISTER;
 			node->location.address = storage->dbx_register_number;
 		}
 		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
 		{
-			node->location.type = DataInspectorLocation::EE_MEMORY;
+			node->location.type = SymbolTreeLocation::EE_MEMORY;
 			node->location.address = stack_pointer + storage->stack_pointer_offset;
 		}
 		

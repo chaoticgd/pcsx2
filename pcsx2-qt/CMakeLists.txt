@@ -177,6 +177,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/StackModel.h
 	Debugger/Models/SavedAddressesModel.cpp
 	Debugger/Models/SavedAddressesModel.h
+	Debugger/SymbolTree/SymbolTreeLocation.cpp
+	Debugger/SymbolTree/SymbolTreeLocation.h
 	Debugger/SymbolTree/SymbolTreeModel.cpp
 	Debugger/SymbolTree/SymbolTreeModel.h
 	Debugger/SymbolTree/SymbolTreeNode.cpp
