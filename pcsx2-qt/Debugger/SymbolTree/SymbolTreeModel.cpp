@@ -598,7 +598,7 @@ std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const
 	for (s32 i = 0; i < 10 && type->descriptor == ccc::ast::TYPE_NAME; i++)
 	{
 		const ccc::DataType* data_type = database.data_types.symbol_from_handle(type->as<ccc::ast::TypeName>().data_type_handle);
-		if (!data_type && data_type->type())
+		if (!data_type || !data_type->type())
 			break;
 		type = data_type->type();
 		symbol = data_type;
