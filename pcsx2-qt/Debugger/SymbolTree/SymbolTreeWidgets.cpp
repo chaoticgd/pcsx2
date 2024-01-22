@@ -282,11 +282,26 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 		if (!filters.test(function, function.source_file(), database, name))
 			continue;
 
-		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
-		node->name = std::move(name);
-		node->location.type = SymbolTreeLocation::EE_MEMORY;
-		node->location.address = function.address().value;
-		variables.emplace_back(std::move(node));
+		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
+
+		function_node->name = std::move(name);
+		function_node->location.type = SymbolTreeLocation::EE_MEMORY;
+		function_node->location.address = function.address().value;
+
+		for (auto pair : database.labels.handles_from_address_range(function.address_range()))
+		{
+			const ccc::Label* label = database.labels.symbol_from_handle(pair.second);
+			if (!label || label->address() == function.address())
+				continue;
+
+			std::unique_ptr<SymbolTreeNode> label_node = std::make_unique<SymbolTreeNode>();
+			label_node->name = QString::fromStdString(label->name());
+			label_node->location.type = SymbolTreeLocation::EE_MEMORY;
+			label_node->location.address = label->address().value;
+			function_node->emplace_child(std::move(label_node));
+		}
+
+		variables.emplace_back(std::move(function_node));
 	}
 
 	return variables;
@@ -353,7 +368,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = QString::fromStdString(local_variable.name());
 		node->type = ccc::NodeHandle(local_variable, local_variable.type());
-		
+
 		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))
 		{
 			if (!local_variable.address().valid())
@@ -372,7 +387,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 			node->location.type = SymbolTreeLocation::EE_MEMORY;
 			node->location.address = stack_pointer + storage->stack_pointer_offset;
 		}
-		
+
 		variables.emplace_back(std::move(node));
 	}
 
