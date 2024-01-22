@@ -89,8 +89,6 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 
-	u32 pc = r5900Debug.getRegister(EECAT_GPR, 32);
-
 	switch (index.column())
 	{
 		case NAME:
@@ -143,7 +141,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		if (!logical_type)
 			return;
 
-		const ccc::ast::Node& type = resolvePhysicalType(*logical_type, database);
+		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
 
 		switch (type.descriptor)
 		{
@@ -231,7 +229,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 		if (!logical_type)
 			return;
 
-		const ccc::ast::Node& type = resolvePhysicalType(*logical_type, database);
+		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:
@@ -325,54 +323,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 		if (!logical_parent_type)
 			return;
 
-		const ccc::ast::Node& parent_type = resolvePhysicalType(*logical_parent_type, database);
-
-		switch (parent_type.descriptor)
-		{
-			case ccc::ast::ARRAY:
-			{
-				const ccc::ast::Array& array = parent_type.as<ccc::ast::Array>();
-				for (s32 i = 0; i < array.element_count; i++)
-				{
-					std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
-					element->name = QString("[%1]").arg(i);
-					element->type = parent_node->type.handle_for_child(array.element_type.get());
-					element->location = parent_node->location.addOffset(i * array.element_type->computed_size_bytes);
-					children.emplace_back(std::move(element));
-				}
-				break;
-			}
-			case ccc::ast::POINTER_OR_REFERENCE:
-			{
-				u32 address = parent_node->location.read32();
-				if (parent_node->location.cpu().isValidAddress(address))
-				{
-					const ccc::ast::PointerOrReference& pointer_or_reference = parent_type.as<ccc::ast::PointerOrReference>();
-					std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
-					element->name = QString("*%1").arg(address);
-					element->type = parent_node->type.handle_for_child(pointer_or_reference.value_type.get());
-					element->location = parent_node->location.createAddress(address);
-					children.emplace_back(std::move(element));
-				}
-				break;
-			}
-			case ccc::ast::STRUCT_OR_UNION:
-			{
-				const ccc::ast::StructOrUnion& structOrUnion = parent_type.as<ccc::ast::StructOrUnion>();
-				for (const std::unique_ptr<ccc::ast::Node>& field : structOrUnion.fields)
-				{
-					std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
-					child_node->name = QString::fromStdString(field->name);
-					child_node->type = parent_node->type.handle_for_child(field.get());
-					child_node->location = parent_node->location.addOffset(field->offset_bytes);
-					children.emplace_back(std::move(child_node));
-				}
-				break;
-			}
-			default:
-			{
-			}
-		}
+		children = populateChildren(parent_node->location, *logical_parent_type, parent_node->type, database);
 	});
 
 	if (!children.empty())
@@ -456,16 +407,95 @@ void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 	endResetModel();
 }
 
-bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const
+std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
+	SymbolTreeLocation location,
+	const ccc::ast::Node& logical_type,
+	ccc::NodeHandle parent_handle,
+	const ccc::SymbolDatabase& database)
 {
-	const ccc::ast::Node& physical_type = resolvePhysicalType(type, database);
+	auto [type, symbol] = resolvePhysicalType(&logical_type, database);
 
-	bool result = false;
-	switch (physical_type.descriptor)
+	// If we went through a type name, we need to make the node handles for the
+	// children point to the new symbol instead of the original one.
+	if (symbol)
+		parent_handle = ccc::NodeHandle(*symbol, nullptr);
+
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
+
+	switch (type->descriptor)
 	{
 		case ccc::ast::ARRAY:
 		{
-			const ccc::ast::Array& array = physical_type.as<ccc::ast::Array>();
+			const ccc::ast::Array& array = type->as<ccc::ast::Array>();
+			for (s32 i = 0; i < array.element_count; i++)
+			{
+				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
+				element->name = QString("[%1]").arg(i);
+				element->type = parent_handle.handle_for_child(array.element_type.get());
+				element->location = location.addOffset(i * array.element_type->computed_size_bytes);
+				if (element->location.type != SymbolTreeLocation::NONE)
+					children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::POINTER_OR_REFERENCE:
+		{
+			u32 address = location.read32();
+			if (location.cpu().isValidAddress(address))
+			{
+				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
+				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
+				element->name = QString("*%1").arg(address);
+				element->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
+				element->location = location.createAddress(address);
+				children.emplace_back(std::move(element));
+			}
+			break;
+		}
+		case ccc::ast::STRUCT_OR_UNION:
+		{
+			const ccc::ast::StructOrUnion& struct_or_union = type->as<ccc::ast::StructOrUnion>();
+			for (const std::unique_ptr<ccc::ast::Node>& base_class : struct_or_union.base_classes)
+			{
+				SymbolTreeLocation base_class_location = location.addOffset(base_class->offset_bytes);
+				if (base_class_location.type != SymbolTreeLocation::NONE)
+				{
+					std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
+						base_class_location, *base_class.get(), parent_handle, database);
+					children.insert(children.end(),
+						std::make_move_iterator(fields.begin()),
+						std::make_move_iterator(fields.end()));
+				}
+			}
+			for (const std::unique_ptr<ccc::ast::Node>& field : struct_or_union.fields)
+			{
+				std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
+				child_node->name = QString::fromStdString(field->name);
+				child_node->type = parent_handle.handle_for_child(field.get());
+				child_node->location = location.addOffset(field->offset_bytes);
+				if (child_node->location.type != SymbolTreeLocation::NONE)
+					children.emplace_back(std::move(child_node));
+			}
+			break;
+		}
+		default:
+		{
+		}
+	}
+
+	return children;
+}
+
+bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database)
+{
+	const ccc::ast::Node& type = *resolvePhysicalType(&logical_type, database).first;
+
+	bool result = false;
+	switch (type.descriptor)
+	{
+		case ccc::ast::ARRAY:
+		{
+			const ccc::ast::Array& array = type.as<ccc::ast::Array>();
 			result = array.element_count > 0;
 			break;
 		}
@@ -476,8 +506,8 @@ bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& type, const ccc::Sym
 		}
 		case ccc::ast::STRUCT_OR_UNION:
 		{
-			const ccc::ast::StructOrUnion& struct_or_union = physical_type.as<ccc::ast::StructOrUnion>();
-			result = !struct_or_union.fields.empty() || !struct_or_union.base_classes.empty();
+			const ccc::ast::StructOrUnion& struct_or_union = type.as<ccc::ast::StructOrUnion>();
+			result = !struct_or_union.base_classes.empty() || !struct_or_union.fields.empty();
 			break;
 		}
 		default:
@@ -503,7 +533,7 @@ QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
 	return createIndex(row, 0, &node);
 }
 
-QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database) const
+QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
 {
 	std::vector<char> pointer_chars;
 	std::vector<s32> array_indices;
@@ -538,7 +568,7 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 	}
 
 	QString result;
-	
+
 	// Append the actual type name, or at the very least the node type.
 	switch (type->descriptor)
 	{
@@ -557,28 +587,27 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 			result = ccc::ast::node_type_to_string(*type);
 		}
 	}
-	
+
 	// Append pointer characters and array indices at the end.
-	for(size_t i = pointer_chars.size(); i > 0; i--)
+	for (size_t i = pointer_chars.size(); i > 0; i--)
 		result += pointer_chars[i - 1];
 
-	for(s32 index : array_indices)
+	for (s32 index : array_indices)
 		result += QString("[%1]").arg(index);
 
 	return result;
 }
 
-const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::SymbolDatabase& database)
+std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
 {
-	const ccc::ast::Node* result = &type;
-	for (s32 i = 0; i < 10 && result->descriptor == ccc::ast::TYPE_NAME; i++)
+	const ccc::DataType* symbol = nullptr;
+	for (s32 i = 0; i < 10 && type->descriptor == ccc::ast::TYPE_NAME; i++)
 	{
-		const ccc::DataType* symbol = database.data_types.symbol_from_handle(result->as<ccc::ast::TypeName>().data_type_handle);
-		if (!symbol)
-		{
+		const ccc::DataType* data_type = database.data_types.symbol_from_handle(type->as<ccc::ast::TypeName>().data_type_handle);
+		if (!data_type && data_type->type())
 			break;
-		}
-		result = symbol->type();
+		type = data_type->type();
+		symbol = data_type;
 	}
-	return *result;
+	return std::pair(type, symbol);
 }

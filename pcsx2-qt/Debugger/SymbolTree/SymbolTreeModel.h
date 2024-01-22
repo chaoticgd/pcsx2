@@ -58,14 +58,20 @@ public:
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
 protected:
-	bool nodeHasChildren(const ccc::ast::Node& type, const ccc::SymbolDatabase& database) const;
+	static std::vector<std::unique_ptr<SymbolTreeNode>> populateChildren(
+		SymbolTreeLocation location,
+		const ccc::ast::Node& logical_type,
+		ccc::NodeHandle parent_handle,
+		const ccc::SymbolDatabase& database);
+	
+	static bool nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database);
 	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
 	
-	QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database) const;
+	static QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
 
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;
 	const SymbolGuardian& m_guardian;
 };
 
-const ccc::ast::Node& resolvePhysicalType(const ccc::ast::Node& type, const ccc::SymbolDatabase& database);
+std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);

@@ -29,6 +29,11 @@ SymbolTreeLocation SymbolTreeLocation::addOffset(u32 offset) const
 	SymbolTreeLocation location;
 	switch (type)
 	{
+		case EE_REGISTER:
+		case IOP_REGISTER:
+			if (offset == 0)
+				location = *this;
+			break;
 		case EE_MEMORY:
 		case IOP_MEMORY:
 			location.type = type;
