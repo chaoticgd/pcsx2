@@ -59,8 +59,6 @@ void SymbolTreeWidget::setupMenu()
 	});
 	m_context_menu->addAction(go_to_in_memory_view);
 
-	m_context_menu->addSeparator();
-
 	if (m_flags & ALLOW_GROUPING)
 	{
 		m_context_menu->addSeparator();
@@ -84,6 +82,8 @@ void SymbolTreeWidget::setupMenu()
 
 	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
 	{
+		m_context_menu->addSeparator();
+	
 		m_sort_by_if_type_is_known = new QAction("Sort by if type is known", this);
 		m_sort_by_if_type_is_known->setCheckable(true);
 		m_sort_by_if_type_is_known->setChecked(true);
