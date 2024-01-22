@@ -10,6 +10,7 @@
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 	: QWidget(parent)
+	, m_flags(flags)
 {
 	m_ui.setupUi(this);
 

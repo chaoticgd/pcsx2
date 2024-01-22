@@ -61,7 +61,7 @@ protected:
 		ENABLE_GROUPING = 1 << 0
 	};
 
-	Flags m_flags;
+	u32 m_flags;
 };
 
 class FunctionTreeWidget : public SymbolTreeWidget
