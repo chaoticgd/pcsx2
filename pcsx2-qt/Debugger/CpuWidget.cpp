@@ -126,12 +126,12 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 		savedAddressesTableView->resizeColumnToContents(topLeft.column());
 	});
 	
-	m_ui.functionTreeWidget->setCPU(&cpu);
-	m_ui.globalVariableTreeWidget->setCPU(&cpu);
+	m_ui.tabFunctions->setCPU(&cpu);
+	m_ui.tabGlobalVariables->setCPU(&cpu);
 	m_ui.tabLocalVariables->setCPU(&cpu);
 	
-	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_ui.functionTreeWidget, &SymbolTreeWidget::update);
-	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.globalVariableTreeWidget, &SymbolTreeWidget::update);
+	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_ui.tabFunctions, &SymbolTreeWidget::update);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.tabGlobalVariables, &SymbolTreeWidget::update);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.tabLocalVariables, &SymbolTreeWidget::update);
 }
 

@@ -45,7 +45,7 @@
         </size>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="tabRegisters">
         <attribute name="title">
@@ -99,7 +99,7 @@
          </item>
         </layout>
        </widget>
-       <widget class="QWidget" name="tabFunctions">
+       <widget class="FunctionTreeWidget" name="tabFunctions">
         <attribute name="title">
          <string>Functions</string>
         </attribute>
@@ -119,9 +119,6 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
-         <item>
-          <widget class="FunctionTreeWidget" name="functionTreeWidget" native="true"/>
-         </item>
         </layout>
        </widget>
        <widget class="QWidget" name="tab">
@@ -550,7 +547,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tabGlobalVariables">
+      <widget class="GlobalVariableTreeWidget" name="tabGlobalVariables">
        <attribute name="title">
         <string>Globals</string>
        </attribute>
@@ -567,9 +564,6 @@
         <property name="bottomMargin">
          <number>0</number>
         </property>
-        <item>
-         <widget class="GlobalVariableTreeWidget" name="globalVariableTreeWidget" native="true"/>
-        </item>
        </layout>
       </widget>
       <widget class="LocalVariableTreeWidget" name="tabLocalVariables">
