@@ -421,7 +421,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	u32 program_counter = m_cpu->getPC();
 	u32 stack_pointer = m_cpu->getRegister(EECAT_GPR, 29);
 
-	const ccc::Function* function = database.functions.symbol_from_contained_address(program_counter);
+	const ccc::Function* function = database.functions.symbol_overlapping_address(program_counter);
 	if (!function)
 		return nodes;
 
@@ -481,7 +481,7 @@ bool SymbolFilters::test(
 
 	if (group_by_section)
 	{
-		const ccc::Section* test_section = database.sections.symbol_from_contained_address(test_symbol.address());
+		const ccc::Section* test_section = database.sections.symbol_overlapping_address(test_symbol.address());
 		if (section.valid())
 		{
 			if (!test_section || test_section->handle() != section)

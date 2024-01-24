@@ -180,7 +180,7 @@ void DisassemblyWidget::contextAddFunction()
 {
 	// Get current function
 	const u32 curAddress = m_selectedAddressStart;
-	FunctionStat curFunc = m_cpu->GetSymbolGuardian().StatFunctionContainingAddress(m_selectedAddressStart);
+	FunctionStat curFunc = m_cpu->GetSymbolGuardian().StatFunctionOverlappingAddress(m_selectedAddressStart);
 	u32 curFuncNewSize = UINT32_MAX;
 
 	QString newFuncName;
@@ -220,7 +220,7 @@ void DisassemblyWidget::contextAddFunction()
 		newFuncSize = m_selectedAddressEnd + 4 - m_selectedAddressStart;
 	}
 
-	m_cpu->GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
 		if (curFuncNewSize != UINT32_MAX)
 		{
 			ccc::Function* currentFunction = database.functions.symbol_from_handle(curFunc.handle);
@@ -247,12 +247,12 @@ void DisassemblyWidget::contextCopyFunctionName()
 
 void DisassemblyWidget::contextRemoveFunction()
 {
-	m_cpu->GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
-		ccc::Function* curFunc = database.functions.symbol_from_contained_address(m_selectedAddressStart);
+	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		ccc::Function* curFunc = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if(!curFunc)
 			return;
 		
-		ccc::Function* previousFunc = database.functions.symbol_from_contained_address(curFunc->address().value - 4);
+		ccc::Function* previousFunc = database.functions.symbol_overlapping_address(curFunc->address().value - 4);
 		if(previousFunc)
 			previousFunc->set_size(curFunc->size() + previousFunc->size());
 		
@@ -262,7 +262,7 @@ void DisassemblyWidget::contextRemoveFunction()
 
 void DisassemblyWidget::contextRenameFunction()
 {
-	const FunctionStat curFunc = m_cpu->GetSymbolGuardian().StatFunctionContainingAddress(m_selectedAddressStart);
+	const FunctionStat curFunc = m_cpu->GetSymbolGuardian().StatFunctionOverlappingAddress(m_selectedAddressStart);
 
 	if (!curFunc.address.valid())
 	{
@@ -283,7 +283,7 @@ void DisassemblyWidget::contextRenameFunction()
 		return;
 	}
 
-	m_cpu->GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
 		database.functions.rename_symbol(curFunc.handle, newName.toStdString());
 	});
 }
@@ -292,7 +292,7 @@ void DisassemblyWidget::contextStubFunction()
 {
 	u32 address = m_selectedAddressStart;
 	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(m_selectedAddressStart);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (function)
 			address = function->address().value;
 	});
@@ -309,7 +309,7 @@ void DisassemblyWidget::contextRestoreFunction()
 {
 	u32 address = m_selectedAddressStart;
 	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(m_selectedAddressStart);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (function)
 			address = function->address().value;
 	});
@@ -794,7 +794,7 @@ QColor DisassemblyWidget::GetAddressFunctionColor(u32 address)
 
 	ccc::FunctionHandle handle;
 	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (function)
 			handle = function->handle();
 	});
@@ -858,7 +858,7 @@ bool DisassemblyWidget::AddressCanRestore(u32 start, u32 end)
 bool DisassemblyWidget::FunctionCanRestore(u32 address)
 {
 	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (function)
 			address = function->address().value;
 	});

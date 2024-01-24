@@ -3,16 +3,13 @@
 
 #pragma once
 
-#include <vector>
-#include <map>
-#include <string>
-#include <mutex>
-
+#include <atomic>
 #include <functional>
 #include <shared_mutex>
 
 #include "common/Pcsx2Types.h"
 #include "DebugTools/ccc/symbol_database.h"
+#include "DebugTools/ccc/symbol_file.h"
 
 struct FunctionStat
 {
@@ -31,32 +28,55 @@ public:
 	SymbolGuardian& operator=(const SymbolGuardian& rhs) = delete;
 	SymbolGuardian& operator=(SymbolGuardian&& rhs) = delete;
 
-	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const;
-	void ReadWrite(std::function<void(ccc::SymbolDatabase&)> callback);
+	// Take a shared lock on the symbol database and run the callback. If the
+	// symbol database is busy, nothing happens and we return false.
+	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+	
+	// Take an exclusive lock on the symbol database. Read calls will block
+	// until the lock is released when the function returns.
+	void ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
+	
+	// Take an exclusive lock on the symbol database and set the busy flag while
+	// the callback in being run. Read calls will fail and return false.
+	void LongReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
 
-	void LoadSymbolTables(std::vector<u8> elf, std::string file_name);
+	// This should only be called from the CPU thread.
+	void ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string file_name);
+	
+	// This should only be called from the CPU thread.
+	void ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file);
+	
+	// This should only be called from the CPU thread.
+	void InterruptImportThread();
 
 	// Delete all symbols, including user-defined symbols. It is important to do
 	// it this way rather than assigning a new SymbolDatabase object so we
 	// don't get dangling symbol handles.
 	void Clear();
+	
+	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();
 	
 	bool FunctionExistsWithStartingAddress(u32 address) const;
-	bool FunctionExistsThatContainsAddress(u32 address) const;
+	bool FunctionExistsThatOverlapsAddress(u32 address) const;
 	
 	// Copy commonly used attributes of a function so they can be used by the
 	// calling thread without needing to keep the lock held.
 	FunctionStat StatFunctionStartingAtAddress(u32 address) const;
-	FunctionStat StatFunctionContainingAddress(u32 address) const;
+	FunctionStat StatFunctionOverlappingAddress(u32 address) const;
 
 	ccc::SymbolSourceHandle GetUserDefinedSymbolSource() const;
 
 protected:
+	
 	ccc::SymbolDatabase m_database;
 	ccc::SymbolSourceHandle m_user_defined;
 	ccc::ModuleHandle m_main_elf;
 	mutable std::shared_mutex m_big_symbol_lock;
+	std::atomic_bool m_busy;
+	
+	std::thread m_import_thread;
+	std::atomic_bool m_interrupt_import_thread;
 };
 
 extern SymbolGuardian R5900SymbolGuardian;

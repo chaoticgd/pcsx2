@@ -26,29 +26,34 @@ SymbolGuardian::SymbolGuardian()
 	Clear();
 }
 
-bool SymbolGuardian::Read(std::function<void(const ccc::SymbolDatabase&)> callback) const
+bool SymbolGuardian::Read(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
 {
-	if (!m_big_symbol_lock.try_lock_shared())
+	if (m_busy)
 		return false;
+	m_big_symbol_lock.lock_shared();
 	callback(m_database);
 	m_big_symbol_lock.unlock_shared();
 	return true;
 }
 
-void SymbolGuardian::ReadWrite(std::function<void(ccc::SymbolDatabase&)> callback)
+void SymbolGuardian::ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
 {
-	std::unique_lock lock(m_big_symbol_lock);
+	m_big_symbol_lock.lock();
 	callback(m_database);
+	m_big_symbol_lock.unlock();
 }
 
-void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf, std::string file_name)
+void SymbolGuardian::LongReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
 {
-	std::unique_lock lock(m_big_symbol_lock);
+	m_busy = true;
+	m_big_symbol_lock.lock();
+	callback(m_database);
+	m_big_symbol_lock.unlock();
+	m_busy = false;
+}
 
-	// Delete any previously loaded symbols tables.
-	m_database.destroy_symbols_from_modules(m_main_elf);
-	m_main_elf = ccc::ModuleHandle();
-
+void SymbolGuardian::ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string file_name)
+{
 	ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(elf));
 	if (!parsed_elf.success())
 	{
@@ -57,54 +62,72 @@ void SymbolGuardian::LoadSymbolTables(std::vector<u8> elf, std::string file_name
 	}
 
 	std::unique_ptr<ccc::SymbolFile> symbol_file = std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf), std::move(file_name));
+	ImportSymbolTablesAsync(std::move(symbol_file));
+}
 
-	ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = symbol_file->get_all_symbol_tables();
-	if (!symbol_tables.success())
-	{
-		ccc::report_error(symbol_tables.error());
-		return;
-	}
+void SymbolGuardian::ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file)
+{
+	InterruptImportThread();
+	
+	m_import_thread = std::thread([this, file = std::move(symbol_file)]() {
+		LongReadWrite([&](ccc::SymbolDatabase& database) {
+			ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = file->get_all_symbol_tables();
+			if (!symbol_tables.success())
+			{
+				ccc::report_error(symbol_tables.error());
+				return;
+			}
 
-	ccc::DemanglerFunctions demangler;
-	demangler.cplus_demangle = cplus_demangle;
-	demangler.cplus_demangle_opname = cplus_demangle_opname;
+			ccc::DemanglerFunctions demangler;
+			demangler.cplus_demangle = cplus_demangle;
+			demangler.cplus_demangle_opname = cplus_demangle_opname;
 
-	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
+			u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
 
-	ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
-		m_database, symbol_file->name(), *symbol_tables, importer_flags, demangler);
-	if (!module_handle.success())
-	{
-		ccc::report_error(module_handle.error());
-		return;
-	}
+			ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
+				database, file->name(), *symbol_tables, importer_flags, demangler, &m_interrupt_import_thread);
+			if (!module_handle.success())
+			{
+				ccc::report_error(module_handle.error());
+				return;
+			}
 
-	m_main_elf = *module_handle;
+			Console.WriteLn("Imported %d symbols.", database.symbol_count());
+		});
+	});
+}
+
+void SymbolGuardian::InterruptImportThread()
+{
+	m_interrupt_import_thread = true;
+	if (m_import_thread.joinable())
+		m_import_thread.join();
+	m_interrupt_import_thread = false;
 }
 
 void SymbolGuardian::Clear()
 {
-	std::unique_lock lock(m_big_symbol_lock);
+	LongReadWrite([&](ccc::SymbolDatabase& database) {
+		database.clear();
+		m_main_elf = ccc::ModuleHandle();
 
-	m_database.clear();
-	m_main_elf = ccc::ModuleHandle();
-
-	ccc::Result<ccc::SymbolSource*> source = m_database.symbol_sources.create_symbol("User Defined", ccc::SymbolSourceHandle());
-	CCC_EXIT_IF_ERROR(source);
-	m_user_defined = (*source)->handle();
+		ccc::Result<ccc::SymbolSource*> source = database.symbol_sources.create_symbol("User Defined", ccc::SymbolSourceHandle());
+		CCC_EXIT_IF_ERROR(source);
+		m_user_defined = (*source)->handle();
+	});
 }
 
 void SymbolGuardian::ClearIrxModules()
 {
-	std::unique_lock lock(m_big_symbol_lock);
+	LongReadWrite([&](ccc::SymbolDatabase& database) {
+		std::vector<ccc::ModuleHandle> irx_modules;
+		for (const ccc::Module& module : m_database.modules)
+			if (module.is_irx)
+				irx_modules.emplace_back(module.handle());
 
-	std::vector<ccc::ModuleHandle> irx_modules;
-	for (const ccc::Module& module : m_database.modules)
-		if (module.is_irx)
-			irx_modules.emplace_back(module.handle());
-
-	for (ccc::ModuleHandle module : irx_modules)
-		m_database.destroy_symbols_from_modules(module);
+		for (ccc::ModuleHandle module : irx_modules)
+			m_database.destroy_symbols_from_modules(module);
+	});
 }
 
 bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
@@ -117,11 +140,11 @@ bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
 	return exists;
 }
 
-bool SymbolGuardian::FunctionExistsThatContainsAddress(u32 address) const
+bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address) const
 {
 	bool exists = false;
 	Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		exists = function != nullptr;
 	});
 	return exists;
@@ -144,11 +167,11 @@ FunctionStat SymbolGuardian::StatFunctionStartingAtAddress(u32 address) const
 	return stat;
 }
 
-FunctionStat SymbolGuardian::StatFunctionContainingAddress(u32 address) const
+FunctionStat SymbolGuardian::StatFunctionOverlappingAddress(u32 address) const
 {
 	FunctionStat stat;
 	Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_from_contained_address(address);
+		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (function)
 		{
 			stat.handle = function->handle();

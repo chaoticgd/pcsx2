@@ -1087,7 +1087,8 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
-	R5900SymbolGuardian.LoadSymbolTables(elfo.ReleaseData(), s_elf_path);
+	R5900SymbolGuardian.Clear();
+	R5900SymbolGuardian.ImportElfSymbolTablesAsync(elfo.ReleaseData(), s_elf_path);
 }
 
 void VMManager::ClearELFInfo()
@@ -1541,6 +1542,10 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	// clear out any potentially-incorrect settings from the last game
 	LoadSettings();
+	
+	// Cancel any active symbol table import operations.
+	R3000SymbolGuardian.InterruptImportThread();
+	R5900SymbolGuardian.InterruptImportThread();
 }
 
 void VMManager::Reset()
