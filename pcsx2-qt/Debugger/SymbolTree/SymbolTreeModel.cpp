@@ -573,6 +573,12 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 	QString name;
 	switch (type->descriptor)
 	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& built_in = type->as<ccc::ast::BuiltIn>();
+			name = ccc::ast::builtin_class_to_string(built_in.bclass);
+			break;
+		}
 		case ccc::ast::TYPE_NAME:
 		{
 			const ccc::ast::TypeName& type_name = type->as<ccc::ast::TypeName>();
@@ -588,7 +594,7 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 			name = ccc::ast::node_type_to_string(*type);
 		}
 	}
-	
+
 	return name + suffix;
 }
 
