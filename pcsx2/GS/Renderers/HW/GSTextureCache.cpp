@@ -2504,7 +2504,7 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 								continue;
 							}
 
-							if (preserve_target || preload)
+							if (!hw_clear && (preserve_target || preload))
 							{
 								const int copy_width = (t->m_texture->GetWidth()) > (dst->m_texture->GetWidth()) ? (dst->m_texture->GetWidth()) : t->m_texture->GetWidth();
 								const int copy_height = overlapping_pages_height * t->m_scale;
@@ -4166,7 +4166,7 @@ GSTextureCache::Source* GSTextureCache::CreateSource(const GIFRegTEX0& TEX0, con
 	{
 		// lod won't contain the full range when using basic mipmapping, only that
 		// which is hashed, so we just allocate the full thing.
-		tlevels = (GSConfig.HWMipmap != HWMipmapLevel::Full) ? -1 : (lod->y - lod->x + 1);
+		tlevels = (GSConfig.HWMipmap != HWMipmapLevel::Full) ? -1 : std::min(lod->y - lod->x + 1, GSDevice::GetMipmapLevelsForSize(tw, th));
 		src->m_lod = *lod;
 	}
 
@@ -5069,7 +5069,7 @@ GSTextureCache::HashCacheEntry* GSTextureCache::LookupHashCache(const GIFRegTEX0
 	// expand/upload texture
 	const int tw = region.HasX() ? region.GetWidth() : (1 << TEX0.TW);
 	const int th = region.HasY() ? region.GetHeight() : (1 << TEX0.TH);
-	const int tlevels = lod ? ((GSConfig.HWMipmap != HWMipmapLevel::Full) ? -1 : (lod->y - lod->x + 1)) : 1;
+	const int tlevels = lod ? ((GSConfig.HWMipmap != HWMipmapLevel::Full) ? -1 : std::min(lod->y - lod->x + 1, GSDevice::GetMipmapLevelsForSize(tw, th))) : 1;
 	GSTexture* tex = g_gs_device->CreateTexture(tw, th, tlevels, paltex ? GSTexture::Format::UNorm8 : GSTexture::Format::Color);
 	if (!tex)
 	{
