@@ -219,6 +219,7 @@ void SymbolTreeLocation::write8(u8 value)
 			break;
 		case IOP_MEMORY:
 			r3000Debug.write8(address, value);
+			break;
 		default:
 		{
 		}
@@ -242,6 +243,7 @@ void SymbolTreeLocation::write16(u16 value)
 			break;
 		case IOP_MEMORY:
 			r3000Debug.write16(address, value);
+			break;
 		default:
 		{
 		}
@@ -265,6 +267,7 @@ void SymbolTreeLocation::write32(u32 value)
 			break;
 		case IOP_MEMORY:
 			r3000Debug.write32(address, value);
+			break;
 		default:
 		{
 		}
@@ -288,6 +291,7 @@ void SymbolTreeLocation::write64(u64 value)
 			break;
 		case IOP_MEMORY:
 			r3000Debug.write64(address, value);
+			break;
 		default:
 		{
 		}
@@ -311,6 +315,7 @@ void SymbolTreeLocation::write128(u128 value)
 			break;
 		case IOP_MEMORY:
 			r3000Debug.write128(address, value);
+			break;
 		default:
 		{
 		}

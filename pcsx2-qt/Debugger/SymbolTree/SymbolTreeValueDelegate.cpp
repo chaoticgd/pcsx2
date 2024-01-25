@@ -241,7 +241,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						model->setData(index, spinBox->value(), Qt::EditRole);
+						model->setData(index, static_cast<float>(spinBox->value()), Qt::EditRole);
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_64:
