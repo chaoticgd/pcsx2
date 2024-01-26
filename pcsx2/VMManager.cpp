@@ -1103,8 +1103,27 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
+
 	R5900SymbolGuardian.Clear();
+
+	// Load the symbols stored in the ELF file.
 	R5900SymbolGuardian.ImportElfSymbolTablesAsync(elfo.ReleaseData(), s_elf_path);
+
+	// Load symbols from a .sym file if it exists.
+	CDVD_SourceType source_type = CDVDsys_GetSourceType();
+	if (source_type == CDVD_SourceType::Iso)
+	{
+		std::string iso_file_path = CDVDsys_GetFile(source_type);
+
+		std::string symName;
+		std::string::size_type n = iso_file_path.rfind('.');
+		if (n == std::string::npos)
+			symName = iso_file_path + ".sym";
+		else
+			symName = iso_file_path.substr(0, n) + ".sym";
+
+		R5900SymbolGuardian.ImportNocashSymbols(symName.c_str());
+	}
 }
 
 void VMManager::ClearELFInfo()
@@ -1558,7 +1577,7 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	// clear out any potentially-incorrect settings from the last game
 	LoadSettings();
-	
+
 	// Cancel any active symbol table import operations.
 	R3000SymbolGuardian.InterruptImportThread();
 	R5900SymbolGuardian.InterruptImportThread();

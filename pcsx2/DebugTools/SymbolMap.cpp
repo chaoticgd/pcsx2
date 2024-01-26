@@ -8,6 +8,7 @@
 #include "common/StringUtil.h"
 
 #include "demangle.h"
+#include "ccc/ast.h"
 #include "ccc/elf.h"
 #include "ccc/importer_flags.h"
 #include "ccc/symbol_file.h"
@@ -68,7 +69,7 @@ void SymbolGuardian::ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string
 void SymbolGuardian::ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file)
 {
 	InterruptImportThread();
-	
+
 	m_import_thread = std::thread([this, file = std::move(symbol_file)]() {
 		LongReadWrite([&](ccc::SymbolDatabase& database) {
 			ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = file->get_all_symbol_tables();
@@ -95,6 +96,121 @@ void SymbolGuardian::ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> sy
 			Console.WriteLn("Imported %d symbols.", database.symbol_count());
 		});
 	});
+}
+
+bool SymbolGuardian::ImportNocashSymbols(const std::string& filename)
+{
+	bool success = false;
+
+	FILE* f = FileSystem::OpenCFile(filename.c_str(), "r");
+	if (!f)
+		return success;
+	
+	LongReadWrite([&](ccc::SymbolDatabase& database) {
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Nocash Symbols");
+		if (!source.success())
+			return;
+
+		while (!feof(f))
+		{
+			char line[256], value[256] = {0};
+			char* p = fgets(line, 256, f);
+			if (p == NULL)
+				break;
+
+			u32 address;
+			if (sscanf(line, "%08X %s", &address, value) != 2)
+				continue;
+			if (address == 0 && strcmp(value, "0") == 0)
+				continue;
+
+			if (value[0] == '.')
+			{
+				// data directives
+				char* s = strchr(value, ':');
+				if (s != NULL)
+				{
+					*s = 0;
+
+					u32 size = 0;
+					if (sscanf(s + 1, "%04X", &size) != 1)
+						continue;
+
+					std::unique_ptr<ccc::ast::BuiltIn> scalar_type = std::make_unique<ccc::ast::BuiltIn>();
+					if (StringUtil::Strcasecmp(value, ".byt") == 0)
+					{
+						scalar_type->computed_size_bytes = 1;
+						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_8;
+					}
+					else if (StringUtil::Strcasecmp(value, ".wrd") == 0)
+					{
+						scalar_type->computed_size_bytes = 2;
+						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_16;
+					}
+					else if (StringUtil::Strcasecmp(value, ".dbl") == 0)
+					{
+						scalar_type->computed_size_bytes = 4;
+						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_32;
+					}
+					else if (StringUtil::Strcasecmp(value, ".asc") == 0)
+					{
+						scalar_type->computed_size_bytes = 1;
+						scalar_type->bclass = ccc::ast::BuiltInClass::UNQUALIFIED_8;
+					}
+					else
+					{
+						continue;
+					}
+
+					ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(
+						line, *source, nullptr, address);
+					if (!global_variable.success())
+						return;
+
+					if (scalar_type->computed_size_bytes == (s32)size)
+					{
+						(*global_variable)->set_type(std::move(scalar_type));
+					}
+					else
+					{
+						std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
+						array->computed_size_bytes = (s32)size;
+						array->element_type = std::move(scalar_type);
+						array->element_count = size / array->element_type->computed_size_bytes;
+						(*global_variable)->set_type(std::move(array));
+					}
+				}
+			}
+			else
+			{ // labels
+				int size = 1;
+				char* seperator = strchr(value, ',');
+				if (seperator != NULL)
+				{
+					*seperator = 0;
+					sscanf(seperator + 1, "%08X", &size);
+				}
+
+				if (size != 1)
+				{
+					ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, *source, nullptr, address);
+					if (!function.success())
+						return;
+				}
+				else
+				{
+					ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, *source, nullptr, address);
+					if (!label.success())
+						return;
+				}
+			}
+		}
+
+		success = true;
+	});
+
+	fclose(f);
+	return success;
 }
 
 void SymbolGuardian::InterruptImportThread()
@@ -198,82 +314,6 @@ void SymbolMap::Clear()
 	functions.clear();
 	labels.clear();
 	data.clear();
-}
-
-
-bool SymbolMap::LoadNocashSym(const std::string& filename)
-{
-	std::lock_guard<std::recursive_mutex> guard(m_lock);
-	FILE* f = FileSystem::OpenCFile(filename.c_str(), "r");
-	if (!f)
-		return false;
-
-	while (!feof(f))
-	{
-		char line[256], value[256] = {0};
-		char* p = fgets(line, 256, f);
-		if (p == NULL)
-			break;
-
-		u32 address;
-		if (sscanf(line, "%08X %s", &address, value) != 2)
-			continue;
-		if (address == 0 && strcmp(value, "0") == 0)
-			continue;
-
-		if (value[0] == '.')
-		{
-			// data directives
-			char* s = strchr(value, ':');
-			if (s != NULL)
-			{
-				*s = 0;
-
-				u32 size = 0;
-				if (sscanf(s + 1, "%04X", &size) != 1)
-					continue;
-
-				if (StringUtil::Strcasecmp(value, ".byt") == 0)
-				{
-					AddData(address, size, DATATYPE_BYTE, 0);
-				}
-				else if (StringUtil::Strcasecmp(value, ".wrd") == 0)
-				{
-					AddData(address, size, DATATYPE_HALFWORD, 0);
-				}
-				else if (StringUtil::Strcasecmp(value, ".dbl") == 0)
-				{
-					AddData(address, size, DATATYPE_WORD, 0);
-				}
-				else if (StringUtil::Strcasecmp(value, ".asc") == 0)
-				{
-					AddData(address, size, DATATYPE_ASCII, 0);
-				}
-			}
-		}
-		else
-		{ // labels
-			int size = 1;
-			char* seperator = strchr(value, ',');
-			if (seperator != NULL)
-			{
-				*seperator = 0;
-				sscanf(seperator + 1, "%08X", &size);
-			}
-
-			if (size != 1)
-			{
-				AddFunction(value, address, size);
-			}
-			else
-			{
-				AddLabel(value, address);
-			}
-		}
-	}
-
-	fclose(f);
-	return true;
 }
 
 SymbolType SymbolMap::GetSymbolType(u32 address) const

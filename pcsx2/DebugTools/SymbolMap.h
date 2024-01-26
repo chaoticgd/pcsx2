@@ -32,21 +32,24 @@ public:
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, nothing happens and we return false.
 	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
-	
+
 	// Take an exclusive lock on the symbol database. Read calls will block
 	// until the lock is released when the function returns.
 	void ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
-	
+
 	// Take an exclusive lock on the symbol database and set the busy flag while
 	// the callback in being run. Read calls will fail and return false.
 	void LongReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
 
 	// This should only be called from the CPU thread.
 	void ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string file_name);
-	
+
 	// This should only be called from the CPU thread.
 	void ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file);
-	
+
+	// Import user-defined symbols in a simple format.
+	bool ImportNocashSymbols(const std::string& filename);
+
 	// This should only be called from the CPU thread.
 	void InterruptImportThread();
 
@@ -54,28 +57,25 @@ public:
 	// it this way rather than assigning a new SymbolDatabase object so we
 	// don't get dangling symbol handles.
 	void Clear();
-	
+
 	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();
-	
+
 	bool FunctionExistsWithStartingAddress(u32 address) const;
 	bool FunctionExistsThatOverlapsAddress(u32 address) const;
-	
+
 	// Copy commonly used attributes of a function so they can be used by the
 	// calling thread without needing to keep the lock held.
 	FunctionStat StatFunctionStartingAtAddress(u32 address) const;
 	FunctionStat StatFunctionOverlappingAddress(u32 address) const;
 
-	ccc::SymbolSourceHandle GetUserDefinedSymbolSource() const;
-
 protected:
-	
 	ccc::SymbolDatabase m_database;
 	ccc::SymbolSourceHandle m_user_defined;
 	ccc::ModuleHandle m_main_elf;
 	mutable std::shared_mutex m_big_symbol_lock;
 	std::atomic_bool m_busy;
-	
+
 	std::thread m_import_thread;
 	std::atomic_bool m_interrupt_import_thread;
 };
@@ -120,8 +120,6 @@ public:
 	SymbolMap() {}
 	void Clear();
 	void SortSymbols();
-
-	bool LoadNocashSym(const std::string& filename);
 
 	SymbolType GetSymbolType(u32 address) const;
 	bool GetSymbolInfo(SymbolInfo* info, u32 address, SymbolType symmask = ST_FUNCTION) const;
