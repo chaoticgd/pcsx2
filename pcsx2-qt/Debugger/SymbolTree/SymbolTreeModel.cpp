@@ -224,7 +224,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 		return result;
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (node->type.valid())
+	if (!node->type.valid())
 		return result;
 
 	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
