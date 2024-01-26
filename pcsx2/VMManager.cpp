@@ -1079,7 +1079,7 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	ApplyCoreSettings();
 
 	MIPSAnalyst::ScanForFunctions(
-		R5900SymbolMap, s_elf_text_range.first, s_elf_text_range.first + s_elf_text_range.second, true);
+		R5900SymbolGuardian, s_elf_text_range.first, s_elf_text_range.first + s_elf_text_range.second);
 }
 
 void VMManager::UpdateELFInfo(std::string elf_path)

@@ -9,8 +9,6 @@
 #include "R5900.h"
 #include "R5900OpcodeTables.h"
 
-static std::vector<MIPSAnalyst::AnalyzedFunction> functions;
-
 #define MIPS_MAKE_J(addr)   (0x08000000 | ((addr)>>2))
 #define MIPS_MAKE_JAL(addr) (0x0C000000 | ((addr)>>2))
 #define MIPS_MAKE_JR_RA()   (0x03e00008)
@@ -183,7 +181,8 @@ namespace MIPSAnalyst
 		return furthestJumpbackAddr;
 	}
 
-	void ScanForFunctions(SymbolMap& map, u32 startAddr, u32 endAddr, bool insertSymbols) {
+	void ScanForFunctions(SymbolGuardian& guardian, u32 startAddr, u32 endAddr) {
+		std::vector<MIPSAnalyst::AnalyzedFunction> functions;
 		AnalyzedFunction currentFunction = {startAddr};
 
 		u32 furthestBranch = 0;
@@ -191,19 +190,12 @@ namespace MIPSAnalyst
 		bool end = false;
 		bool isStraightLeaf = true;
 
-		functions.clear();
-
 		u32 addr;
 		for (addr = startAddr; addr <= endAddr; addr += 4) {
 			// Use pre-existing symbol map info if available. May be more reliable.
-			SymbolInfo syminfo;
-			if (map.GetSymbolInfo(&syminfo, addr, ST_FUNCTION)) {
-				addr = syminfo.address + syminfo.size - 4;
-
-				// We still need to insert the func for hashing purposes.
-				currentFunction.start = syminfo.address;
-				currentFunction.end = syminfo.address + syminfo.size - 4;
-				functions.push_back(currentFunction);
+			FunctionStat existing_symbol = guardian.StatFunctionStartingAtAddress(addr);
+			if (existing_symbol.address.valid() && existing_symbol.size > 0) {
+				addr = existing_symbol.address.value + existing_symbol.size - 4;
 				currentFunction.start = addr + 4;
 				furthestBranch = 0;
 				looking = false;
@@ -300,13 +292,31 @@ namespace MIPSAnalyst
 		currentFunction.end = addr + 4;
 		functions.push_back(currentFunction);
 
-		for (auto iter = functions.begin(); iter != functions.end(); iter++) {
-			iter->size = iter->end - iter->start + 4;
-			if (insertSymbols) {
-				char temp[256];
-				map.AddFunction(DefaultFunctionName(temp, iter->start), iter->start, iter->end - iter->start + 4);
+		guardian.LongReadWrite([&](ccc::SymbolDatabase& database) {
+			ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Analysis");
+			if(!source->valid())
+				return;
+
+			for (const AnalyzedFunction& function : functions) {
+				ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(function.start);
+				ccc::Function* symbol = database.functions.symbol_from_handle(handle);
+				
+				if (!symbol) {
+					char name[256];
+					DefaultFunctionName(name, function.start);
+
+					ccc::Result<ccc::Function*> symbol_result = database.functions.create_symbol(
+						name, *source, nullptr, function.start);
+					if(!symbol_result.success())
+						return;
+					symbol = *symbol_result;
+				}
+
+				if (symbol->size() == 0) {
+					symbol->set_size(function.end - function.start + 4);
+				}
 			}
-		}
+		});
 	}
 
 	MipsOpcodeInfo GetOpcodeInfo(DebugInterface* cpu, u32 address) {

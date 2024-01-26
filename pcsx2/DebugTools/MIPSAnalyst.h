@@ -22,14 +22,13 @@ namespace MIPSAnalyst
 		u32 start;
 		u32 end;
 		u64 hash;
-		u32 size;
 		bool isStraightLeaf;
 		bool hasHash;
 		bool usesVFPU;
 		char name[64];
 	};
 
-	void ScanForFunctions(SymbolMap& map, u32 startAddr, u32 endAddr, bool insertSymbols);
+	void ScanForFunctions(SymbolGuardian& guardian, u32 startAddr, u32 endAddr);
 
 	enum LoadStoreLRType { LOADSTORE_NORMAL, LOADSTORE_LEFT, LOADSTORE_RIGHT };
 
