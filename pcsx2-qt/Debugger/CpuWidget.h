@@ -103,7 +103,8 @@ public slots:
 		m_ui.registerWidget->update();
 		m_ui.disassemblyWidget->update();
 		m_ui.memoryviewWidget->update();
-	};
+		m_ui.tabLocalVariables->update();
+	}
 
 	void onSearchButtonClicked();
 	void onSearchResultsListScroll(u32 value);
