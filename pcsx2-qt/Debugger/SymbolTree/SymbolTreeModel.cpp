@@ -3,12 +3,10 @@
 
 #include "SymbolTreeModel.h"
 
-SymbolTreeModel::SymbolTreeModel(
-	std::unique_ptr<SymbolTreeNode> initial_root,
-	const SymbolGuardian& guardian,
-	QObject* parent)
+#include "common/Assertions.h"
+
+SymbolTreeModel::SymbolTreeModel(SymbolGuardian& guardian, QObject* parent)
 	: QAbstractItemModel(parent)
-	, m_root(std::move(initial_root))
 	, m_guardian(guardian)
 {
 }
@@ -105,13 +103,26 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		case TYPE:
 		{
 			QVariant result;
-			m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
-				const ccc::ast::Node* type = node->type.lookup_node(database);
-				if (!type)
-					return;
+			switch (node->state)
+			{
+				case SymbolTreeNodeState::NORMAL:
+				case SymbolTreeNodeState::ARRAY:
+				{
+					m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
+						const ccc::ast::Node* type = node->type.lookup_node(database);
+						if (!type)
+							return;
 
-				result = typeToString(type, database);
-			});
+						result = typeToString(type, database);
+					});
+					break;
+				}
+				case SymbolTreeNodeState::STRING:
+				{
+					result = "string";
+					break;
+				}
+			}
 			return result;
 		}
 		case LIVENESS:
@@ -331,7 +342,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 
 	if (!children.empty())
 		beginInsertRows(parent, 0, children.size() - 1);
-	parent_node->set_children(std::move(children));
+	parent_node->setChildren(std::move(children));
 	if (!children.empty())
 		endInsertRows();
 }
@@ -352,7 +363,7 @@ bool SymbolTreeModel::canFetchMore(const QModelIndex& parent) const
 		if (!parent_type)
 			return;
 
-		result = nodeHasChildren(*parent_type, database) && !parent_node->children_fetched();
+		result = nodeHasChildren(*parent_type, database) && !parent_node->childrenFetched();
 	});
 
 	return result;
@@ -379,25 +390,15 @@ QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, i
 	switch (section)
 	{
 		case NAME:
-		{
-			return "Name";
-		}
+			return tr("Name");
 		case LOCATION:
-		{
-			return "Location";
-		}
+			return tr("Location");
 		case TYPE:
-		{
-			return "Type";
-		}
+			return tr("Type");
 		case LIVENESS:
-		{
-			return "Liveness";
-		}
+			return tr("Liveness");
 		case VALUE:
-		{
-			return "Value";
-		}
+			return tr("Value");
 	}
 
 	return QVariant();
@@ -408,6 +409,94 @@ void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 	beginResetModel();
 	m_root = std::move(new_root);
 	endResetModel();
+}
+
+ccc::SymbolSourceHandle SymbolTreeModel::convertToArray(QModelIndex index, s32 element_count, std::string source_name, QString& error_out)
+{
+	pxAssertRel(index.isValid(), "Invalid model index.");
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+
+	bool remove_rows = !node->children().empty();
+	if (remove_rows)
+		beginRemoveRows(index, 0, node->children().size() - 1);
+	node->clearChildren();
+	if (remove_rows)
+		endRemoveRows();
+
+	std::vector<std::unique_ptr<SymbolTreeNode>> children;
+	ccc::SymbolSourceHandle source;
+	m_guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
+		ccc::Result<ccc::SymbolSourceHandle> source_result = database.get_symbol_source(source_name);
+		if (!source_result.success())
+		{
+			error_out = tr("Failed to create new symbol source.");
+			return;
+		}
+		source = *source_result;
+
+		const ccc::ast::Node* type = node->type.lookup_node(database);
+		bool is_pointer_or_reference = type && type->descriptor == ccc::ast::POINTER_OR_REFERENCE;
+		const ccc::ast::PointerOrReference* pointer_or_reference =
+			is_pointer_or_reference ? &type->as<ccc::ast::PointerOrReference>() : nullptr;
+		if (!pointer_or_reference || !pointer_or_reference->is_pointer)
+		{
+			error_out = tr("Only pointers can be converted to arrays.");
+			return;
+		}
+
+		if (pointer_or_reference->value_type->descriptor != ccc::ast::TYPE_NAME)
+		{
+			error_out = tr("Not yet implemented: Failed to create new symbol type because the value type is not a type name.");
+			return;
+		}
+
+		const ccc::ast::TypeName& old_type_name = pointer_or_reference->value_type->as<ccc::ast::TypeName>();
+
+		ccc::Result<ccc::DataType*> data_type = database.data_types.create_symbol("(temporary)", source);
+		if (!data_type.success())
+		{
+			error_out = tr("Failed to create new temporary data type.");
+		}
+
+		{
+			std::unique_ptr<ccc::ast::TypeName> type_name = std::make_unique<ccc::ast::TypeName>();
+			type_name->computed_size_bytes = old_type_name.computed_size_bytes;
+			type_name->data_type_handle = old_type_name.data_type_handle;
+			type_name->source = old_type_name.source;
+
+			std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
+			array->computed_size_bytes = element_count * pointer_or_reference->value_type->computed_size_bytes;
+			array->element_type = std::move(type_name);
+			array->element_count = element_count;
+
+			std::unique_ptr<ccc::ast::PointerOrReference> pointer = std::make_unique<ccc::ast::PointerOrReference>();
+			pointer->is_pointer = true;
+			pointer->computed_size_bytes = 4;
+			pointer->value_type = std::move(array);
+
+			(*data_type)->set_type(std::move(pointer));
+		}
+
+		node->type = ccc::NodeHandle(**data_type, (*data_type)->type());
+	});
+
+	return source;
+}
+
+ccc::SymbolSourceHandle SymbolTreeModel::convertToString(QModelIndex index, std::string source_name, QString& error_out)
+{
+	pxAssertRel(index.isValid(), "Invalid model index.");
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+
+	beginRemoveRows(index, 0, node->children().size() - 1);
+	node->clearChildren();
+	endRemoveRows();
+
+	// TODO
+
+	return ccc::SymbolSourceHandle();
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(

@@ -4,7 +4,9 @@
 #include "SymbolTreeWidgets.h"
 
 #include <QtGui/QClipboard>
+#include <QtWidgets/QInputDialog>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QMessageBox>
 
 #include "SymbolTreeValueDelegate.h"
 
@@ -19,88 +21,6 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
 
-void SymbolTreeWidget::setupMenu()
-{
-	m_context_menu = new QMenu(this);
-
-	QAction* copy_name = new QAction("Copy Name", this);
-	connect(copy_name, &QAction::triggered, [this]() {
-		if (!m_model)
-			return;
-
-		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::NAME);
-		QVariant data = m_model->data(index, Qt::DisplayRole);
-		if (data.isValid())
-			QApplication::clipboard()->setText(data.toString());
-	});
-	m_context_menu->addAction(copy_name);
-
-	QAction* copy_location = new QAction("Copy Location", this);
-	connect(copy_location, &QAction::triggered, [this]() {
-		if (!m_model)
-			return;
-
-		QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::LOCATION);
-		QVariant data = m_model->data(index, Qt::DisplayRole);
-		if (data.isValid())
-			QApplication::clipboard()->setText(data.toString());
-	});
-	m_context_menu->addAction(copy_location);
-
-	m_context_menu->addSeparator();
-
-	QAction* go_to_in_disassembly = new QAction("Go to in Disassembly", this);
-	connect(go_to_in_disassembly, &QAction::triggered, [this]() {
-	});
-	m_context_menu->addAction(go_to_in_disassembly);
-
-	QAction* go_to_in_memory_view = new QAction("Go to in Memory View", this);
-	connect(go_to_in_memory_view, &QAction::triggered, [this]() {
-	});
-	m_context_menu->addAction(go_to_in_memory_view);
-
-	if (m_flags & ALLOW_GROUPING)
-	{
-		m_context_menu->addSeparator();
-
-		m_group_by_module = new QAction("Group by module", this);
-		m_group_by_module->setCheckable(true);
-		m_context_menu->addAction(m_group_by_module);
-
-		m_group_by_section = new QAction("Group by section", this);
-		m_group_by_section->setCheckable(true);
-		m_context_menu->addAction(m_group_by_section);
-
-		m_group_by_source_file = new QAction("Group by source file", this);
-		m_group_by_source_file->setCheckable(true);
-		m_context_menu->addAction(m_group_by_source_file);
-
-		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
-		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
-		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
-	}
-
-	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
-	{
-		m_context_menu->addSeparator();
-	
-		m_sort_by_if_type_is_known = new QAction("Sort by if type is known", this);
-		m_sort_by_if_type_is_known->setCheckable(true);
-		m_sort_by_if_type_is_known->setChecked(true);
-		m_context_menu->addAction(m_sort_by_if_type_is_known);
-
-		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
-	}
-
-	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
-	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
-
-	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
-		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
-	});
-}
-
 void SymbolTreeWidget::setCPU(DebugInterface* cpu)
 {
 	m_cpu = cpu;
@@ -113,7 +33,20 @@ void SymbolTreeWidget::update()
 {
 	assert(m_cpu);
 
+	if (!m_model)
+		setupTree();
+
 	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
+
+	// If we've previously created any temporary data types, delete them now.
+	if (m_temporary_source.valid())
+	{
+		guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
+			database.destroy_symbols_from_sources(m_temporary_source);
+		});
+		m_temporary_source = ccc::SymbolSourceHandle();
+	}
+
 	guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
@@ -122,17 +55,101 @@ void SymbolTreeWidget::update()
 		filters.string = m_ui.filterBox->text();
 
 		std::unique_ptr<SymbolTreeNode> root = std::make_unique<SymbolTreeNode>();
-		root->set_children(populateModules(filters, database));
+		root->setChildren(populateModules(filters, database));
 		root->sortChildrenRecursively(m_sort_by_if_type_is_known && m_sort_by_if_type_is_known->isChecked());
+		m_model->reset(std::move(root));
+	});
+}
 
-		m_model = new SymbolTreeModel(std::move(root), guardian, this);
-		m_ui.treeView->setModel(m_model);
+void SymbolTreeWidget::setupTree()
+{
+	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
+	m_model = new SymbolTreeModel(guardian, this);
+	m_ui.treeView->setModel(m_model);
 
-		auto delegate = new SymbolTreeValueDelegate(guardian, this);
-		m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
-		m_ui.treeView->setAlternatingRowColors(true);
-		
-		configureColumnVisibility();
+	auto delegate = new SymbolTreeValueDelegate(guardian, this);
+	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
+	m_ui.treeView->setAlternatingRowColors(true);
+
+	configureColumnVisibility();
+}
+
+void SymbolTreeWidget::setupMenu()
+{
+	m_context_menu = new QMenu(this);
+
+	QAction* copy_name = new QAction(tr("Copy Name"), this);
+	connect(copy_name, &QAction::triggered, this, &SymbolTreeWidget::onCopyName);
+	m_context_menu->addAction(copy_name);
+
+	QAction* copy_location = new QAction(tr("Copy Location"), this);
+	connect(copy_location, &QAction::triggered, this, &SymbolTreeWidget::onCopyLocation);
+	m_context_menu->addAction(copy_location);
+
+	m_context_menu->addSeparator();
+
+	QAction* go_to_in_disassembly = new QAction(tr("Go to in Disassembly"), this);
+	connect(go_to_in_disassembly, &QAction::triggered, this, &SymbolTreeWidget::onGoToInDisassembly);
+	m_context_menu->addAction(go_to_in_disassembly);
+
+	QAction* go_to_in_memory_view = new QAction(tr("Go to in Memory View"), this);
+	connect(go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
+	m_context_menu->addAction(go_to_in_memory_view);
+
+	if (m_flags & ALLOW_GROUPING)
+	{
+		m_context_menu->addSeparator();
+
+		m_group_by_module = new QAction(tr("Group by module"), this);
+		m_group_by_module->setCheckable(true);
+		m_context_menu->addAction(m_group_by_module);
+
+		m_group_by_section = new QAction(tr("Group by section"), this);
+		m_group_by_section->setCheckable(true);
+		m_context_menu->addAction(m_group_by_section);
+
+		m_group_by_source_file = new QAction(tr("Group by source file"), this);
+		m_group_by_source_file->setCheckable(true);
+		m_context_menu->addAction(m_group_by_source_file);
+
+		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
+	}
+
+	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
+	{
+		m_context_menu->addSeparator();
+
+		m_sort_by_if_type_is_known = new QAction(tr("Sort by if type is known"), this);
+		m_sort_by_if_type_is_known->setCheckable(true);
+		m_sort_by_if_type_is_known->setChecked(true);
+		m_context_menu->addAction(m_sort_by_if_type_is_known);
+
+		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
+	}
+
+	if (m_flags & ALLOW_DATA_CONVERSIONS)
+	{
+		m_context_menu->addSeparator();
+
+		m_convert_to_array = new QAction(tr("Convert to array temporarily"), this);
+		m_context_menu->addAction(m_convert_to_array);
+
+		connect(m_convert_to_array, &QAction::triggered, this, &SymbolTreeWidget::onConvertToArray);
+
+		m_convert_to_array = new QAction(tr("Convert to string temporarily"), this);
+		m_context_menu->addAction(m_convert_to_array);
+
+		connect(m_convert_to_array, &QAction::triggered, this, &SymbolTreeWidget::onConvertToString);
+	}
+
+	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
+	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
+
+	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
+		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
 	});
 }
 
@@ -150,7 +167,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown module)";
-			node->set_children(std::move(module_children));
+			node->setChildren(std::move(module_children));
 			nodes.emplace_back(std::move(node));
 		}
 
@@ -169,7 +186,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 					s32 minor = module_symbol.version_minor;
 					node->name += QString(" v%1.%2").arg(major).arg(minor);
 				}
-				node->set_children(std::move(module_children));
+				node->setChildren(std::move(module_children));
 				nodes.emplace_back(std::move(node));
 			}
 		}
@@ -196,7 +213,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown section)";
-			node->set_children(std::move(section_children));
+			node->setChildren(std::move(section_children));
 			nodes.emplace_back(std::move(node));
 		}
 
@@ -212,7 +229,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 
 				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 				node->name = QString::fromStdString(section.name());
-				node->set_children(std::move(section_children));
+				node->setChildren(std::move(section_children));
 				nodes.emplace_back(std::move(node));
 			}
 		}
@@ -239,7 +256,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = "(unknown source file)";
-			node->set_children(std::move(source_file_children));
+			node->setChildren(std::move(source_file_children));
 			nodes.emplace_back(std::move(node));
 		}
 
@@ -256,7 +273,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 				node->name = QString::fromStdString(source_file.command_line_path);
 			else
 				node->name = QString::fromStdString(source_file.name());
-			node->set_children(populateSymbols(filters, database));
+			node->setChildren(populateSymbols(filters, database));
 			nodes.emplace_back(std::move(node));
 		}
 	}
@@ -268,12 +285,114 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 	return nodes;
 }
 
+void SymbolTreeWidget::onCopyName()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::NAME);
+	QVariant data = m_model->data(index, Qt::DisplayRole);
+	if (data.isValid())
+		QApplication::clipboard()->setText(data.toString());
+}
+
+void SymbolTreeWidget::onCopyLocation()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::LOCATION);
+	QVariant data = m_model->data(index, Qt::DisplayRole);
+	if (data.isValid())
+		QApplication::clipboard()->setText(data.toString());
+}
+
+void SymbolTreeWidget::onGoToInDisassembly()
+{
+}
+
+void SymbolTreeWidget::onGoToInMemoryView()
+{
+}
+
+void SymbolTreeWidget::onConvertToArray()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+
+	bool ok;
+
+	QString title = tr("Convert To Array");
+	QString label = tr("Element count:");
+	QString element_count_string = QInputDialog::getText(this, title, label, QLineEdit::Normal, QString(), &ok);
+	if (!ok)
+		return;
+
+	int element_count = element_count_string.toInt(&ok);
+	if (!ok)
+		return;
+	if (element_count < 0)
+	{
+		QMessageBox::warning(this, tr("Cannot Convert To Array"), tr("Element count cannot be negative."));
+		return;
+	}
+
+	QString error_message;
+	ccc::SymbolSourceHandle source = m_model->convertToArray(index, element_count, temporarySourceName(), error_message);
+	if (!error_message.isEmpty())
+		QMessageBox::warning(this, tr("Cannot Convert To Array"), error_message);
+
+	if (source.valid())
+		m_temporary_source = source;
+}
+
+void SymbolTreeWidget::onConvertToString()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	QString error_message;
+	ccc::SymbolSourceHandle source = m_model->convertToString(index, temporarySourceName(), error_message);
+	if (!error_message.isEmpty())
+		QMessageBox::warning(this, tr("Cannot Convert To String"), error_message);
+
+	if (source.valid())
+		m_temporary_source = source;
+}
+
+std::string SymbolTreeWidget::temporarySourceName() const
+{
+	std::string source_name;
+	if (m_cpu->getCpuType() == BREAKPOINT_EE)
+		source_name += "EE";
+	else
+		source_name += "IOP";
+	source_name += " ";
+	source_name += name();
+	source_name += "Temporaries";
+	return source_name;
+}
+
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING, parent)
 {
 }
 
 FunctionTreeWidget::~FunctionTreeWidget() = default;
+
+const char* FunctionTreeWidget::name() const
+{
+	return "Function Tree";
+}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
@@ -306,7 +425,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 			std::unique_ptr<SymbolTreeNode> label_node = std::make_unique<SymbolTreeNode>();
 			label_node->name = QString::fromStdString(label->name());
 			label_node->location = SymbolTreeLocation(m_cpu, label->address().value);
-			function_node->emplace_child(std::move(label_node));
+			function_node->emplaceChild(std::move(label_node));
 		}
 
 		nodes.emplace_back(std::move(function_node));
@@ -325,11 +444,16 @@ void FunctionTreeWidget::configureColumnVisibility()
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_DATA_CONVERSIONS, parent)
 {
 }
 
 GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
+
+const char* GlobalVariableTreeWidget::name() const
+{
+	return "Global Variable Tree";
+}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
@@ -390,7 +514,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 
 		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
 		function_node->name = QString::fromStdString(function.name());
-		function_node->set_children(std::move(local_variable_nodes));
+		function_node->setChildren(std::move(local_variable_nodes));
 		nodes.emplace_back(std::move(function_node));
 	}
 
@@ -407,11 +531,16 @@ void GlobalVariableTreeWidget::configureColumnVisibility()
 }
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(NO_SYMBOL_TREE_FLAGS, parent)
+	: SymbolTreeWidget(ALLOW_DATA_CONVERSIONS, parent)
 {
 }
 
 LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
+
+const char* LocalVariableTreeWidget::name() const
+{
+	return "Local Variable Tree";
+}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const

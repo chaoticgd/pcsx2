@@ -13,12 +13,12 @@ const std::vector<std::unique_ptr<SymbolTreeNode>>& SymbolTreeNode::children() c
 	return m_children;
 }
 
-bool SymbolTreeNode::children_fetched() const
+bool SymbolTreeNode::childrenFetched() const
 {
 	return m_children_fetched;
 }
 
-void SymbolTreeNode::set_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children)
+void SymbolTreeNode::setChildren(std::vector<std::unique_ptr<SymbolTreeNode>> new_children)
 {
 	for (std::unique_ptr<SymbolTreeNode>& child : new_children)
 		child->m_parent = this;
@@ -26,7 +26,7 @@ void SymbolTreeNode::set_children(std::vector<std::unique_ptr<SymbolTreeNode>> n
 	m_children_fetched = true;
 }
 
-void SymbolTreeNode::insert_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children)
+void SymbolTreeNode::insertChildren(std::vector<std::unique_ptr<SymbolTreeNode>> new_children)
 {
 	for (std::unique_ptr<SymbolTreeNode>& child : new_children)
 		child->m_parent = this;
@@ -36,11 +36,17 @@ void SymbolTreeNode::insert_children(std::vector<std::unique_ptr<SymbolTreeNode>
 	m_children_fetched = true;
 }
 
-void SymbolTreeNode::emplace_child(std::unique_ptr<SymbolTreeNode> new_child)
+void SymbolTreeNode::emplaceChild(std::unique_ptr<SymbolTreeNode> new_child)
 {
 	new_child->m_parent = this;
 	m_children.emplace_back(std::move(new_child));
 	m_children_fetched = true;
+}
+
+void SymbolTreeNode::clearChildren()
+{
+	m_children.clear();
+	m_children_fetched = false;
 }
 
 void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)

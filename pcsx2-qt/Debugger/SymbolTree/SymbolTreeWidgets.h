@@ -24,8 +24,11 @@ public:
 protected:
 	explicit SymbolTreeWidget(u32 flags, QWidget* parent = nullptr);
 
+	void setupTree();
 	void setupMenu();
 
+	virtual const char* name() const = 0;
+	
 	// Builds up the tree for when symbols are grouped by the module that
 	// contains them, otherwise it just passes through to populateSections.
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateModules(
@@ -46,7 +49,16 @@ protected:
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const = 0;
 
 	virtual void configureColumnVisibility() = 0;
-
+	
+	void onCopyName();
+	void onCopyLocation();
+	void onGoToInDisassembly();
+	void onGoToInMemoryView();
+	void onConvertToArray();
+	void onConvertToString();
+	
+	std::string temporarySourceName() const;
+	
 	Ui::SymbolTreeWidget m_ui;
 
 	DebugInterface* m_cpu = nullptr;
@@ -57,15 +69,23 @@ protected:
 	QAction* m_group_by_section = nullptr;
 	QAction* m_group_by_source_file = nullptr;
 	QAction* m_sort_by_if_type_is_known = nullptr;
+	QAction* m_convert_to_array = nullptr;
+	QAction* m_convert_to_string = nullptr;
 
 	enum Flags
 	{
 		NO_SYMBOL_TREE_FLAGS = 0,
 		ALLOW_GROUPING = 1 << 0,
-		ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN = 1 << 1
+		ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN = 1 << 1,
+		ALLOW_DATA_CONVERSIONS = 1 << 2
 	};
 
 	u32 m_flags;
+	
+	// Used the by "Convert to array" and "Convert to string" options to create
+	// temporary types in the database that can be safely deleted when the
+	// refresh button is pushed.
+	ccc::SymbolSourceHandle m_temporary_source;
 };
 
 class FunctionTreeWidget : public SymbolTreeWidget
@@ -76,11 +96,13 @@ public:
 	virtual ~FunctionTreeWidget();
 
 protected:
+	const char* name() const override;
+	
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
-	
+
 	void configureColumnVisibility() override;
- };
+};
 
 class GlobalVariableTreeWidget : public SymbolTreeWidget
 {
@@ -90,9 +112,11 @@ public:
 	virtual ~GlobalVariableTreeWidget();
 
 protected:
+	const char* name() const override;
+	
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
-	
+
 	void configureColumnVisibility() override;
 };
 
@@ -104,9 +128,11 @@ public:
 	virtual ~LocalVariableTreeWidget();
 
 protected:
+	const char* name() const override;
+	
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
-	
+
 	void configureColumnVisibility() override;
 };
 

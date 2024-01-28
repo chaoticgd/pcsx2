@@ -10,20 +10,30 @@
 
 class DebugInterface;
 
+enum class SymbolTreeNodeState
+{
+	NORMAL,
+	ARRAY,
+	STRING
+};
+
 struct SymbolTreeNode
 {
 public:
 	QString name;
+	SymbolTreeNodeState state = SymbolTreeNodeState::NORMAL;
+	s32 element_count = -1;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
 	
 	const SymbolTreeNode* parent() const;
 	
 	const std::vector<std::unique_ptr<SymbolTreeNode>>& children() const;
-	bool children_fetched() const;
-	void set_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
-	void insert_children(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
-	void emplace_child(std::unique_ptr<SymbolTreeNode> new_child);
+	bool childrenFetched() const;
+	void setChildren(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
+	void insertChildren(std::vector<std::unique_ptr<SymbolTreeNode>> new_children);
+	void emplaceChild(std::unique_ptr<SymbolTreeNode> new_child);
+	void clearChildren();
 	
 	void sortChildrenRecursively(bool sort_by_if_type_is_known);
 

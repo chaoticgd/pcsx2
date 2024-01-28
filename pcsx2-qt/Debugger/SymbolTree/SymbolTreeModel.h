@@ -26,10 +26,7 @@ public:
 		COLUMN_COUNT = 5
 	};
 
-	SymbolTreeModel(
-		std::unique_ptr<SymbolTreeNode> initial_root,
-		const SymbolGuardian& guardian,
-		QObject* parent = nullptr);
+	SymbolTreeModel(SymbolGuardian& guardian, QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
 	QModelIndex parent(const QModelIndex& index) const override;
@@ -45,6 +42,9 @@ public:
 
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
+	ccc::SymbolSourceHandle convertToArray(QModelIndex index, s32 element_count, std::string source_name, QString& error_out);
+	ccc::SymbolSourceHandle convertToString(QModelIndex index, std::string source_name, QString& error_out);
+
 protected:
 	static std::vector<std::unique_ptr<SymbolTreeNode>> populateChildren(
 		SymbolTreeLocation location,
@@ -59,7 +59,7 @@ protected:
 
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;
-	const SymbolGuardian& m_guardian;
+	SymbolGuardian& m_guardian;
 };
 
 std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
