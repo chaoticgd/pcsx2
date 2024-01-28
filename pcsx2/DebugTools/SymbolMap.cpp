@@ -163,7 +163,7 @@ bool SymbolGuardian::ImportNocashSymbols(const std::string& filename)
 					}
 
 					ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(
-						line, *source, nullptr, address);
+						line, address, *source, nullptr);
 					if (!global_variable.success())
 						return;
 
@@ -193,13 +193,13 @@ bool SymbolGuardian::ImportNocashSymbols(const std::string& filename)
 
 				if (size != 1)
 				{
-					ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, *source, nullptr, address);
+					ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, address, *source, nullptr);
 					if (!function.success())
 						return;
 				}
 				else
 				{
-					ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, *source, nullptr, address);
+					ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, address, *source, nullptr);
 					if (!label.success())
 						return;
 				}

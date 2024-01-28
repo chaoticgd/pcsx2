@@ -115,12 +115,6 @@ namespace MIPSAnalyst
 			return INVALIDTARGET;
 	}
 
-	static const char *DefaultFunctionName(char buffer[256], u32 startAddr) {
-		std::snprintf(buffer, 256, "z_un_%08x", startAddr);
-		return buffer;
-	}
-
-
 	static u32 ScanAheadForJumpback(u32 fromAddr, u32 knownStart, u32 knownEnd) {
 		static const u32 MAX_AHEAD_SCAN = 0x1000;
 		// Maybe a bit high... just to make sure we don't get confused by recursive tail recursion.
@@ -302,12 +296,23 @@ namespace MIPSAnalyst
 				ccc::Function* symbol = database.functions.symbol_from_handle(handle);
 				
 				if (!symbol) {
-					char name[256];
-					DefaultFunctionName(name, function.start);
+					std::string name;
+					
+					// The SNDLL importer will create labels for symbols since
+					// it can't distinguish between functions and globals.
+					ccc::LabelHandle label_handle = database.labels.first_handle_from_starting_address(function.start);
+					ccc::Label* label = database.labels.symbol_from_handle(label_handle);
+					if(label) {
+						name = label->name();
+					}
+					
+					if (name.empty()) {
+						name = StringUtil::StdStringFromFormat("z_un_%08x", function.start);
+					}
 
 					ccc::Result<ccc::Function*> symbol_result = database.functions.create_symbol(
-						name, *source, nullptr, function.start);
-					if(!symbol_result.success())
+						std::move(name), function.start, *source, nullptr);
+					if (!symbol_result.success())
 						return;
 					symbol = *symbol_result;
 				}

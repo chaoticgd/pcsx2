@@ -232,7 +232,7 @@ void DisassemblyWidget::contextAddFunction()
 		if (!source.success())
 			return;
 		ccc::Result<ccc::Function*> function = database.functions.create_symbol(
-			newFuncName.toStdString(), *source, nullptr, newFuncAddress);
+			newFuncName.toStdString(), newFuncAddress, *source, nullptr);
 		if (!function.success())
 			return;
 		(*function)->set_size(newFuncSize);

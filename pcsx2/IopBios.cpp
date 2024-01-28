@@ -1104,7 +1104,7 @@ namespace R3000A
 					else
 						qualified_name = fmt::format("{}[{:02}]::unkn_{:02}", modname, index, index);
 
-					ccc::Result<ccc::Function*> function = database.functions.create_symbol(qualified_name, *source, *module_symbol, funcptr);
+					ccc::Result<ccc::Function*> function = database.functions.create_symbol(qualified_name, funcptr, *source, *module_symbol);
 					if (!function.success())
 						return;
 
