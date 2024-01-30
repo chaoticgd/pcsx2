@@ -505,12 +505,21 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 	// Traverse through arrays, pointers and references, and build a string
 	// to be appended to the end of the type name.
 	bool done_finding_arrays_pointers = false;
+	bool found_pointer = false;
 	while (!done_finding_arrays_pointers)
 	{
 		switch (type->descriptor)
 		{
 			case ccc::ast::ARRAY:
 			{
+				// If we see a pointer to an array we can't print that properly
+				// with C-like syntax so we just print the node type instead.
+				if (found_pointer)
+				{
+					done_finding_arrays_pointers = true;
+					break;
+				}
+
 				const ccc::ast::Array& array = type->as<ccc::ast::Array>();
 				suffix.append(QString("[%1]").arg(array.element_count));
 				type = array.element_type.get();
@@ -521,6 +530,7 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
 				suffix.prepend(pointer_or_reference.is_pointer ? '*' : '&');
 				type = pointer_or_reference.value_type.get();
+				found_pointer = true;
 				break;
 			}
 			default:
