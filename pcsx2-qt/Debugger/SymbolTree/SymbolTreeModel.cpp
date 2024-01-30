@@ -85,7 +85,7 @@ bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 
 QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 {
-	if (!index.isValid() || role != Qt::DisplayRole)
+	if (!index.isValid() || (role != Qt::DisplayRole && role != Qt::UserRole))
 		return QVariant();
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
@@ -138,100 +138,42 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 			//}
 			return QVariant();
 		}
-		default:
+		case VALUE:
 		{
+			if (!node->type.valid())
+				return QVariant();
+
+			QVariant result;
+			m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
+				const ccc::ast::Node* logical_type = node->type.lookup_node(database);
+				if (!logical_type)
+					return;
+
+				const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
+
+				switch (role)
+				{
+					case Qt::DisplayRole:
+						result = node->toString(type);
+						break;
+					case Qt::UserRole:
+						result = node->toVariant(type);
+						break;
+				}
+			});
+
+			return result;
 		}
 	}
 
-	Q_ASSERT(index.column() == VALUE);
-
-	QVariant result;
-
-	if (!node->type.valid())
-		return result;
-
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
-		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
-		if (!logical_type)
-			return;
-
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-
-		switch (type.descriptor)
-		{
-			case ccc::ast::BUILTIN:
-			{
-				const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
-				switch (builtIn.bclass)
-				{
-					case ccc::ast::BuiltInClass::UNSIGNED_8:
-						result = (qulonglong)node->location.read8();
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_8:
-						result = (qlonglong)(s8)node->location.read8();
-						break;
-					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-						result = (qulonglong)node->location.read8();
-						break;
-					case ccc::ast::BuiltInClass::BOOL_8:
-						result = (bool)node->location.read8();
-						break;
-					case ccc::ast::BuiltInClass::UNSIGNED_16:
-						result = (qulonglong)node->location.read16();
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_16:
-						result = (qlonglong)(s16)node->location.read16();
-						break;
-					case ccc::ast::BuiltInClass::UNSIGNED_32:
-						result = (qulonglong)node->location.read32();
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_32:
-						result = (qlonglong)(s32)node->location.read32();
-						break;
-					case ccc::ast::BuiltInClass::FLOAT_32:
-					{
-						u32 value = node->location.read32();
-						result = *reinterpret_cast<float*>(&value);
-						break;
-					}
-					case ccc::ast::BuiltInClass::UNSIGNED_64:
-						result = (qulonglong)node->location.read64();
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_64:
-						result = (qlonglong)(s64)node->location.read64();
-						break;
-					case ccc::ast::BuiltInClass::FLOAT_64:
-					{
-						u64 value = node->location.read64();
-						result = *reinterpret_cast<double*>(&value);
-						break;
-					}
-					default:
-					{
-					}
-				}
-				break;
-			}
-			case ccc::ast::ENUM:
-				result = node->location.read32();
-				break;
-			case ccc::ast::POINTER_OR_REFERENCE:
-				result = node->location.read32();
-				break;
-			default:
-			{
-			}
-		}
-	});
-
-	return result;
+	return QVariant();
 }
 
 bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
 	bool result = false;
 
-	if (!index.isValid())
+	if (!index.isValid() || role != Qt::UserRole)
 		return result;
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
@@ -244,76 +186,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 			return;
 
 		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		switch (type.descriptor)
-		{
-			case ccc::ast::BUILTIN:
-			{
-				const ccc::ast::BuiltIn& built_in = type.as<ccc::ast::BuiltIn>();
-
-				switch (built_in.bclass)
-				{
-					case ccc::ast::BuiltInClass::UNSIGNED_8:
-						node->location.write8((u8)value.toULongLong());
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_8:
-						node->location.write8((u8)(s8)value.toLongLong());
-						break;
-					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-						node->location.write8((u8)value.toULongLong());
-						break;
-					case ccc::ast::BuiltInClass::BOOL_8:
-						node->location.write8((u8)value.toBool());
-						break;
-					case ccc::ast::BuiltInClass::UNSIGNED_16:
-						node->location.write16((u16)value.toULongLong());
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_16:
-						node->location.write16((u16)(s16)value.toLongLong());
-						break;
-					case ccc::ast::BuiltInClass::UNSIGNED_32:
-						node->location.write32((u32)value.toULongLong());
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_32:
-						node->location.write32((u32)(s32)value.toLongLong());
-						break;
-					case ccc::ast::BuiltInClass::FLOAT_32:
-					{
-						float f = value.toFloat();
-						node->location.write32(*reinterpret_cast<u32*>(&f));
-						break;
-					}
-					case ccc::ast::BuiltInClass::UNSIGNED_64:
-						node->location.write64((u64)value.toULongLong());
-						break;
-					case ccc::ast::BuiltInClass::SIGNED_64:
-						node->location.write64((u64)(s64)value.toLongLong());
-						break;
-					case ccc::ast::BuiltInClass::FLOAT_64:
-					{
-						double d = value.toDouble();
-						node->location.write64(*reinterpret_cast<u64*>(&d));
-						break;
-					}
-					default:
-					{
-						return;
-					}
-				}
-				break;
-			}
-			case ccc::ast::ENUM:
-				node->location.write32((u32)value.toULongLong());
-				break;
-			case ccc::ast::POINTER_OR_REFERENCE:
-				node->location.write32((u32)value.toULongLong());
-				break;
-			default:
-			{
-				return;
-			}
-		}
-
-		result = true;
+		result = node->fromVariant(value, type);
 	});
 
 	if (result)
@@ -537,7 +410,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 			{
 				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
 				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
-				element->name = QString("*%1").arg(address);
+				element->name = QString("*%1").arg(QString::number(address, 16));
 				element->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
 				element->location = location.createAddress(address);
 				children.emplace_back(std::move(element));

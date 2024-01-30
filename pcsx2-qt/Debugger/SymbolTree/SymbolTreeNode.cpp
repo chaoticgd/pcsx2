@@ -3,6 +3,202 @@
 
 #include "SymbolTreeNode.h"
 
+#include "DebugTools/ccc/ast.h"
+
+QString SymbolTreeNode::toString(const ccc::ast::Node& type)
+{
+	switch (type.descriptor)
+	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
+			switch (builtIn.bclass)
+			{
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
+					return QString::number(location.read8());
+				case ccc::ast::BuiltInClass::SIGNED_8:
+					return QString::number((s8)location.read8());
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					return QString::number(location.read8());
+				case ccc::ast::BuiltInClass::BOOL_8:
+					return QString::number(location.read8());
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
+					return QString::number(location.read16());
+				case ccc::ast::BuiltInClass::SIGNED_16:
+					return QString::number((s16)location.read16());
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
+					return QString::number(location.read32());
+				case ccc::ast::BuiltInClass::SIGNED_32:
+					return QString::number((s32)location.read32());
+				case ccc::ast::BuiltInClass::FLOAT_32:
+				{
+					u32 value = location.read32();
+					return QString::number(*reinterpret_cast<float*>(&value));
+				}
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
+					return QString::number(location.read64());
+				case ccc::ast::BuiltInClass::SIGNED_64:
+					return QString::number((s64)location.read64());
+				case ccc::ast::BuiltInClass::FLOAT_64:
+				{
+					u64 value = location.read64();
+					return QString::number(*reinterpret_cast<double*>(&value));
+				}
+				default:
+				{
+				}
+			}
+			break;
+		}
+		case ccc::ast::ENUM:
+		{
+			s32 value = (s32)location.read32();
+			const auto& enum_type = type.as<ccc::ast::Enum>();
+			for (auto [test_value, name] : enum_type.constants)
+			{
+				if (test_value == value)
+					return QString::fromStdString(name);
+			}
+		}
+		case ccc::ast::POINTER_OR_REFERENCE:
+			return QString::number(location.read32(), 16);
+		default:
+		{
+		}
+	}
+	return QString();
+}
+
+QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
+{
+	switch (type.descriptor)
+	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
+			switch (builtIn.bclass)
+			{
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
+					return (qulonglong)location.read8();
+				case ccc::ast::BuiltInClass::SIGNED_8:
+					return (qlonglong)(s8)location.read8();
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					return (qulonglong)location.read8();
+				case ccc::ast::BuiltInClass::BOOL_8:
+					return (bool)location.read8();
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
+					return (qulonglong)location.read16();
+				case ccc::ast::BuiltInClass::SIGNED_16:
+					return (qlonglong)(s16)location.read16();
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
+					return (qulonglong)location.read32();
+				case ccc::ast::BuiltInClass::SIGNED_32:
+					return (qlonglong)(s32)location.read32();
+				case ccc::ast::BuiltInClass::FLOAT_32:
+				{
+					u32 value = location.read32();
+					return *reinterpret_cast<float*>(&value);
+				}
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
+					return (qulonglong)location.read64();
+				case ccc::ast::BuiltInClass::SIGNED_64:
+					return (qlonglong)(s64)location.read64();
+				case ccc::ast::BuiltInClass::FLOAT_64:
+				{
+					u64 value = location.read64();
+					return *reinterpret_cast<double*>(&value);
+				}
+				default:
+				{
+				}
+			}
+			break;
+		}
+		case ccc::ast::ENUM:
+			return location.read32();
+		case ccc::ast::POINTER_OR_REFERENCE:
+			return location.read32();
+		default:
+		{
+		}
+	}
+	return QVariant();
+}
+
+bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type)
+{
+	switch (type.descriptor)
+	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& built_in = type.as<ccc::ast::BuiltIn>();
+
+			switch (built_in.bclass)
+			{
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
+					location.write8((u8)value.toULongLong());
+					break;
+				case ccc::ast::BuiltInClass::SIGNED_8:
+					location.write8((u8)(s8)value.toLongLong());
+					break;
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					location.write8((u8)value.toULongLong());
+					break;
+				case ccc::ast::BuiltInClass::BOOL_8:
+					location.write8((u8)value.toBool());
+					break;
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
+					location.write16((u16)value.toULongLong());
+					break;
+				case ccc::ast::BuiltInClass::SIGNED_16:
+					location.write16((u16)(s16)value.toLongLong());
+					break;
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
+					location.write32((u32)value.toULongLong());
+					break;
+				case ccc::ast::BuiltInClass::SIGNED_32:
+					location.write32((u32)(s32)value.toLongLong());
+					break;
+				case ccc::ast::BuiltInClass::FLOAT_32:
+				{
+					float f = value.toFloat();
+					location.write32(*reinterpret_cast<u32*>(&f));
+					break;
+				}
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
+					location.write64((u64)value.toULongLong());
+					break;
+				case ccc::ast::BuiltInClass::SIGNED_64:
+					location.write64((u64)(s64)value.toLongLong());
+					break;
+				case ccc::ast::BuiltInClass::FLOAT_64:
+				{
+					double d = value.toDouble();
+					location.write64(*reinterpret_cast<u64*>(&d));
+					break;
+				}
+				default:
+				{
+					return false;
+				}
+			}
+			break;
+		}
+		case ccc::ast::ENUM:
+			location.write32((u32)value.toULongLong());
+			break;
+		case ccc::ast::POINTER_OR_REFERENCE:
+			location.write32((u32)value.toULongLong());
+			break;
+		default:
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 const SymbolTreeNode* SymbolTreeNode::parent() const
 {
 	return m_parent;

@@ -86,9 +86,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* comboBox = new QComboBox(parent);
 				for (auto [value, string] : enumeration.constants)
-				{
 					comboBox->addItem(QString::fromStdString(string));
-				}
 				result = comboBox;
 				break;
 			}
@@ -129,7 +127,7 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 					{
 						UInt64SpinBox* spinBox = qobject_cast<UInt64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						spinBox->setValue(index.data().toULongLong());
+						spinBox->setValue(index.data(Qt::UserRole).toULongLong());
 						break;
 					}
 					case ccc::ast::BuiltInClass::SIGNED_8:
@@ -139,28 +137,28 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 					{
 						Int64SpinBox* spinBox = qobject_cast<Int64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						spinBox->setValue(index.data().toLongLong());
+						spinBox->setValue(index.data(Qt::UserRole).toLongLong());
 						break;
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
 						Q_ASSERT(checkBox);
-						checkBox->setChecked(index.data().toBool());
+						checkBox->setChecked(index.data(Qt::UserRole).toBool());
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						spinBox->setValue(index.data().toFloat());
+						spinBox->setValue(index.data(Qt::UserRole).toFloat());
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						spinBox->setValue(index.data().toFloat());
+						spinBox->setValue(index.data(Qt::UserRole).toFloat());
 						break;
 					}
 					default:
@@ -173,7 +171,7 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* comboBox = static_cast<QComboBox*>(editor);
-				QVariant data = index.data(Qt::EditRole);
+				QVariant data = index.data(Qt::UserRole);
 				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
 				{
 					if (enumeration.constants[i].first == data.toInt())
@@ -218,7 +216,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					{
 						UInt64SpinBox* spinBox = qobject_cast<UInt64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						model->setData(index, spinBox->value(), Qt::EditRole);
+						model->setData(index, spinBox->value(), Qt::UserRole);
 						break;
 					}
 					case ccc::ast::BuiltInClass::SIGNED_8:
@@ -228,27 +226,27 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					{
 						Int64SpinBox* spinBox = qobject_cast<Int64SpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						model->setData(index, spinBox->value(), Qt::EditRole);
+						model->setData(index, spinBox->value(), Qt::UserRole);
 						break;
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
-						model->setData(index, checkBox->isChecked(), Qt::EditRole);
+						model->setData(index, checkBox->isChecked(), Qt::UserRole);
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						model->setData(index, static_cast<float>(spinBox->value()), Qt::EditRole);
+						model->setData(index, static_cast<float>(spinBox->value()), Qt::UserRole);
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
 						QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(editor);
 						Q_ASSERT(spinBox);
-						model->setData(index, spinBox->value(), Qt::EditRole);
+						model->setData(index, spinBox->value(), Qt::UserRole);
 						break;
 					}
 					default:
@@ -265,7 +263,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				if (comboIndex < (s32)enumeration.constants.size())
 				{
 					s32 value = enumeration.constants[comboIndex].first;
-					model->setData(index, QVariant(value), Qt::EditRole);
+					model->setData(index, QVariant(value), Qt::UserRole);
 				}
 				break;
 			}

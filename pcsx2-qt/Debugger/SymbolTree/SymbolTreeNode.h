@@ -5,7 +5,6 @@
 
 #include <QString>
 
-#include "common/Pcsx2Defs.h"
 #include "SymbolTreeLocation.h"
 
 class DebugInterface;
@@ -25,6 +24,10 @@ public:
 	s32 element_count = -1;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
+	
+	QString toString(const ccc::ast::Node& type);
+	QVariant toVariant(const ccc::ast::Node& type);
+	bool fromVariant(QVariant value, const ccc::ast::Node& type);
 	
 	const SymbolTreeNode* parent() const;
 	
