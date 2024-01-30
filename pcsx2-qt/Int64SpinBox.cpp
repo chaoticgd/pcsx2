@@ -1,17 +1,5 @@
-/*  PCSX2 - PS2 Emulator for PCs
- *  Copyright (C) 2002-2023  PCSX2 Dev Team
- *
- *  PCSX2 is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU Lesser General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  PCSX2 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along with PCSX2.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
 
 #include "Int64SpinBox.h"
 
@@ -22,35 +10,8 @@ Int64SpinBox::Int64SpinBox(qlonglong minimum, qlonglong maximum, QWidget* parent
 	, m_minimum(minimum)
 	, m_maximum(maximum)
 {
-	connect(lineEdit(), SIGNAL(textEdited(QString)), this, SLOT(onEditFinished()));
+	connect(this, &QAbstractSpinBox::editingFinished, this, &Int64SpinBox::onEditingFinished);
 }
-
-QValidator::State Int64SpinBox::validate(QString& input, int& pos) const
-{
-	for (QChar& c : input)
-	{
-		if (!c.isDigit())
-		{
-			return QValidator::Invalid;
-		}
-	}
-	return QValidator::Acceptable;
-}
-
-void Int64SpinBox::onEditFinished()
-{
-	QString input = lineEdit()->text();
-	int pos = 0;
-	if (QValidator::Acceptable == validate(input, pos))
-		setValue(input.toLongLong());
-	else
-		lineEdit()->setText(QString::number(m_value));
-}
-
-void Int64SpinBox::fixup(QString& input) const
-{
-}
-
 void Int64SpinBox::stepBy(int steps)
 {
 	m_value += steps;
@@ -71,7 +32,55 @@ void Int64SpinBox::setValue(qlonglong value)
 	lineEdit()->setText(QString::number(value));
 }
 
+void Int64SpinBox::onEditingFinished()
+{
+	setValue(lineEdit()->text().toLongLong(nullptr, 0));
+}
+
 Int64SpinBox::StepEnabled Int64SpinBox::stepEnabled() const
+{
+	StepEnabled result = StepNone;
+	if (m_value > m_minimum)
+		result |= StepUpEnabled;
+	if (m_value < m_maximum)
+		result |= StepDownEnabled;
+	return result;
+}
+
+UInt64SpinBox::UInt64SpinBox(qulonglong minimum, qulonglong maximum, QWidget* parent)
+	: QAbstractSpinBox(parent)
+	, m_minimum(minimum)
+	, m_maximum(maximum)
+{
+	connect(this, &QAbstractSpinBox::editingFinished, this, &UInt64SpinBox::onEditingFinished);
+}
+
+void UInt64SpinBox::stepBy(int steps)
+{
+	m_value += steps;
+	m_value = std::max(m_value, m_minimum);
+	m_value = std::min(m_value, m_maximum);
+}
+
+qulonglong UInt64SpinBox::value()
+{
+	return m_value;
+}
+
+void UInt64SpinBox::setValue(qulonglong value)
+{
+	m_value = value;
+	m_value = std::max(m_value, m_minimum);
+	m_value = std::min(m_value, m_maximum);
+	lineEdit()->setText(QString::number(value));
+}
+
+void UInt64SpinBox::onEditingFinished()
+{
+	setValue(lineEdit()->text().toULongLong(nullptr, 0));
+}
+
+UInt64SpinBox::StepEnabled UInt64SpinBox::stepEnabled() const
 {
 	StepEnabled result = StepNone;
 	if (m_value > m_minimum)

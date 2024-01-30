@@ -168,7 +168,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 						result = (qulonglong)node->location.read8();
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_8:
-						result = (qlonglong)node->location.read8();
+						result = (qlonglong)(s8)node->location.read8();
 						break;
 					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 						result = (qulonglong)node->location.read8();
@@ -180,13 +180,13 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 						result = (qulonglong)node->location.read16();
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_16:
-						result = (qlonglong)node->location.read16();
+						result = (qlonglong)(s16)node->location.read16();
 						break;
 					case ccc::ast::BuiltInClass::UNSIGNED_32:
 						result = (qulonglong)node->location.read32();
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_32:
-						result = (qlonglong)node->location.read32();
+						result = (qlonglong)(s32)node->location.read32();
 						break;
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
@@ -198,7 +198,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 						result = (qulonglong)node->location.read64();
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_64:
-						result = (qlonglong)node->location.read64();
+						result = (qlonglong)(s64)node->location.read64();
 						break;
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
@@ -256,7 +256,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 						node->location.write8((u8)value.toULongLong());
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_8:
-						node->location.write8((u8)value.toLongLong());
+						node->location.write8((u8)(s8)value.toLongLong());
 						break;
 					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 						node->location.write8((u8)value.toULongLong());
@@ -268,13 +268,13 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 						node->location.write16((u16)value.toULongLong());
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_16:
-						node->location.write16((u16)value.toLongLong());
+						node->location.write16((u16)(s16)value.toLongLong());
 						break;
 					case ccc::ast::BuiltInClass::UNSIGNED_32:
 						node->location.write32((u32)value.toULongLong());
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_32:
-						node->location.write32((u32)value.toLongLong());
+						node->location.write32((u32)(s32)value.toLongLong());
 						break;
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
@@ -286,7 +286,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 						node->location.write64((u64)value.toULongLong());
 						break;
 					case ccc::ast::BuiltInClass::SIGNED_64:
-						node->location.write64((u64)value.toLongLong());
+						node->location.write64((u64)(s64)value.toLongLong());
 						break;
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
