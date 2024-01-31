@@ -26,7 +26,7 @@ public:
 		COLUMN_COUNT = 5
 	};
 
-	SymbolTreeModel(SymbolGuardian& guardian, QObject* parent = nullptr);
+	SymbolTreeModel(DebugInterface& cpu, QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
 	QModelIndex parent(const QModelIndex& index) const override;
@@ -59,6 +59,7 @@ protected:
 
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;
+	DebugInterface& m_cpu;
 	SymbolGuardian& m_guardian;
 };
 

@@ -64,7 +64,7 @@ void SymbolTreeWidget::update()
 void SymbolTreeWidget::setupTree()
 {
 	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
-	m_model = new SymbolTreeModel(guardian, this);
+	m_model = new SymbolTreeModel(*m_cpu, this);
 	m_ui.treeView->setModel(m_model);
 
 	auto delegate = new SymbolTreeValueDelegate(guardian, this);
@@ -580,6 +580,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 		{
 			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
 		}
+		node->live_range = local_variable.live_range;
 
 		nodes.emplace_back(std::move(node));
 	}

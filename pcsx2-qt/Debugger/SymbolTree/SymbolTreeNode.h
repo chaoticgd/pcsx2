@@ -24,6 +24,7 @@ public:
 	s32 element_count = -1;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
+	ccc::AddressRange live_range;
 	
 	QString toString(const ccc::ast::Node& type);
 	QVariant toVariant(const ccc::ast::Node& type);

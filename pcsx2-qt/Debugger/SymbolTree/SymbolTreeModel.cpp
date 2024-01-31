@@ -5,9 +5,10 @@
 
 #include "common/Assertions.h"
 
-SymbolTreeModel::SymbolTreeModel(SymbolGuardian& guardian, QObject* parent)
+SymbolTreeModel::SymbolTreeModel(DebugInterface& cpu, QObject* parent)
 	: QAbstractItemModel(parent)
-	, m_guardian(guardian)
+	, m_cpu(cpu)
+	, m_guardian(cpu.GetSymbolGuardian())
 {
 }
 
@@ -127,15 +128,12 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LIVENESS:
 		{
-			//if (node->type && node->type->descriptor == ccc::ast::VARIABLE)
-			//{
-			//	const ccc::ast::Variable& variable = node->type->as<ccc::ast::Variable>();
-			//	if (variable.storage.type != ccc::ast::VariableStorageType::GLOBAL)
-			//	{
-			//		bool alive = pc >= variable.block.low && pc < variable.block.high;
-			//		return alive ? "Alive" : "Dead";
-			//	}
-			//}
+			if(node->live_range.low.valid() && node->live_range.high.valid())
+			{
+				u32 pc = m_cpu.getPC();
+				bool alive = pc >= node->live_range.low && pc < node->live_range.high;
+				return alive ? "Alive" : "Dead";
+			}
 			return QVariant();
 		}
 		case VALUE:
