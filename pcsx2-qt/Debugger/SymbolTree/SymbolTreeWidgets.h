@@ -10,6 +10,8 @@
 
 struct SymbolFilters;
 
+// A symbol tree widget with its associated refresh button, filter box and
+// right-click menu. Supports grouping, sorting and various other settings.
 class SymbolTreeWidget : public QWidget
 {
 	Q_OBJECT

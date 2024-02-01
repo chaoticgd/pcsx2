@@ -16,6 +16,7 @@ enum class SymbolTreeNodeState
 	STRING
 };
 
+// A node in a symbol tree model.
 struct SymbolTreeNode
 {
 public:

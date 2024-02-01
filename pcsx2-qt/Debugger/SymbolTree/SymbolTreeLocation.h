@@ -10,6 +10,7 @@
 
 class DebugInterface;
 
+// A memory location, either a register or an address.
 struct SymbolTreeLocation
 {
 	enum

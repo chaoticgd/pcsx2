@@ -11,6 +11,8 @@
 #include "DebugTools/ccc/symbol_database.h"
 #include "SymbolTreeNode.h"
 
+// Model for the symbol trees. It will dynamically grow itself as the user
+// chooses to expand different nodes.
 class SymbolTreeModel : public QAbstractItemModel
 {
 	Q_OBJECT
