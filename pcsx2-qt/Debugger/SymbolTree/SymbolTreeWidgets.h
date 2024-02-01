@@ -50,7 +50,7 @@ protected:
 	virtual std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const = 0;
 
-	virtual void configureColumnVisibility() = 0;
+	virtual void configureColumns() = 0;
 
 	void onCopyName();
 	void onCopyLocation();
@@ -98,7 +98,7 @@ protected:
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
-	void configureColumnVisibility() override;
+	void configureColumns() override;
 };
 
 class GlobalVariableTreeWidget : public SymbolTreeWidget
@@ -114,7 +114,7 @@ protected:
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
-	void configureColumnVisibility() override;
+	void configureColumns() override;
 };
 
 class LocalVariableTreeWidget : public SymbolTreeWidget
@@ -130,7 +130,7 @@ protected:
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
-	void configureColumnVisibility() override;
+	void configureColumns() override;
 };
 
 struct SymbolFilters
