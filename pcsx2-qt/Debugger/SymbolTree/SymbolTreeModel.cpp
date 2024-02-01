@@ -51,8 +51,10 @@ int SymbolTreeModel::rowCount(const QModelIndex& parent) const
 	SymbolTreeNode* node;
 	if (parent.isValid())
 		node = static_cast<SymbolTreeNode*>(parent.internalPointer());
-	else
+	else if (m_root.get())
 		node = m_root.get();
+	else
+		return 0;
 
 	return (int)node->children().size();
 }
