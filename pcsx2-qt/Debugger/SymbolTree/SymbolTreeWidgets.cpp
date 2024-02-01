@@ -119,13 +119,17 @@ void SymbolTreeWidget::setupMenu()
 		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
 	}
 
-	if (m_flags & ALLOW_CHANGING_TYPES)
+	if (m_flags & ALLOW_TYPE_ACTIONS)
 	{
 		m_context_menu->addSeparator();
+
+		m_reset_children = new QAction(tr("Reset children"), this);
+		m_context_menu->addAction(m_reset_children);
 
 		m_change_type_temporarily = new QAction(tr("Change type temporarily"), this);
 		m_context_menu->addAction(m_change_type_temporarily);
 
+		connect(m_reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
 		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
 	}
 
@@ -300,6 +304,19 @@ void SymbolTreeWidget::onGoToInMemoryView()
 {
 }
 
+void SymbolTreeWidget::onResetChildren()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	if (!m_model->resetChildren(index))
+		QMessageBox::warning(this, tr("Cannot Reset Children"), tr("That node doesn't have a type."));
+}
+
 void SymbolTreeWidget::onChangeTypeTemporarily()
 {
 	if (!m_model)
@@ -311,10 +328,15 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 
 	QString title = tr("Change Type To");
 	QString label = tr("Type:");
-	QString old_type = m_model->typeToString(index);
+	std::optional<QString> old_type = m_model->typeToString(index);
+	if (!old_type.has_value())
+	{
+		QMessageBox::warning(this, tr("Cannot Change Type"), tr("That node doesn't have a type."));
+		return;
+	}
 
 	bool ok;
-	QString type_string = QInputDialog::getText(this, title, label, QLineEdit::Normal, old_type, &ok);
+	QString type_string = QInputDialog::getText(this, title, label, QLineEdit::Normal, *old_type, &ok);
 	if (!ok)
 		return;
 
@@ -398,7 +420,7 @@ void FunctionTreeWidget::configureColumnVisibility()
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_CHANGING_TYPES, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, parent)
 {
 }
 
@@ -485,7 +507,7 @@ void GlobalVariableTreeWidget::configureColumnVisibility()
 }
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_CHANGING_TYPES, parent)
+	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, parent)
 {
 }
 

@@ -40,14 +40,18 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
+	// Reset the whole model.
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
+
+	// Remove all the children of a given node, and allow fetching again.
+	bool resetChildren(QModelIndex index);
 
 	// Change the node of a type based on the provided string. This is a wrapper
 	// around stringToType that handles taking a lock on the symbol database
 	// and updating the model with the new type.
 	QString changeTypeTemporarily(QModelIndex index, std::string_view type_string);
 
-	QString typeToString(QModelIndex index);
+	std::optional<QString> typeToString(QModelIndex index);
 	static QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
 
 	// Take a string e.g. "int*[3]" and return an AST node for the type

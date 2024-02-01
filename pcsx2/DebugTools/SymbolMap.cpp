@@ -37,6 +37,13 @@ bool SymbolGuardian::Read(std::function<void(const ccc::SymbolDatabase&)> callba
 	return true;
 }
 
+void SymbolGuardian::BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+{
+	m_big_symbol_lock.lock_shared();
+	callback(m_database);
+	m_big_symbol_lock.unlock_shared();
+}
+
 void SymbolGuardian::ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
 {
 	m_big_symbol_lock.lock();

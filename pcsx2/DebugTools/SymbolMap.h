@@ -32,6 +32,10 @@ public:
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, nothing happens and we return false.
 	bool Read(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+	
+	// Take a shared lock on the symbol database and run the callback. If the
+	// symbol database is busy, we block until it's available.
+	void BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
 
 	// Take an exclusive lock on the symbol database. Read calls will block
 	// until the lock is released when the function returns.

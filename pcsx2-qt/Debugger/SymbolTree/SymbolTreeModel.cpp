@@ -282,19 +282,29 @@ void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 	endResetModel();
 }
 
-QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
+bool SymbolTreeModel::resetChildren(QModelIndex index)
 {
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->type.valid())
+		return false;
 
-	// Remove any existing children.
 	bool remove_rows = !node->children().empty();
 	if (remove_rows)
 		beginRemoveRows(index, 0, node->children().size() - 1);
 	node->clearChildren();
 	if (remove_rows)
 		endRemoveRows();
+
+	return true;
+}
+
+QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
+{
+	resetChildren(index);
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 
 	QString error_message;
 	m_guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
@@ -313,12 +323,12 @@ QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_vi
 	return error_message;
 }
 
-QString SymbolTreeModel::typeToString(QModelIndex index)
+std::optional<QString> SymbolTreeModel::typeToString(QModelIndex index)
 {
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
-	QString result;
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
+	std::optional<QString> result;
+	m_guardian.BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 		const ccc::ast::Node* type = node->type.lookup_node(database);
 		if (!type)
