@@ -25,6 +25,7 @@ public:
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
 	ccc::AddressRange live_range;
+	std::unique_ptr<ccc::ast::Node> temporary_type;
 	
 	QString toString(const ccc::ast::Node& type);
 	QVariant toVariant(const ccc::ast::Node& type);

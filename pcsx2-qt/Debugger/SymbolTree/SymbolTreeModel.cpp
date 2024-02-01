@@ -128,7 +128,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LIVENESS:
 		{
-			if(node->live_range.low.valid() && node->live_range.high.valid())
+			if (node->live_range.low.valid() && node->live_range.high.valid())
 			{
 				u32 pc = m_cpu.getPC();
 				bool alive = pc >= node->live_range.low && pc < node->live_range.high;
@@ -282,12 +282,13 @@ void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 	endResetModel();
 }
 
-ccc::SymbolSourceHandle SymbolTreeModel::convertToArray(QModelIndex index, s32 element_count, std::string source_name, QString& error_out)
+QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
 {
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 
+	// Remove any existing children.
 	bool remove_rows = !node->children().empty();
 	if (remove_rows)
 		beginRemoveRows(index, 0, node->children().size() - 1);
@@ -295,79 +296,198 @@ ccc::SymbolSourceHandle SymbolTreeModel::convertToArray(QModelIndex index, s32 e
 	if (remove_rows)
 		endRemoveRows();
 
-	std::vector<std::unique_ptr<SymbolTreeNode>> children;
-	ccc::SymbolSourceHandle source;
+	QString error_message;
 	m_guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
-		ccc::Result<ccc::SymbolSourceHandle> source_result = database.get_symbol_source(source_name);
-		if (!source_result.success())
+		// Parse the input string.
+		std::unique_ptr<ccc::ast::Node> type = stringToType(type_string, database, error_message);
+		if (!error_message.isEmpty() || !type)
 		{
-			error_out = tr("Failed to create new symbol source.");
-			return;
-		}
-		source = *source_result;
-
-		const ccc::ast::Node* type = node->type.lookup_node(database);
-		bool is_pointer_or_reference = type && type->descriptor == ccc::ast::POINTER_OR_REFERENCE;
-		const ccc::ast::PointerOrReference* pointer_or_reference =
-			is_pointer_or_reference ? &type->as<ccc::ast::PointerOrReference>() : nullptr;
-		if (!pointer_or_reference || !pointer_or_reference->is_pointer)
-		{
-			error_out = tr("Only pointers can be converted to arrays.");
 			return;
 		}
 
-		if (pointer_or_reference->value_type->descriptor != ccc::ast::TYPE_NAME)
-		{
-			error_out = tr("Not yet implemented: Failed to create new symbol type because the value type is not a type name.");
-			return;
-		}
-
-		const ccc::ast::TypeName& old_type_name = pointer_or_reference->value_type->as<ccc::ast::TypeName>();
-
-		ccc::Result<ccc::DataType*> data_type = database.data_types.create_symbol("(temporary)", source);
-		if (!data_type.success())
-		{
-			error_out = tr("Failed to create new temporary data type.");
-		}
-
-		{
-			std::unique_ptr<ccc::ast::TypeName> type_name = std::make_unique<ccc::ast::TypeName>();
-			type_name->computed_size_bytes = old_type_name.computed_size_bytes;
-			type_name->data_type_handle = old_type_name.data_type_handle;
-			type_name->source = old_type_name.source;
-
-			std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
-			array->computed_size_bytes = element_count * pointer_or_reference->value_type->computed_size_bytes;
-			array->element_type = std::move(type_name);
-			array->element_count = element_count;
-
-			std::unique_ptr<ccc::ast::PointerOrReference> pointer = std::make_unique<ccc::ast::PointerOrReference>();
-			pointer->is_pointer = true;
-			pointer->computed_size_bytes = 4;
-			pointer->value_type = std::move(array);
-
-			(*data_type)->set_type(std::move(pointer));
-		}
-
-		node->type = ccc::NodeHandle(**data_type, (*data_type)->type());
+		// Update the model.
+		node->temporary_type = std::move(type);
+		node->type = ccc::NodeHandle(node->temporary_type.get());
 	});
 
-	return source;
+	return error_message;
 }
 
-ccc::SymbolSourceHandle SymbolTreeModel::convertToString(QModelIndex index, std::string source_name, QString& error_out)
+QString SymbolTreeModel::typeToString(QModelIndex index)
 {
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	QString result;
+	m_guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
+		SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+		const ccc::ast::Node* type = node->type.lookup_node(database);
+		if (!type)
+			return;
 
-	beginRemoveRows(index, 0, node->children().size() - 1);
-	node->clearChildren();
-	endRemoveRows();
+		result = typeToString(type, database);
+	});
 
-	// TODO
+	return result;
+}
 
-	return ccc::SymbolSourceHandle();
+QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
+{
+	QString suffix;
+
+	// Traverse through arrays, pointers and references, and build a string
+	// to be appended to the end of the type name.
+	bool done_finding_arrays_pointers = false;
+	bool found_pointer = false;
+	while (!done_finding_arrays_pointers)
+	{
+		switch (type->descriptor)
+		{
+			case ccc::ast::ARRAY:
+			{
+				// If we see a pointer to an array we can't print that properly
+				// with C-like syntax so we just print the node type instead.
+				if (found_pointer)
+				{
+					done_finding_arrays_pointers = true;
+					break;
+				}
+
+				const ccc::ast::Array& array = type->as<ccc::ast::Array>();
+				suffix.append(QString("[%1]").arg(array.element_count));
+				type = array.element_type.get();
+				break;
+			}
+			case ccc::ast::POINTER_OR_REFERENCE:
+			{
+				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
+				suffix.prepend(pointer_or_reference.is_pointer ? '*' : '&');
+				type = pointer_or_reference.value_type.get();
+				found_pointer = true;
+				break;
+			}
+			default:
+			{
+				done_finding_arrays_pointers = true;
+				break;
+			}
+		}
+	}
+
+	// Determine the actual type name, or at the very least the node type.
+	QString name;
+	switch (type->descriptor)
+	{
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& built_in = type->as<ccc::ast::BuiltIn>();
+			name = ccc::ast::builtin_class_to_string(built_in.bclass);
+			break;
+		}
+		case ccc::ast::TYPE_NAME:
+		{
+			const ccc::ast::TypeName& type_name = type->as<ccc::ast::TypeName>();
+			const ccc::DataType* data_type = database.data_types.symbol_from_handle(type_name.data_type_handle);
+			if (data_type)
+			{
+				name = QString::fromStdString(data_type->name());
+			}
+			break;
+		}
+		default:
+		{
+			name = ccc::ast::node_type_to_string(*type);
+		}
+	}
+
+	return name + suffix;
+}
+
+std::unique_ptr<ccc::ast::Node> SymbolTreeModel::stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out)
+{
+	if (string.empty())
+	{
+		error_out = tr("No type name provided.");
+		return nullptr;
+	}
+
+	size_t i = string.size();
+
+	// Parse array subscripts e.g. 'float[4][4]'.
+	std::vector<s32> array_subscripts;
+	for (; i > 0; i--)
+	{
+		if (string[i - 1] != ']' || i < 2)
+			break;
+
+		size_t j = i - 1;
+		for (; string[j - 1] >= '0' && string[j - 1] <= '9' && j >= 0; j--)
+			;
+
+		if (string[j - 1] != '[')
+			break;
+
+		s32 element_count = atoi(&string[j]);
+		if (element_count < 0)
+		{
+			error_out = tr("Array subscripts cannot be negative.");
+			return nullptr;
+		}
+		array_subscripts.emplace_back(element_count);
+
+		i = j;
+	}
+
+	// Parse pointer characters e.g. 'char*&'.
+	std::vector<char> pointer_characters;
+	for (; i > 0 && string[i - 1] == '*' || string[i - 1] == '&'; i--)
+	{
+		pointer_characters.emplace_back(string[i - 1]);
+	}
+
+	if (i > 0 && string[i - 1] == ']')
+	{
+		error_out = tr("To create a pointer to an array, you must change the type of the pointee instead of the pointer itself.");
+		return nullptr;
+	}
+
+	// Lookup the type.
+	std::string type_name_string(string.data(), string.data() + i);
+	ccc::DataTypeHandle handle = database.data_types.first_handle_from_name(type_name_string);
+	const ccc::DataType* data_type = database.data_types.symbol_from_handle(handle);
+	if (!data_type || !data_type->type())
+	{
+		error_out = tr("Type '%1' not found.").arg(QString::fromStdString(type_name_string));
+		return nullptr;
+	}
+
+	std::unique_ptr<ccc::ast::Node> result;
+
+	// Create the AST.
+	std::unique_ptr<ccc::ast::TypeName> type_name = std::make_unique<ccc::ast::TypeName>();
+	type_name->computed_size_bytes = data_type->type()->computed_size_bytes;
+	type_name->data_type_handle = data_type->handle();
+	type_name->source = ccc::ast::TypeNameSource::REFERENCE;
+	result = std::move(type_name);
+
+	for (i = pointer_characters.size(); i > 0; i--)
+	{
+		std::unique_ptr<ccc::ast::PointerOrReference> pointer_or_reference = std::make_unique<ccc::ast::PointerOrReference>();
+		pointer_or_reference->computed_size_bytes = 4;
+		pointer_or_reference->is_pointer = pointer_characters[i - 1] == '*';
+		pointer_or_reference->value_type = std::move(result);
+		result = std::move(pointer_or_reference);
+	}
+
+	for (s32 element_count : array_subscripts)
+	{
+		std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
+		array->computed_size_bytes = element_count * result->computed_size_bytes;
+		array->element_type = std::move(result);
+		array->element_count = element_count;
+		result = std::move(array);
+	}
+
+	return result;
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
@@ -494,78 +614,6 @@ QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
 		row = 0;
 
 	return createIndex(row, 0, &node);
-}
-
-QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
-{
-	QString suffix;
-
-	// Traverse through arrays, pointers and references, and build a string
-	// to be appended to the end of the type name.
-	bool done_finding_arrays_pointers = false;
-	bool found_pointer = false;
-	while (!done_finding_arrays_pointers)
-	{
-		switch (type->descriptor)
-		{
-			case ccc::ast::ARRAY:
-			{
-				// If we see a pointer to an array we can't print that properly
-				// with C-like syntax so we just print the node type instead.
-				if (found_pointer)
-				{
-					done_finding_arrays_pointers = true;
-					break;
-				}
-
-				const ccc::ast::Array& array = type->as<ccc::ast::Array>();
-				suffix.append(QString("[%1]").arg(array.element_count));
-				type = array.element_type.get();
-				break;
-			}
-			case ccc::ast::POINTER_OR_REFERENCE:
-			{
-				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
-				suffix.prepend(pointer_or_reference.is_pointer ? '*' : '&');
-				type = pointer_or_reference.value_type.get();
-				found_pointer = true;
-				break;
-			}
-			default:
-			{
-				done_finding_arrays_pointers = true;
-				break;
-			}
-		}
-	}
-
-	// Determine the actual type name, or at the very least the node type.
-	QString name;
-	switch (type->descriptor)
-	{
-		case ccc::ast::BUILTIN:
-		{
-			const ccc::ast::BuiltIn& built_in = type->as<ccc::ast::BuiltIn>();
-			name = ccc::ast::builtin_class_to_string(built_in.bclass);
-			break;
-		}
-		case ccc::ast::TYPE_NAME:
-		{
-			const ccc::ast::TypeName& type_name = type->as<ccc::ast::TypeName>();
-			const ccc::DataType* data_type = database.data_types.symbol_from_handle(type_name.data_type_handle);
-			if (data_type)
-			{
-				name = QString::fromStdString(data_type->name());
-			}
-			break;
-		}
-		default:
-		{
-			name = ccc::ast::node_type_to_string(*type);
-		}
-	}
-
-	return name + suffix;
 }
 
 std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)

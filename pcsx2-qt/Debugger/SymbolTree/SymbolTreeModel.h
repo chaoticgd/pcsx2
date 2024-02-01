@@ -42,8 +42,19 @@ public:
 
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
-	ccc::SymbolSourceHandle convertToArray(QModelIndex index, s32 element_count, std::string source_name, QString& error_out);
-	ccc::SymbolSourceHandle convertToString(QModelIndex index, std::string source_name, QString& error_out);
+	// Change the node of a type based on the provided string. This is a wrapper
+	// around stringToType that handles taking a lock on the symbol database
+	// and updating the model with the new type.
+	QString changeTypeTemporarily(QModelIndex index, std::string_view type_string);
+
+	QString typeToString(QModelIndex index);
+	static QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
+
+	// Take a string e.g. "int*[3]" and return an AST node for the type
+	// specified. If pointer characters or array subscripts are specified, the
+	// owner field in the result structure will be populated with the newly
+	// created AST.
+	std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out);
 
 protected:
 	static std::vector<std::unique_ptr<SymbolTreeNode>> populateChildren(
@@ -51,11 +62,9 @@ protected:
 		const ccc::ast::Node& logical_type,
 		ccc::NodeHandle parent_handle,
 		const ccc::SymbolDatabase& database);
-	
+
 	static bool nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database);
 	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
-	
-	static QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
 
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;

@@ -8,6 +8,7 @@
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
 
+#include "common/Assertions.h"
 #include "SymbolTreeValueDelegate.h"
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
@@ -36,18 +37,7 @@ void SymbolTreeWidget::update()
 	if (!m_model)
 		setupTree();
 
-	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
-
-	// If we've previously created any temporary data types, delete them now.
-	if (m_temporary_source.valid())
-	{
-		guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
-			database.destroy_symbols_from_sources(m_temporary_source);
-		});
-		m_temporary_source = ccc::SymbolSourceHandle();
-	}
-
-	guardian.Read([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
@@ -129,19 +119,14 @@ void SymbolTreeWidget::setupMenu()
 		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
 	}
 
-	if (m_flags & ALLOW_DATA_CONVERSIONS)
+	if (m_flags & ALLOW_CHANGING_TYPES)
 	{
 		m_context_menu->addSeparator();
 
-		m_convert_to_array = new QAction(tr("Convert to array temporarily"), this);
-		m_context_menu->addAction(m_convert_to_array);
+		m_change_type_temporarily = new QAction(tr("Change type temporarily"), this);
+		m_context_menu->addAction(m_change_type_temporarily);
 
-		connect(m_convert_to_array, &QAction::triggered, this, &SymbolTreeWidget::onConvertToArray);
-
-		m_convert_to_array = new QAction(tr("Convert to string temporarily"), this);
-		m_context_menu->addAction(m_convert_to_array);
-
-		connect(m_convert_to_array, &QAction::triggered, this, &SymbolTreeWidget::onConvertToString);
+		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
 	}
 
 	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
@@ -315,7 +300,7 @@ void SymbolTreeWidget::onGoToInMemoryView()
 {
 }
 
-void SymbolTreeWidget::onConvertToArray()
+void SymbolTreeWidget::onChangeTypeTemporarily()
 {
 	if (!m_model)
 		return;
@@ -324,49 +309,18 @@ void SymbolTreeWidget::onConvertToArray()
 	if (!index.isValid())
 		return;
 
+	QString title = tr("Change Type To");
+	QString label = tr("Type:");
+	QString old_type = m_model->typeToString(index);
 
 	bool ok;
-
-	QString title = tr("Convert To Array");
-	QString label = tr("Element count:");
-	QString element_count_string = QInputDialog::getText(this, title, label, QLineEdit::Normal, QString(), &ok);
+	QString type_string = QInputDialog::getText(this, title, label, QLineEdit::Normal, old_type, &ok);
 	if (!ok)
 		return;
 
-	int element_count = element_count_string.toInt(&ok);
-	if (!ok)
-		return;
-	if (element_count < 0)
-	{
-		QMessageBox::warning(this, tr("Cannot Convert To Array"), tr("Element count cannot be negative."));
-		return;
-	}
-
-	QString error_message;
-	ccc::SymbolSourceHandle source = m_model->convertToArray(index, element_count, temporarySourceName(), error_message);
+	QString error_message = m_model->changeTypeTemporarily(index, type_string.toStdString());
 	if (!error_message.isEmpty())
-		QMessageBox::warning(this, tr("Cannot Convert To Array"), error_message);
-
-	if (source.valid())
-		m_temporary_source = source;
-}
-
-void SymbolTreeWidget::onConvertToString()
-{
-	if (!m_model)
-		return;
-
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	QString error_message;
-	ccc::SymbolSourceHandle source = m_model->convertToString(index, temporarySourceName(), error_message);
-	if (!error_message.isEmpty())
-		QMessageBox::warning(this, tr("Cannot Convert To String"), error_message);
-
-	if (source.valid())
-		m_temporary_source = source;
+		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
 }
 
 std::string SymbolTreeWidget::temporarySourceName() const
@@ -444,7 +398,7 @@ void FunctionTreeWidget::configureColumnVisibility()
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_DATA_CONVERSIONS, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_CHANGING_TYPES, parent)
 {
 }
 
@@ -531,7 +485,7 @@ void GlobalVariableTreeWidget::configureColumnVisibility()
 }
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_DATA_CONVERSIONS, parent)
+	: SymbolTreeWidget(ALLOW_CHANGING_TYPES, parent)
 {
 }
 
