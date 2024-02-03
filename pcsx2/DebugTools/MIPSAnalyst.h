@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "SymbolMap.h"
+#include "SymbolGuardian.h"
 
 class DebugInterface;
 

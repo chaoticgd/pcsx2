@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "SymbolMap.h"
+#include "SymbolGuardian.h"
 #include "common/Threading.h"
 #include "common/Pcsx2Types.h"
 #include "DebugInterface.h"

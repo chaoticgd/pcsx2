@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0+
 
 #include "Common.h"
-#include "DebugTools/SymbolMap.h"
+#include "DebugTools/SymbolGuardian.h"
 #include "IopBios.h"
 #include "IopMem.h"
 #include "R3000A.h"

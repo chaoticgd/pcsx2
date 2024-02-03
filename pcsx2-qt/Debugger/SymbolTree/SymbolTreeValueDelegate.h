@@ -5,7 +5,7 @@
 
 #include <QtWidgets/QStyledItemDelegate>
 
-#include "DebugTools/SymbolMap.h"
+#include "DebugTools/SymbolGuardian.h"
 
 // This manages the editor widgets in the symbol trees.
 class SymbolTreeValueDelegate : public QStyledItemDelegate

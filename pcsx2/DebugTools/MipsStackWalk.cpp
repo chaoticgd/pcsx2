@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 
 #include "MipsStackWalk.h"
-#include "SymbolMap.h"
+#include "SymbolGuardian.h"
 #include "MIPSAnalyst.h"
 #include "DebugInterface.h"
 #include "R5900OpcodeTables.h"

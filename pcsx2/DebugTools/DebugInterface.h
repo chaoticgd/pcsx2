@@ -5,7 +5,7 @@
 #include "DebugTools/BiosDebugData.h"
 #include "MemoryTypes.h"
 #include "ExpressionParser.h"
-#include "SymbolMap.h"
+#include "SymbolGuardian.h"
 
 #include <string>
 

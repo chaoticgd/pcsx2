@@ -4,7 +4,7 @@
 #include "Elfheader.h"
 #include "CDVD/IsoReader.h"
 #include "DebugTools/Debug.h"
-#include "DebugTools/SymbolMap.h"
+#include "DebugTools/SymbolGuardian.h"
 
 #include "common/Error.h"
 #include "common/FileSystem.h"

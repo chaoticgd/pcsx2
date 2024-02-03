@@ -12,7 +12,6 @@
 
 #include "R3000A.h"
 #include "IopMem.h"
-#include "SymbolMap.h"
 #include "VMManager.h"
 
 #include "common/StringUtil.h"

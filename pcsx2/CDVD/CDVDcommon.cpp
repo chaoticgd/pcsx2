@@ -4,7 +4,6 @@
 #include "CDVD/CDVDcommon.h"
 #include "CDVD/IsoReader.h"
 #include "CDVD/IsoFileFormats.h"
-#include "DebugTools/SymbolMap.h"
 #include "Config.h"
 #include "Host.h"
 #include "IconsFontAwesome5.h"
