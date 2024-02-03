@@ -350,19 +350,6 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
 }
 
-std::string SymbolTreeWidget::temporarySourceName() const
-{
-	std::string source_name;
-	if (m_cpu->getCpuType() == BREAKPOINT_EE)
-		source_name += "EE";
-	else
-		source_name += "IOP";
-	source_name += " ";
-	source_name += name();
-	source_name += "Temporaries";
-	return source_name;
-}
-
 FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING, parent)
 {

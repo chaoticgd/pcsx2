@@ -59,8 +59,6 @@ protected:
 	void onResetChildren();
 	void onChangeTypeTemporarily();
 
-	std::string temporarySourceName() const;
-
 	Ui::SymbolTreeWidget m_ui;
 
 	DebugInterface* m_cpu = nullptr;
