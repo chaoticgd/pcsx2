@@ -434,9 +434,9 @@ std::unique_ptr<ccc::ast::Node> SymbolTreeModel::stringToType(std::string_view s
 			break;
 
 		s32 element_count = atoi(&string[j]);
-		if (element_count < 0)
+		if(element_count < 0 || element_count > 1024 * 1024)
 		{
-			error_out = tr("Array subscripts cannot be negative.");
+			error_out = tr("Invalid array subscript.");
 			return nullptr;
 		}
 		array_subscripts.emplace_back(element_count);
