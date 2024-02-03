@@ -416,12 +416,6 @@ QString SymbolTreeModel::typeToString(const ccc::ast::Node* type, const ccc::Sym
 
 std::unique_ptr<ccc::ast::Node> SymbolTreeModel::stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out)
 {
-	if (string.empty())
-	{
-		error_out = tr("No type name provided.");
-		return nullptr;
-	}
-
 	size_t i = string.size();
 
 	// Parse array subscripts e.g. 'float[4][4]'.
@@ -432,8 +426,9 @@ std::unique_ptr<ccc::ast::Node> SymbolTreeModel::stringToType(std::string_view s
 			break;
 
 		size_t j = i - 1;
-		for (; string[j - 1] >= '0' && string[j - 1] <= '9' && j >= 0; j--)
-			;
+		for (; j > 0; j--)
+			if (string[j - 1] < '0' || string[j - 1] > '9')
+				break;
 
 		if (string[j - 1] != '[')
 			break;
@@ -464,6 +459,12 @@ std::unique_ptr<ccc::ast::Node> SymbolTreeModel::stringToType(std::string_view s
 
 	// Lookup the type.
 	std::string type_name_string(string.data(), string.data() + i);
+	if (type_name_string.empty())
+	{
+		error_out = tr("No type name provided.");
+		return nullptr;
+	}
+
 	ccc::DataTypeHandle handle = database.data_types.first_handle_from_name(type_name_string);
 	const ccc::DataType* data_type = database.data_types.symbol_from_handle(handle);
 	if (!data_type || !data_type->type())
