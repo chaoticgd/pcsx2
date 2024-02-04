@@ -19,12 +19,10 @@ class SymbolTreeWidget : public QWidget
 public:
 	virtual ~SymbolTreeWidget();
 
-	void setCPU(DebugInterface* cpu);
-
 	void update();
 
 protected:
-	explicit SymbolTreeWidget(u32 flags, QWidget* parent = nullptr);
+	explicit SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent = nullptr);
 
 	void setupTree();
 	void setupMenu();
@@ -61,7 +59,7 @@ protected:
 
 	Ui::SymbolTreeWidget m_ui;
 
-	DebugInterface* m_cpu = nullptr;
+	DebugInterface& m_cpu;
 	SymbolTreeModel* m_model = nullptr;
 
 	QMenu* m_context_menu = nullptr;
@@ -87,7 +85,7 @@ class FunctionTreeWidget : public SymbolTreeWidget
 {
 	Q_OBJECT
 public:
-	explicit FunctionTreeWidget(QWidget* parent = nullptr);
+	explicit FunctionTreeWidget(DebugInterface& cpu, QWidget* parent = nullptr);
 	virtual ~FunctionTreeWidget();
 
 protected:
@@ -103,7 +101,7 @@ class GlobalVariableTreeWidget : public SymbolTreeWidget
 {
 	Q_OBJECT
 public:
-	explicit GlobalVariableTreeWidget(QWidget* parent = nullptr);
+	explicit GlobalVariableTreeWidget(DebugInterface& cpu, QWidget* parent = nullptr);
 	virtual ~GlobalVariableTreeWidget();
 
 protected:
@@ -119,7 +117,7 @@ class LocalVariableTreeWidget : public SymbolTreeWidget
 {
 	Q_OBJECT
 public:
-	explicit LocalVariableTreeWidget(QWidget* parent = nullptr);
+	explicit LocalVariableTreeWidget(DebugInterface& cpu, QWidget* parent = nullptr);
 	virtual ~LocalVariableTreeWidget();
 
 protected:

@@ -135,20 +135,37 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	connect(m_ui.savedAddressesList->model(), &QAbstractItemModel::dataChanged, [savedAddressesTableView](const QModelIndex& topLeft) {
 		savedAddressesTableView->resizeColumnToContents(topLeft.column());
 	});
-	
-	m_ui.tabFunctions->setCPU(&cpu);
-	m_ui.tabGlobalVariables->setCPU(&cpu);
-	m_ui.tabLocalVariables->setCPU(&cpu);
-	
-	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_ui.tabFunctions, &SymbolTreeWidget::update);
-	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.tabGlobalVariables, &SymbolTreeWidget::update);
-	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_ui.tabLocalVariables, &SymbolTreeWidget::update);
+
+	setupSymbolTrees();
 
 	DebuggerSettingsManager::loadGameSettings(&m_bpModel);
 	DebuggerSettingsManager::loadGameSettings(&m_savedAddressesModel);
 }
 
 CpuWidget::~CpuWidget() = default;
+
+void CpuWidget::setupSymbolTrees()
+{
+	m_ui.tabFunctions->setLayout(new QVBoxLayout());
+	m_ui.tabGlobalVariables->setLayout(new QVBoxLayout());
+	m_ui.tabLocalVariables->setLayout(new QVBoxLayout());
+	
+	m_ui.tabFunctions->layout()->setContentsMargins(0, 0, 0, 0);
+	m_ui.tabGlobalVariables->layout()->setContentsMargins(0, 0, 0, 0);
+	m_ui.tabLocalVariables->layout()->setContentsMargins(0, 0, 0, 0);
+	
+	m_function_tree = new FunctionTreeWidget(m_cpu);
+	m_global_variable_tree = new GlobalVariableTreeWidget(m_cpu);
+	m_local_variable_tree = new LocalVariableTreeWidget(m_cpu);
+
+	m_ui.tabFunctions->layout()->addWidget(m_function_tree);
+	m_ui.tabGlobalVariables->layout()->addWidget(m_global_variable_tree);
+	m_ui.tabLocalVariables->layout()->addWidget(m_local_variable_tree);
+
+	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::update);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::update);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_local_variable_tree, &SymbolTreeWidget::update);
+}
 
 void CpuWidget::paintEvent(QPaintEvent* event)
 {

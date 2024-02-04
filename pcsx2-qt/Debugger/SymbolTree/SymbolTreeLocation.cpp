@@ -7,8 +7,8 @@
 
 SymbolTreeLocation::SymbolTreeLocation() = default;
 
-SymbolTreeLocation::SymbolTreeLocation(DebugInterface* cpu, u32 addr)
-	: type((cpu->getCpuType() == BREAKPOINT_EE) ? EE_MEMORY : IOP_MEMORY)
+SymbolTreeLocation::SymbolTreeLocation(DebugInterface& cpu, u32 addr)
+	: type((cpu.getCpuType() == BREAKPOINT_EE) ? EE_MEMORY : IOP_MEMORY)
 	, address(addr)
 {
 }

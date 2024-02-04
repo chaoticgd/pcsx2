@@ -11,36 +11,25 @@
 #include "common/Assertions.h"
 #include "SymbolTreeValueDelegate.h"
 
-SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
+SymbolTreeWidget::SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent)
 	: QWidget(parent)
+	, m_cpu(cpu)
 	, m_flags(flags)
 {
 	m_ui.setupUi(this);
-
-	m_ui.treeView->setEditTriggers(QTreeView::AllEditTriggers);
 
 	setupMenu();
 }
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
 
-void SymbolTreeWidget::setCPU(DebugInterface* cpu)
-{
-	m_cpu = cpu;
-
-	if (m_group_by_module && m_cpu->getCpuType() == BREAKPOINT_IOP)
-		m_group_by_module->setChecked(true);
-}
-
 void SymbolTreeWidget::update()
 {
-	assert(m_cpu);
-
 	if (!m_model)
 		setupTree();
 
 	std::unique_ptr<SymbolTreeNode> root;
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
@@ -60,13 +49,14 @@ void SymbolTreeWidget::update()
 
 void SymbolTreeWidget::setupTree()
 {
-	SymbolGuardian& guardian = m_cpu->GetSymbolGuardian();
-	m_model = new SymbolTreeModel(*m_cpu, this);
+	m_model = new SymbolTreeModel(m_cpu, this);
 	m_ui.treeView->setModel(m_model);
 
-	auto delegate = new SymbolTreeValueDelegate(guardian, this);
+	auto delegate = new SymbolTreeValueDelegate(m_cpu.GetSymbolGuardian(), this);
 	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
+
 	m_ui.treeView->setAlternatingRowColors(true);
+	m_ui.treeView->setEditTriggers(QTreeView::AllEditTriggers);
 
 	configureColumns();
 }
@@ -99,6 +89,8 @@ void SymbolTreeWidget::setupMenu()
 
 		m_group_by_module = new QAction(tr("Group by module"), this);
 		m_group_by_module->setCheckable(true);
+		if (m_cpu.getCpuType() == BREAKPOINT_IOP)
+			m_group_by_module->setChecked(true);
 		m_context_menu->addAction(m_group_by_module);
 
 		m_group_by_section = new QAction(tr("Group by section"), this);
@@ -352,8 +344,8 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
 }
 
-FunctionTreeWidget::FunctionTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING, parent)
+FunctionTreeWidget::FunctionTreeWidget(DebugInterface& cpu, QWidget* parent)
+	: SymbolTreeWidget(ALLOW_GROUPING, cpu, parent)
 {
 }
 
@@ -417,8 +409,8 @@ void FunctionTreeWidget::configureColumns()
 	m_ui.treeView->header()->setStretchLastSection(false);
 }
 
-GlobalVariableTreeWidget::GlobalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, parent)
+GlobalVariableTreeWidget::GlobalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, cpu, parent)
 {
 }
 
@@ -510,8 +502,8 @@ void GlobalVariableTreeWidget::configureColumns()
 	m_ui.treeView->header()->setStretchLastSection(false);
 }
 
-LocalVariableTreeWidget::LocalVariableTreeWidget(QWidget* parent)
-	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, parent)
+LocalVariableTreeWidget::LocalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
+	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, cpu, parent)
 {
 }
 
@@ -527,8 +519,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 {
 	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
-	u32 program_counter = m_cpu->getPC();
-	u32 stack_pointer = m_cpu->getRegister(EECAT_GPR, 29);
+	u32 program_counter = m_cpu.getPC();
+	u32 stack_pointer = m_cpu.getRegister(EECAT_GPR, 29);
 
 	const ccc::Function* function = database.functions.symbol_overlapping_address(program_counter);
 	if (!function)
@@ -550,7 +542,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 		}
 		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
 		{
-			if (m_cpu->getCpuType() == BREAKPOINT_EE)
+			if (m_cpu.getCpuType() == BREAKPOINT_EE)
 				node->location.type = SymbolTreeLocation::EE_REGISTER;
 			else
 				node->location.type = SymbolTreeLocation::IOP_REGISTER;

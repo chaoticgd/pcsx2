@@ -24,7 +24,7 @@ struct SymbolTreeLocation
 	u32 address = 0;
 	
 	SymbolTreeLocation();
-	SymbolTreeLocation(DebugInterface* cpu, u32 addr);
+	SymbolTreeLocation(DebugInterface& cpu, u32 addr);
 	
 	QString name() const;
 	

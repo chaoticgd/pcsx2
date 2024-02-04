@@ -14,6 +14,7 @@
 #include "Models/ThreadModel.h"
 #include "Models/StackModel.h"
 #include "Models/SavedAddressesModel.h"
+#include "Debugger/SymbolTree/SymbolTreeWidgets.h"
 
 #include "QtHost.h"
 #include <QtWidgets/QWidget>
@@ -118,6 +119,8 @@ public slots:
 	void saveSavedAddressesToDebuggerSettings();
 
 private:
+	void setupSymbolTrees();
+
 	std::vector<QTableWidget*> m_registerTableViews;
 	std::vector<u32> m_searchResults;
 
@@ -140,4 +143,8 @@ private:
 	bool m_moduleView = true;
 	u32 m_initialResultsLoadLimit = 20000;
 	u32 m_numResultsAddedPerLoad = 10000;
+
+	FunctionTreeWidget* m_function_tree = nullptr;
+	GlobalVariableTreeWidget* m_global_variable_tree = nullptr;
+	LocalVariableTreeWidget* m_local_variable_tree = nullptr;
 };
