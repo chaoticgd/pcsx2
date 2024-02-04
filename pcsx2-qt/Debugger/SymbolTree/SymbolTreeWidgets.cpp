@@ -17,6 +17,8 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, QWidget* parent)
 {
 	m_ui.setupUi(this);
 
+	m_ui.treeView->setEditTriggers(QTreeView::AllEditTriggers);
+
 	setupMenu();
 }
 

@@ -16,7 +16,7 @@
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
 
-static void error_callback(const ccc::Error& error, ccc::ErrorSeverity severity)
+static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
 	Console.Error("Error while importing symbol table: %s", error.message.c_str());
 }
