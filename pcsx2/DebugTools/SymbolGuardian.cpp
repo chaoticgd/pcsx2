@@ -18,7 +18,15 @@ SymbolGuardian R3000SymbolGuardian;
 
 static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
-	Console.Error("Error while importing symbol table: %s", error.message.c_str());
+	switch (level)
+	{
+		case ccc::ERROR_LEVEL_ERROR:
+			Console.Error("Error while importing symbol table: %s", error.message.c_str());
+			break;
+		case ccc::ERROR_LEVEL_WARNING:
+			Console.Warning("Warning while importing symbol table: %s", error.message.c_str());
+			break;
+	}
 }
 
 SymbolGuardian::SymbolGuardian()
@@ -112,7 +120,7 @@ bool SymbolGuardian::ImportNocashSymbols(const std::string& filename)
 	FILE* f = FileSystem::OpenCFile(filename.c_str(), "r");
 	if (!f)
 		return success;
-	
+
 	LongReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Nocash Symbols");
 		if (!source.success())
