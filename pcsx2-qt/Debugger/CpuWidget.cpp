@@ -149,11 +149,11 @@ void CpuWidget::setupSymbolTrees()
 	m_ui.tabFunctions->setLayout(new QVBoxLayout());
 	m_ui.tabGlobalVariables->setLayout(new QVBoxLayout());
 	m_ui.tabLocalVariables->setLayout(new QVBoxLayout());
-	
+
 	m_ui.tabFunctions->layout()->setContentsMargins(0, 0, 0, 0);
 	m_ui.tabGlobalVariables->layout()->setContentsMargins(0, 0, 0, 0);
 	m_ui.tabLocalVariables->layout()->setContentsMargins(0, 0, 0, 0);
-	
+
 	m_function_tree = new FunctionTreeWidget(m_cpu);
 	m_global_variable_tree = new GlobalVariableTreeWidget(m_cpu);
 	m_local_variable_tree = new LocalVariableTreeWidget(m_cpu);
@@ -165,6 +165,20 @@ void CpuWidget::setupSymbolTrees()
 	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::update);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::update);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_local_variable_tree, &SymbolTreeWidget::update);
+
+	connect(m_function_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+
+	connect(m_function_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+
+	connect(m_function_tree, &SymbolTreeWidget::nameColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+	connect(m_function_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+
+	connect(m_global_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_local_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 }
 
 void CpuWidget::paintEvent(QPaintEvent* event)
@@ -311,7 +325,7 @@ void CpuWidget::onBPListDoubleClicked(const QModelIndex& index)
 	{
 		if (index.column() == BreakpointModel::OFFSET)
 		{
-			m_ui.disassemblyWidget->gotoAddress(m_bpModel.data(index, BreakpointModel::DataRole).toUInt());
+			m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_bpModel.data(index, BreakpointModel::DataRole).toUInt());
 		}
 	}
 }
@@ -479,7 +493,7 @@ void CpuWidget::onSavedAddressesListContextMenu(QPoint pos)
 			QAction* goToAddressDisassemblyAction = new QAction(tr("Go to in Disassembly"), m_ui.savedAddressesList);
 			connect(goToAddressDisassemblyAction, &QAction::triggered, this, [this, indexAtPos]() {
 				const QModelIndex rowAddressIndex = m_ui.savedAddressesList->model()->index(indexAtPos.row(), 0, QModelIndex());
-				m_ui.disassemblyWidget->gotoAddress(m_ui.savedAddressesList->model()->data(rowAddressIndex, Qt::UserRole).toUInt());
+				m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_ui.savedAddressesList->model()->data(rowAddressIndex, Qt::UserRole).toUInt());
 			});
 			contextMenu->addAction(goToAddressDisassemblyAction);
 		}
@@ -578,7 +592,7 @@ void CpuWidget::contextSearchResultGoToDisassembly()
 	if (!selModel->hasSelection())
 		return;
 
-	m_ui.disassemblyWidget->gotoAddress(m_ui.listSearchResults->selectedItems().first()->data(Qt::UserRole).toUInt());
+	m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_ui.listSearchResults->selectedItems().first()->data(Qt::UserRole).toUInt());
 }
 
 void CpuWidget::contextRemoveSearchResult()
@@ -650,7 +664,7 @@ void CpuWidget::onThreadListDoubleClick(const QModelIndex& index)
 			m_ui.tabWidget->setCurrentWidget(m_ui.tab_memory);
 			break;
 		default: // Default to PC
-			m_ui.disassemblyWidget->gotoAddress(m_ui.threadList->model()->data(m_ui.threadList->model()->index(index.row(), ThreadModel::ThreadColumns::PC), Qt::UserRole).toUInt());
+			m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_ui.threadList->model()->data(m_ui.threadList->model()->index(index.row(), ThreadModel::ThreadColumns::PC), Qt::UserRole).toUInt());
 			break;
 	}
 }
@@ -725,14 +739,14 @@ void CpuWidget::onStackListDoubleClick(const QModelIndex& index)
 	{
 		case StackModel::StackModel::ENTRY:
 		case StackModel::StackModel::ENTRY_LABEL:
-			m_ui.disassemblyWidget->gotoAddress(m_ui.stackList->model()->data(m_ui.stackList->model()->index(index.row(), StackModel::StackColumns::ENTRY), Qt::UserRole).toUInt());
+			m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_ui.stackList->model()->data(m_ui.stackList->model()->index(index.row(), StackModel::StackColumns::ENTRY), Qt::UserRole).toUInt());
 			break;
 		case StackModel::StackModel::SP:
 			m_ui.memoryviewWidget->gotoAddress(m_ui.stackList->model()->data(index, Qt::UserRole).toUInt());
 			m_ui.tabWidget->setCurrentWidget(m_ui.tab_memory);
 			break;
 		default: // Default to PC
-			m_ui.disassemblyWidget->gotoAddress(m_ui.stackList->model()->data(m_ui.stackList->model()->index(index.row(), StackModel::StackColumns::PC), Qt::UserRole).toUInt());
+			m_ui.disassemblyWidget->gotoAddressAndSetFocus(m_ui.stackList->model()->data(m_ui.stackList->model()->index(index.row(), StackModel::StackColumns::PC), Qt::UserRole).toUInt());
 			break;
 	}
 }

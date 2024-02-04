@@ -59,6 +59,8 @@ void SymbolTreeWidget::setupTree()
 	m_ui.treeView->setEditTriggers(QTreeView::AllEditTriggers);
 
 	configureColumns();
+
+	connect(m_ui.treeView, &QTreeView::pressed, this, &SymbolTreeWidget::onTreeViewClicked);
 }
 
 void SymbolTreeWidget::setupMenu()
@@ -297,10 +299,28 @@ void SymbolTreeWidget::onCopyLocation()
 
 void SymbolTreeWidget::onGoToInDisassembly()
 {
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	goToInDisassembly(node->location.address);
 }
 
 void SymbolTreeWidget::onGoToInMemoryView()
 {
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	goToInMemoryView(node->location.address);
 }
 
 void SymbolTreeWidget::onResetChildren()
@@ -344,17 +364,30 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
 }
 
+void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+
+	switch (index.column())
+	{
+		case SymbolTreeModel::NAME:
+			nameColumnClicked(node->location.address);
+			break;
+		case SymbolTreeModel::LOCATION:
+			locationColumnClicked(node->location.address);
+			break;
+	}
+}
+
 FunctionTreeWidget::FunctionTreeWidget(DebugInterface& cpu, QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING, cpu, parent)
 {
 }
 
 FunctionTreeWidget::~FunctionTreeWidget() = default;
-
-const char* FunctionTreeWidget::name() const
-{
-	return "Function Tree";
-}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
@@ -415,11 +448,6 @@ GlobalVariableTreeWidget::GlobalVariableTreeWidget(DebugInterface& cpu, QWidget*
 }
 
 GlobalVariableTreeWidget::~GlobalVariableTreeWidget() = default;
-
-const char* GlobalVariableTreeWidget::name() const
-{
-	return "Global Variable Tree";
-}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
@@ -508,11 +536,6 @@ LocalVariableTreeWidget::LocalVariableTreeWidget(DebugInterface& cpu, QWidget* p
 }
 
 LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
-
-const char* LocalVariableTreeWidget::name() const
-{
-	return "Local Variable Tree";
-}
 
 std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSymbols(
 	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const

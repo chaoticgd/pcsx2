@@ -21,13 +21,17 @@ public:
 
 	void update();
 
+signals:
+	void goToInDisassembly(u32 address);
+	void goToInMemoryView(u32 address);
+	void nameColumnClicked(u32 address);
+	void locationColumnClicked(u32 address);
+
 protected:
 	explicit SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent = nullptr);
 
 	void setupTree();
 	void setupMenu();
-
-	virtual const char* name() const = 0;
 
 	// Builds up the tree for when symbols are grouped by the module that
 	// contains them, otherwise it just passes through to populateSections.
@@ -56,6 +60,8 @@ protected:
 	void onGoToInMemoryView();
 	void onResetChildren();
 	void onChangeTypeTemporarily();
+
+	void onTreeViewClicked(const QModelIndex& index);
 
 	Ui::SymbolTreeWidget m_ui;
 
@@ -89,8 +95,6 @@ public:
 	virtual ~FunctionTreeWidget();
 
 protected:
-	const char* name() const override;
-
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
@@ -105,8 +109,6 @@ public:
 	virtual ~GlobalVariableTreeWidget();
 
 protected:
-	const char* name() const override;
-
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
@@ -121,8 +123,6 @@ public:
 	virtual ~LocalVariableTreeWidget();
 
 protected:
-	const char* name() const override;
-
 	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
