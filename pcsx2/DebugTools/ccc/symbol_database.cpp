@@ -30,6 +30,56 @@ const SymbolType* SymbolList<SymbolType>::symbol_from_handle(SymbolHandle<Symbol
 }
 
 template <typename SymbolType>
+std::vector<SymbolType*> SymbolList<SymbolType>::symbols_from_handles(
+	const std::vector<SymbolHandle<SymbolType>>& handles)
+{
+	std::vector<SymbolType*> result;
+	for(SymbolHandle<SymbolType> handle : handles) {
+		SymbolType* symbol = symbol_from_handle(handle);
+		if(symbol) {
+			result.emplace_back(symbol);
+		}
+	}
+	return result;
+}
+
+template <typename SymbolType>
+std::vector<const SymbolType*> SymbolList<SymbolType>::symbols_from_handles(
+	const std::vector<SymbolHandle<SymbolType>>& handles) const
+{
+	std::vector<const SymbolType*> result;
+	for(SymbolHandle<SymbolType> handle : handles) {
+		const SymbolType* symbol = symbol_from_handle(handle);
+		if(symbol) {
+			result.emplace_back(symbol);
+		}
+	}
+	return result;
+}
+
+template <typename SymbolType>
+std::vector<SymbolType*> SymbolList<SymbolType>::optional_symbols_from_handles(
+	const std::optional<std::vector<SymbolHandle<SymbolType>>>& handles)
+{
+	if(handles.has_value()) {
+		return symbols_from_handles(*handles);
+	} else {
+		return std::vector<SymbolType*>();
+	}
+}
+
+template <typename SymbolType>
+std::vector<const SymbolType*> SymbolList<SymbolType>::optional_symbols_from_handles(
+	const std::optional<std::vector<SymbolHandle<SymbolType>>>& handles) const
+{
+	if(handles.has_value()) {
+		return symbols_from_handles(*handles);
+	} else {
+		return std::vector<const SymbolType*>();
+	}
+}
+
+template <typename SymbolType>
 typename SymbolList<SymbolType>::Iterator SymbolList<SymbolType>::begin()
 {
 	return m_symbols.begin();
@@ -51,44 +101,6 @@ template <typename SymbolType>
 typename SymbolList<SymbolType>::ConstIterator SymbolList<SymbolType>::end() const
 {
 	return m_symbols.end();
-}
-
-template <typename SymbolType>
-std::span<SymbolType> SymbolList<SymbolType>::span(SymbolRange<SymbolType> range)
-{
-	size_t first = binary_search(range.first);
-	size_t last = binary_search(range.last);
-	if(last < m_symbols.size() && m_symbols[last].m_handle == range.last) {
-		return std::span<SymbolType>(m_symbols.data() + first, m_symbols.data() + last + 1);
-	} else {
-		return std::span<SymbolType>(m_symbols.data() + first, m_symbols.data() + last);
-	}
-}
-
-template <typename SymbolType>
-std::span<const SymbolType> SymbolList<SymbolType>::span(SymbolRange<SymbolType> range) const
-{
-	return const_cast<SymbolList<SymbolType>*>(this)->span(range);
-}
-
-template <typename SymbolType>
-std::span<SymbolType> SymbolList<SymbolType>::optional_span(std::optional<SymbolRange<SymbolType>> range)
-{
-	if(range.has_value()) {
-		return span(*range);
-	} else {
-		return std::span<SymbolType>();
-	}
-}
-
-template <typename SymbolType>
-std::span<const SymbolType> SymbolList<SymbolType>::optional_span(std::optional<SymbolRange<SymbolType>> range) const
-{
-	if(range.has_value()) {
-		return span(*range);
-	} else {
-		return std::span<SymbolType>();
-	}
 }
 
 template <typename SymbolType>
@@ -172,18 +184,6 @@ s32 SymbolList<SymbolType>::index_from_handle(SymbolHandle<SymbolType> handle) c
 	}
 	
 	return (s32) index;
-}
-
-template <typename SymbolType>
-std::pair<s32, s32> SymbolList<SymbolType>::index_pair_from_range(SymbolRange<SymbolType> range) const
-{
-	size_t first = binary_search(range.first);
-	size_t last = binary_search(range.last);
-	if(last < m_symbols.size() && m_symbols[last].m_handle == range.last) {
-		return {first, last + 1};
-	} else {
-		return {first, last};
-	}
 }
 
 template <typename SymbolType>
@@ -516,32 +516,62 @@ const char* global_storage_location_to_string(GlobalStorageLocation location)
 
 // *****************************************************************************
 
-void Function::set_parameter_variables(
-	std::optional<ParameterVariableRange> range, ShouldDeleteOldSymbols delete_old_symbols, SymbolDatabase& database)
+const std::optional<std::vector<ParameterVariableHandle>>& Function::parameter_variables() const
 {
-	if(delete_old_symbols == DELETE_OLD_SYMBOLS && m_parameter_variables.has_value()) {
-		database.parameter_variables.destroy_symbols(*m_parameter_variables);
-	}
-	if(range.has_value()) {
-		for(ParameterVariable& parameter_variable : database.parameter_variables.span(*range)) {
-			parameter_variable.m_function = m_handle;
+	return m_parameter_variables;
+}
+
+void Function::set_parameter_variables(
+	std::optional<std::vector<ParameterVariableHandle>> parameter_variables, SymbolDatabase& database)
+{
+	if(m_parameter_variables.has_value()) {
+		for(ParameterVariableHandle parameter_variable_handle : *m_parameter_variables) {
+			ParameterVariable* parameter_variable = database.parameter_variables.symbol_from_handle(parameter_variable_handle);
+			if(parameter_variable && parameter_variable->m_function == handle()) {
+				parameter_variable->m_function = FunctionHandle();
+			}
 		}
 	}
-	m_parameter_variables = range;
+	
+	m_parameter_variables = std::move(parameter_variables);
+	
+	if(m_parameter_variables.has_value()) {
+		for(ParameterVariableHandle parameter_variable_handle : *m_parameter_variables) {
+			ParameterVariable* parameter_variable = database.parameter_variables.symbol_from_handle(parameter_variable_handle);
+			if(parameter_variable) {
+				parameter_variable->m_function = handle();
+			}
+		}
+	}
+}
+	
+const std::optional<std::vector<LocalVariableHandle>>& Function::local_variables() const
+{
+	return m_local_variables;
 }
 
 void Function::set_local_variables(
-	std::optional<LocalVariableRange> range, ShouldDeleteOldSymbols delete_old_symbols, SymbolDatabase& database)
+	std::optional<std::vector<LocalVariableHandle>> local_variables, SymbolDatabase& database)
 {
-	if(delete_old_symbols == DELETE_OLD_SYMBOLS && m_local_variables.has_value()) {
-		database.local_variables.destroy_symbols(*m_local_variables);
-	}
-	if(range.has_value()) {
-		for(LocalVariable& local_variable : database.local_variables.span(*range)) {
-			local_variable.m_function = m_handle;
+	if(m_local_variables.has_value()) {
+		for(LocalVariableHandle local_variable_handle : *m_local_variables) {
+			LocalVariable* local_variable = database.local_variables.symbol_from_handle(local_variable_handle);
+			if(local_variable && local_variable->m_function == handle()) {
+				local_variable->m_function = FunctionHandle();
+			}
 		}
 	}
-	m_local_variables = range;
+	
+	m_local_variables = std::move(local_variables);
+	
+	if(m_local_variables.has_value()) {
+		for(LocalVariableHandle local_variable_handle : *m_local_variables) {
+			LocalVariable* local_variable = database.local_variables.symbol_from_handle(local_variable_handle);
+			if(local_variable) {
+				local_variable->m_function = handle();
+			}
+		}
+	}
 }
 
 const std::string& Function::mangled_name() const
@@ -572,27 +602,51 @@ void GlobalVariable::set_mangled_name(std::string mangled)
 	m_mangled_name = std::move(mangled);
 }
 
-void SourceFile::set_functions(
-	FunctionRange range, ShouldDeleteOldSymbols delete_old_symbols, SymbolDatabase& database)
+const std::vector<FunctionHandle>& SourceFile::functions() const
 {
-	if(delete_old_symbols == DELETE_OLD_SYMBOLS) {
-		database.functions.destroy_symbols(m_functions);
+	return m_functions;
+}
+
+void SourceFile::set_functions(std::vector<FunctionHandle> functions, SymbolDatabase& database)
+{
+	for(FunctionHandle function_handle : m_functions) {
+		Function* function = database.functions.symbol_from_handle(function_handle);
+		if(function && function->m_source_file == handle()) {
+			function->m_source_file = SourceFileHandle();
+		}
 	}
-	m_functions = range;
-	for(Function& function : database.functions.span(range)) {
-		function.m_source_file = m_handle;
+	
+	m_functions = std::move(functions);
+	
+	for(FunctionHandle function_handle : m_functions) {
+		Function* function = database.functions.symbol_from_handle(function_handle);
+		if(function) {
+			function->m_source_file = handle();
+		}
 	}
 }
 
-void SourceFile::set_global_variables(
-	GlobalVariableRange range, ShouldDeleteOldSymbols delete_old_symbols, SymbolDatabase& database)
+const std::vector<GlobalVariableHandle>& SourceFile::global_variables() const
 {
-	if(delete_old_symbols == DELETE_OLD_SYMBOLS) {
-		database.global_variables.destroy_symbols(m_global_variables);
+	return m_global_variables;
+}
+
+void SourceFile::set_global_variables(std::vector<GlobalVariableHandle> global_variables, SymbolDatabase& database)
+{
+	for(GlobalVariableHandle global_variable_handle : m_global_variables) {
+		GlobalVariable* global_variable = database.global_variables.symbol_from_handle(global_variable_handle);
+		if(global_variable && global_variable->m_source_file == handle()) {
+			global_variable->m_source_file = SourceFileHandle();
+		}
 	}
-	m_global_variables = range;
-	for(GlobalVariable& global_variable : database.global_variables.span(range)) {
-		global_variable.m_source_file = m_handle;
+	
+	m_global_variables = std::move(global_variables);
+	
+	for(GlobalVariableHandle global_variable_handle : m_global_variables) {
+		GlobalVariable* global_variable = database.global_variables.symbol_from_handle(global_variable_handle);
+		if(global_variable) {
+			global_variable->m_source_file = handle();
+		}
 	}
 }
 
@@ -758,45 +812,43 @@ bool SymbolDatabase::destroy_function(FunctionHandle handle)
 		return false;
 	}
 	if(function->parameter_variables().has_value()) {
-		parameter_variables.destroy_symbols(*function->parameter_variables());
+		for(ParameterVariableHandle parameter_variable_handle : *function->parameter_variables()) {
+			parameter_variables.destroy_symbol(parameter_variable_handle);
+		}
 	}
 	if(function->local_variables().has_value()) {
-		local_variables.destroy_symbols(*function->local_variables());
+		for(LocalVariableHandle local_variable_handle : *function->local_variables()) {
+			local_variables.destroy_symbol(local_variable_handle);
+		}
 	}
 	return functions.destroy_symbol(handle);
 }
 
 // *****************************************************************************
 
-NodeHandle::NodeHandle() {}
-
-NodeHandle::NodeHandle(const ast::Node* node)
-	: m_node(node) {}
+MultiSymbolHandle::MultiSymbolHandle() {}
 
 template <typename SymbolType>
-NodeHandle::NodeHandle(const SymbolType& symbol, const ast::Node* node)
+MultiSymbolHandle::MultiSymbolHandle(const SymbolType& symbol)
 	: m_descriptor(SymbolType::DESCRIPTOR)
-	, m_symbol_handle(symbol.handle().value)
-	, m_node(node)
-	, m_generation(symbol.generation()) {}
+	, m_symbol_handle(symbol.handle().value) {}
 
-bool NodeHandle::valid() const
+bool MultiSymbolHandle::valid() const
 {
-	return m_node != nullptr;
+	return m_symbol_handle != (u32) -1;
 }
 
-const ast::Node* NodeHandle::lookup_node(const SymbolDatabase& database) const
+SymbolDescriptor MultiSymbolHandle::descriptor() const
 {
-	if(m_symbol_handle != (u32) -1) {
-		const Symbol* symbol = lookup_symbol(database);
-		if(!symbol || symbol->generation() != m_generation) {
-			return nullptr;
-		}
-	}
-	return m_node;
+	return m_descriptor;
 }
 
-const Symbol* NodeHandle::lookup_symbol(const SymbolDatabase& database) const
+u32 MultiSymbolHandle::handle() const
+{
+	return m_symbol_handle;
+}
+
+const Symbol* MultiSymbolHandle::lookup_symbol(const SymbolDatabase& database) const
 {
 	if(m_symbol_handle != (u32) -1) {
 		switch(m_descriptor) {
@@ -810,11 +862,46 @@ const Symbol* NodeHandle::lookup_symbol(const SymbolDatabase& database) const
 	return nullptr;
 }
 
+#define CCC_X(SymbolType, symbol_list) template MultiSymbolHandle::MultiSymbolHandle(const SymbolType& symbol);
+CCC_FOR_EACH_SYMBOL_TYPE_DO_X
+#undef CCC_X
+
+// *****************************************************************************
+
+NodeHandle::NodeHandle() {}
+
+NodeHandle::NodeHandle(const ast::Node* node)
+	: m_node(node) {}
+
+template <typename SymbolType>
+NodeHandle::NodeHandle(const SymbolType& symbol, const ast::Node* node)
+	: m_symbol(symbol)
+	, m_node(node)
+	, m_generation(symbol.generation()) {}
+
+bool NodeHandle::valid() const
+{
+	return m_node != nullptr;
+}
+
+const MultiSymbolHandle& NodeHandle::symbol() const
+{
+	return m_symbol;
+}
+
+const ast::Node* NodeHandle::lookup_node(const SymbolDatabase& database) const
+{
+	const Symbol* symbol = m_symbol.lookup_symbol(database);
+	if(!symbol || symbol->generation() != m_generation) {
+		return nullptr;
+	}
+	return m_node;
+}
+
 NodeHandle NodeHandle::handle_for_child(const ast::Node* child_node) const
 {
 	NodeHandle child_handle;
-	child_handle.m_descriptor = m_descriptor;
-	child_handle.m_symbol_handle = m_symbol_handle;
+	child_handle.m_symbol = m_symbol;
 	child_handle.m_node = child_node;
 	child_handle.m_generation = m_generation;
 	return child_handle;

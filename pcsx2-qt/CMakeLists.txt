@@ -176,6 +176,9 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Models/StackModel.h
 	Debugger/Models/SavedAddressesModel.cpp
 	Debugger/Models/SavedAddressesModel.h
+	Debugger/SymbolTree/NewSymbolDialogs.cpp
+	Debugger/SymbolTree/NewSymbolDialogs.h
+	Debugger/SymbolTree/NewSymbolDialog.ui
 	Debugger/SymbolTree/SymbolTreeLocation.cpp
 	Debugger/SymbolTree/SymbolTreeLocation.h
 	Debugger/SymbolTree/SymbolTreeModel.cpp
@@ -187,6 +190,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/SymbolTree/SymbolTreeWidgets.cpp
 	Debugger/SymbolTree/SymbolTreeWidgets.h
 	Debugger/SymbolTree/SymbolTreeWidget.ui
+	Debugger/SymbolTree/TypeString.cpp
+	Debugger/SymbolTree/TypeString.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp
 	Tools/InputRecording/NewInputRecordingDlg.h
 	Tools/InputRecording/NewInputRecordingDlg.ui

@@ -9,6 +9,7 @@
 #include <QtWidgets/QMessageBox>
 
 #include "common/Assertions.h"
+#include "NewSymbolDialogs.h"
 #include "SymbolTreeValueDelegate.h"
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent)
@@ -19,6 +20,17 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* pare
 	m_ui.setupUi(this);
 
 	setupMenu();
+
+	connect(m_ui.refreshButton, &QPushButton::clicked, this, &SymbolTreeWidget::update);
+	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
+
+	connect(m_ui.newButton, &QPushButton::clicked, this, &SymbolTreeWidget::onNewButtonPressed);
+	connect(m_ui.deleteButton, &QPushButton::clicked, this, &SymbolTreeWidget::onDeleteButtonPressed);
+
+	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
+		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
+	});
 }
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
@@ -133,14 +145,6 @@ void SymbolTreeWidget::setupMenu()
 		connect(m_reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
 		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
 	}
-
-	connect(m_ui.refreshButton, &QPushButton::pressed, this, &SymbolTreeWidget::update);
-	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
-
-	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
-		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
-	});
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
@@ -299,27 +303,19 @@ void SymbolTreeWidget::onCopyLocation()
 
 void SymbolTreeWidget::onGoToInDisassembly()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	goToInDisassembly(node->location.address);
 }
 
 void SymbolTreeWidget::onGoToInMemoryView()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	goToInMemoryView(node->location.address);
 }
 
@@ -347,7 +343,7 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 
 	QString title = tr("Change Type To");
 	QString label = tr("Type:");
-	std::optional<QString> old_type = m_model->typeToString(index);
+	std::optional<QString> old_type = m_model->typeFromModelIndexToString(index);
 	if (!old_type.has_value())
 	{
 		QMessageBox::warning(this, tr("Cannot Change Type"), tr("That node doesn't have a type."));
@@ -382,6 +378,18 @@ void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
 	}
 }
 
+SymbolTreeNode* SymbolTreeWidget::currentNode()
+{
+	if (!m_model)
+		return nullptr;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return nullptr;
+
+	return static_cast<SymbolTreeNode*>(index.internalPointer());
+}
+
 FunctionTreeWidget::FunctionTreeWidget(DebugInterface& cpu, QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING, cpu, parent)
 {
@@ -394,13 +402,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 {
 	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
-	std::span<const ccc::Function> functions;
-	if (filters.group_by_source_file && filters.source_file)
-		functions = database.functions.span(filters.source_file->functions());
-	else
-		functions = database.functions;
-
-	for (const ccc::Function& function : functions)
+	for (const ccc::Function& function : database.functions)
 	{
 		QString name;
 		if (!filters.test(function, function.source_file(), database, name))
@@ -410,6 +412,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 
 		function_node->name = std::move(name);
 		function_node->location = SymbolTreeLocation(m_cpu, function.address().value);
+		function_node->symbol = ccc::MultiSymbolHandle(function);
 
 		for (auto pair : database.labels.handles_from_address_range(function.address_range()))
 		{
@@ -442,6 +445,29 @@ void FunctionTreeWidget::configureColumns()
 	m_ui.treeView->header()->setStretchLastSection(false);
 }
 
+void FunctionTreeWidget::onNewButtonPressed()
+{
+	NewFunctionDialog* dialog = new NewFunctionDialog(m_cpu, this);
+	if (dialog->exec() == QDialog::Accepted)
+		update();
+}
+
+void FunctionTreeWidget::onDeleteButtonPressed()
+{
+	SymbolTreeNode* node = currentNode();
+	if (!node)
+		return;
+
+	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::FUNCTION)
+		return;
+
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		database.destroy_function(node->symbol.handle());
+	});
+
+	update();
+}
+
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
 	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, cpu, parent)
 {
@@ -454,20 +480,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 {
 	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
 
-	std::span<const ccc::Function> functions;
-	std::span<const ccc::GlobalVariable> global_variables;
-	if (filters.group_by_source_file && filters.source_file)
-	{
-		functions = database.functions.span(filters.source_file->functions());
-		global_variables = database.global_variables.span(filters.source_file->global_variables());
-	}
-	else
-	{
-		functions = database.functions;
-		global_variables = database.global_variables;
-	}
-
-	for (const ccc::GlobalVariable& global_variable : global_variables)
+	for (const ccc::GlobalVariable& global_variable : database.global_variables)
 	{
 		QString name;
 		if (!filters.test(global_variable, global_variable.source_file(), database, name))
@@ -478,28 +491,33 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		if (global_variable.type())
 			node->type = ccc::NodeHandle(global_variable, global_variable.type());
 		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
+		node->symbol = ccc::MultiSymbolHandle(global_variable);
 		nodes.emplace_back(std::move(node));
 	}
 
 	// We also include static local variables in the global variable tree
 	// because they have global storage. Why not.
-	for (const ccc::Function& function : functions)
+	for (const ccc::Function& function : database.functions)
 	{
 		std::vector<std::unique_ptr<SymbolTreeNode>> local_variable_nodes;
-		for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function.local_variables()))
+
+		std::vector<const ccc::LocalVariable*> local_variables =
+			database.local_variables.optional_symbols_from_handles(function.local_variables());
+
+		for (const ccc::LocalVariable* local_variable : local_variables)
 		{
-			if (!std::holds_alternative<ccc::GlobalStorage>(local_variable.storage))
+			if (!std::holds_alternative<ccc::GlobalStorage>(local_variable->storage))
 				continue;
 
 			QString name;
-			if (!filters.test(local_variable, function.source_file(), database, name))
+			if (!filters.test(*local_variable, function.source_file(), database, name))
 				continue;
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 			node->name = std::move(name);
-			if (local_variable.type())
-				node->type = ccc::NodeHandle(local_variable, local_variable.type());
-			node->location = SymbolTreeLocation(m_cpu, local_variable.address().value);
+			if (local_variable->type())
+				node->type = ccc::NodeHandle(*local_variable, local_variable->type());
+			node->location = SymbolTreeLocation(m_cpu, local_variable->address().value);
 			local_variable_nodes.emplace_back(std::move(node));
 		}
 
@@ -530,6 +548,29 @@ void GlobalVariableTreeWidget::configureColumns()
 	m_ui.treeView->header()->setStretchLastSection(false);
 }
 
+void GlobalVariableTreeWidget::onNewButtonPressed()
+{
+	NewGlobalVariableDialog* dialog = new NewGlobalVariableDialog(m_cpu, this);
+	if (dialog->exec() == QDialog::Accepted)
+		update();
+}
+
+void GlobalVariableTreeWidget::onDeleteButtonPressed()
+{
+	SymbolTreeNode* node = currentNode();
+	if (!node)
+		return;
+
+	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::GLOBAL_VARIABLE)
+		return;
+
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		database.global_variables.destroy_symbol(node->symbol.handle());
+	});
+
+	update();
+}
+
 LocalVariableTreeWidget::LocalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
 	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, cpu, parent)
 {
@@ -549,21 +590,24 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	if (!function)
 		return nodes;
 
-	for (const ccc::LocalVariable& local_variable : database.local_variables.optional_span(function->local_variables()))
+	std::vector<const ccc::LocalVariable*> local_variables =
+		database.local_variables.optional_symbols_from_handles(function->local_variables());
+
+	for (const ccc::LocalVariable* local_variable : local_variables)
 	{
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
-		node->name = QString::fromStdString(local_variable.name());
-		if (local_variable.type())
-			node->type = ccc::NodeHandle(local_variable, local_variable.type());
+		node->name = QString::fromStdString(local_variable->name());
+		if (local_variable->type())
+			node->type = ccc::NodeHandle(*local_variable, local_variable->type());
 
-		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))
+		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable->storage))
 		{
-			if (!local_variable.address().valid())
+			if (!local_variable->address().valid())
 				continue;
 
-			node->location = SymbolTreeLocation(m_cpu, stack_pointer + local_variable.address().value);
+			node->location = SymbolTreeLocation(m_cpu, stack_pointer + local_variable->address().value);
 		}
-		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
+		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable->storage))
 		{
 			if (m_cpu.getCpuType() == BREAKPOINT_EE)
 				node->location.type = SymbolTreeLocation::EE_REGISTER;
@@ -571,11 +615,12 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 				node->location.type = SymbolTreeLocation::IOP_REGISTER;
 			node->location.address = storage->dbx_register_number;
 		}
-		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
+		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable->storage))
 		{
 			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
 		}
-		node->live_range = local_variable.live_range;
+		node->live_range = local_variable->live_range;
+		node->symbol = ccc::MultiSymbolHandle(*local_variable);
 
 		nodes.emplace_back(std::move(node));
 	}
@@ -596,6 +641,29 @@ void LocalVariableTreeWidget::configureColumns()
 	m_ui.treeView->header()->setSectionResizeMode(SymbolTreeModel::VALUE, QHeaderView::Stretch);
 
 	m_ui.treeView->header()->setStretchLastSection(false);
+}
+
+void LocalVariableTreeWidget::onNewButtonPressed()
+{
+	NewLocalVariableDialog* dialog = new NewLocalVariableDialog(m_cpu, this);
+	if (dialog->exec() == QDialog::Accepted)
+		update();
+}
+
+void LocalVariableTreeWidget::onDeleteButtonPressed()
+{
+	SymbolTreeNode* node = currentNode();
+	if (!node)
+		return;
+
+	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::LOCAL_VARIABLE)
+		return;
+
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		database.local_variables.destroy_symbol(node->symbol.handle());
+	});
+
+	update();
 }
 
 bool SymbolFilters::test(

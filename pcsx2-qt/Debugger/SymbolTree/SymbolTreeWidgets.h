@@ -54,6 +54,9 @@ protected:
 
 	virtual void configureColumns() = 0;
 
+	virtual void onNewButtonPressed() = 0;
+	virtual void onDeleteButtonPressed() = 0;
+
 	void onCopyName();
 	void onCopyLocation();
 	void onGoToInDisassembly();
@@ -62,6 +65,8 @@ protected:
 	void onChangeTypeTemporarily();
 
 	void onTreeViewClicked(const QModelIndex& index);
+
+	SymbolTreeNode* currentNode();
 
 	Ui::SymbolTreeWidget m_ui;
 
@@ -99,6 +104,9 @@ protected:
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
+
+	void onNewButtonPressed() override;
+	void onDeleteButtonPressed() override;
 };
 
 class GlobalVariableTreeWidget : public SymbolTreeWidget
@@ -113,6 +121,9 @@ protected:
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
+
+	void onNewButtonPressed() override;
+	void onDeleteButtonPressed() override;
 };
 
 class LocalVariableTreeWidget : public SymbolTreeWidget
@@ -127,6 +138,9 @@ protected:
 		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
+
+	void onNewButtonPressed() override;
+	void onDeleteButtonPressed() override;
 };
 
 struct SymbolFilters

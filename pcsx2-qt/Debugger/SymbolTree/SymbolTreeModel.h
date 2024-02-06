@@ -48,19 +48,8 @@ public:
 	// Remove all the children of a given node, and allow fetching again.
 	bool resetChildren(QModelIndex index);
 
-	// Change the node of a type based on the provided string. This is a wrapper
-	// around stringToType that handles taking a lock on the symbol database
-	// and updating the model with the new type.
 	QString changeTypeTemporarily(QModelIndex index, std::string_view type_string);
-
-	std::optional<QString> typeToString(QModelIndex index);
-	static QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
-
-	// Take a string e.g. "int*[3]" and return an AST node for the type
-	// specified. If pointer characters or array subscripts are specified, the
-	// owner field in the result structure will be populated with the newly
-	// created AST.
-	std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out);
+	std::optional<QString> typeFromModelIndexToString(QModelIndex index);
 
 protected:
 	static std::vector<std::unique_ptr<SymbolTreeNode>> populateChildren(

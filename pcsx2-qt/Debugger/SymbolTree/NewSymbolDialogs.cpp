@@ -1,0 +1,291 @@
+// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-License-Identifier: LGPL-3.0+
+
+#include "NewSymbolDialogs.h"
+
+#include <QtWidgets/QMessageBox>
+
+#include "TypeString.h"
+
+NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent)
+	: QDialog(parent)
+	, m_cpu(cpu)
+{
+	m_ui.setupUi(this);
+
+	connect(m_ui.buttonBox, &QDialogButtonBox::accepted, this, &NewSymbolDialog::createSymbol);
+	connect(m_ui.storageTabBar, &QTabBar::currentChanged, this, &NewSymbolDialog::onStorageTabChanged);
+
+	if (flags & GLOBAL_STORAGE)
+		m_ui.storageTabBar->addTab("Global");
+	if (flags & REGISTER_STORAGE)
+		m_ui.storageTabBar->addTab("Register");
+	if (flags & STACK_STORAGE)
+		m_ui.storageTabBar->addTab("Stack");
+
+	if (m_ui.storageTabBar->count() == 1)
+		m_ui.storageTabBar->hide();
+
+	if (!(flags & SIZE_FIELD))
+	{
+		m_ui.sizeLabel->hide();
+		m_ui.expandToFillSpaceRadioButton->hide();
+		m_ui.customSizeRadioButton->hide();
+		m_ui.customSizeSpinBox->hide();
+	}
+	
+	if(!(flags & EXISTING_FUNCTIONS_FIELD))
+	{
+		m_ui.existingFunctionsLabel->hide();
+		m_ui.shrinkExistingRadioButton->hide();
+		m_ui.doNotModifyExistingRadioButton->hide();
+	}
+
+	if (!(flags & TYPE_FIELD))
+	{
+		m_ui.typeLabel->hide();
+		m_ui.typeLineEdit->hide();
+	}
+
+	if (!(flags & FUNCTION_FIELD))
+	{
+		m_ui.functionLabel->hide();
+		m_ui.functionComboBox->hide();
+	}
+}
+
+void NewSymbolDialog::setupRegisterField()
+{
+	m_ui.registerComboBox->clear();
+	for (int i = 0; i < m_cpu.getRegisterCount(0); i++)
+	{
+		m_ui.registerComboBox->addItem(m_cpu.getRegisterName(0, i));
+	}
+}
+
+void NewSymbolDialog::onStorageTabChanged(int index)
+{
+	QString name = m_ui.storageTabBar->tabText(index);
+
+	bool global_storage = name == "Global";
+	bool register_storage = name == "Register";
+	bool stack_storage = name == "Stack";
+
+	m_ui.addressLabel->setVisible(global_storage);
+	m_ui.addressLineEdit->setVisible(global_storage);
+
+	m_ui.registerLabel->setVisible(register_storage);
+	m_ui.registerComboBox->setVisible(register_storage);
+
+	m_ui.stackPointerOffsetLabel->setVisible(stack_storage);
+	m_ui.stackPointerOffsetSpinBox->setVisible(stack_storage);
+
+	if (register_storage)
+		setupRegisterField();
+}
+
+u32 NewSymbolDialog::storageType() const
+{
+	QString name = m_ui.storageTabBar->tabText(m_ui.storageTabBar->currentIndex());
+
+	if (name == "Global")
+		return GLOBAL_STORAGE;
+	if (name == "Register")
+		return REGISTER_STORAGE;
+	if (name == "Stack")
+		return STACK_STORAGE;
+
+	return 0;
+}
+
+NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | SIZE_FIELD | EXISTING_FUNCTIONS_FIELD, cpu, parent)
+{
+	setWindowTitle("New Function");
+
+	adjustSize();
+}
+
+void NewFunctionDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		bool ok;
+
+		std::string name = m_ui.nameLineEdit->text().toStdString();
+		if (name.empty())
+		{
+			error_message = tr("No name provided.");
+			return;
+		}
+
+		u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+		if (!ok)
+		{
+			error_message = tr("Invalid address.");
+			return;
+		}
+
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
+		if (!source.success())
+		{
+			error_message = tr("Cannot create symbol source.");
+			return;
+		}
+
+		ccc::Result<ccc::Function*> function = database.functions.create_symbol(std::move(name), address, *source, nullptr);
+		if (!function.success())
+		{
+			error_message = tr("Cannot create symbol.");
+			return;
+		}
+	});
+
+	if (!error_message.isEmpty())
+		QMessageBox::warning(this, tr("Cannot Create Function"), error_message);
+}
+
+NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | TYPE_FIELD, cpu, parent)
+{
+	setWindowTitle("New Global Variable");
+
+	adjustSize();
+}
+
+void NewGlobalVariableDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		bool ok;
+
+		std::string name = m_ui.nameLineEdit->text().toStdString();
+		if (name.empty())
+		{
+			error_message = tr("No name provided.");
+			return;
+		}
+
+		u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+		if (!ok)
+		{
+			error_message = tr("Invalid address.");
+			return;
+		}
+
+		std::unique_ptr<ccc::ast::Node> type = stringToType(m_ui.typeLineEdit->text().toStdString(), database, error_message);
+		if (!type)
+			return;
+
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
+		if (!source.success())
+		{
+			error_message = tr("Cannot create symbol source.");
+			return;
+		}
+
+		ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(std::move(name), address, *source, nullptr);
+		if (!global_variable.success())
+		{
+			error_message = tr("Cannot create symbol.");
+			return;
+		}
+
+		(*global_variable)->set_type(std::move(type));
+	});
+
+	if (!error_message.isEmpty())
+		QMessageBox::warning(this, tr("Cannot Create Global Variable"), error_message);
+}
+
+NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, cpu, parent)
+{
+	setWindowTitle("New Local Variable");
+
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Function* default_function = database.functions.symbol_overlapping_address(cpu.getPC());
+
+		for (const ccc::Function& function : database.functions)
+		{
+			QString name = QString::fromStdString(function.name());
+			name.truncate(64);
+			m_ui.functionComboBox->addItem(name);
+			m_functions.emplace_back(function.handle());
+
+			if (default_function && function.handle() == default_function->handle())
+				m_ui.functionComboBox->setCurrentIndex(m_ui.functionComboBox->count() - 1);
+		}
+	});
+
+	adjustSize();
+}
+
+void NewLocalVariableDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		bool ok;
+
+		std::string name = m_ui.nameLineEdit->text().toStdString();
+		if (name.empty())
+		{
+			error_message = tr("No name provided.");
+			return;
+		}
+
+		std::variant<ccc::GlobalStorage, ccc::RegisterStorage, ccc::StackStorage> storage;
+		ccc::Address address;
+
+		switch (storageType())
+		{
+			case GLOBAL_STORAGE:
+			{
+				storage.emplace<ccc::GlobalStorage>();
+				address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+				if (!ok)
+				{
+					error_message = tr("Invalid address.");
+					return;
+				}
+				break;
+			}
+			case REGISTER_STORAGE:
+			{
+				ccc::RegisterStorage& register_storage = storage.emplace<ccc::RegisterStorage>();
+				register_storage.dbx_register_number = m_ui.registerComboBox->currentIndex();
+				break;
+			}
+			case STACK_STORAGE:
+			{
+				ccc::StackStorage& stack_storage = storage.emplace<ccc::StackStorage>();
+				stack_storage.stack_pointer_offset = m_ui.stackPointerOffsetSpinBox->value();
+				break;
+			}
+		}
+
+		std::unique_ptr<ccc::ast::Node> type = stringToType(m_ui.typeLineEdit->text().toStdString(), database, error_message);
+		if (!type)
+			return;
+
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
+		if (!source.success())
+		{
+			error_message = tr("Cannot create symbol source.");
+			return;
+		}
+
+		ccc::Result<ccc::LocalVariable*> local_variable = database.local_variables.create_symbol(std::move(name), address, *source, nullptr);
+		if (!local_variable.success())
+		{
+			error_message = tr("Cannot create symbol.");
+			return;
+		}
+
+		(*local_variable)->set_type(std::move(type));
+		(*local_variable)->storage = storage;
+	});
+
+	if (!error_message.isEmpty())
+		QMessageBox::warning(this, tr("Cannot Create Local Variable"), error_message);
+}

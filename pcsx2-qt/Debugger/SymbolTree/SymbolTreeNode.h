@@ -9,23 +9,16 @@
 
 class DebugInterface;
 
-enum class SymbolTreeNodeState
-{
-	NORMAL,
-	ARRAY,
-	STRING
-};
-
 // A node in a symbol tree model.
 struct SymbolTreeNode
 {
 public:
 	QString name;
-	SymbolTreeNodeState state = SymbolTreeNodeState::NORMAL;
 	s32 element_count = -1;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
 	ccc::AddressRange live_range;
+	ccc::MultiSymbolHandle symbol;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 	
 	QString toString(const ccc::ast::Node& type);
