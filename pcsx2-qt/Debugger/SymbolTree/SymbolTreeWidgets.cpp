@@ -748,6 +748,7 @@ void ParameterVariableTreeWidget::configureColumns()
 	m_ui.treeView->setColumnHidden(SymbolTreeModel::NAME, false);
 	m_ui.treeView->setColumnHidden(SymbolTreeModel::LOCATION, false);
 	m_ui.treeView->setColumnHidden(SymbolTreeModel::TYPE, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LIVENESS, true);
 	m_ui.treeView->setColumnHidden(SymbolTreeModel::VALUE, false);
 
 	m_ui.treeView->header()->setSectionResizeMode(SymbolTreeModel::NAME, QHeaderView::Stretch);
