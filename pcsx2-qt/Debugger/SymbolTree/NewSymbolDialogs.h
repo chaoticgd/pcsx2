@@ -30,6 +30,19 @@ protected:
 		FUNCTION_FIELD = 1 << 6
 	};
 
+	// Used for setting up row visibility. Keep in sync with the .ui file!
+	enum Row
+	{
+		NAME,
+		ADDRESS,
+		REGISTER,
+		STACK_POINTER_OFFSET,
+		SIZE,
+		EXISTING_FUNCTIONS,
+		TYPE,
+		FUNCTION
+	};
+
 	void setupRegisterField();
 	void setupFunctionField();
 	void onStorageTabChanged(int index);

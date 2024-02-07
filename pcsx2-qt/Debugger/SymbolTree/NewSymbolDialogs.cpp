@@ -31,36 +31,13 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent
 	if (m_ui.storageTabBar->count() == 1)
 		m_ui.storageTabBar->hide();
 
-	if (!(flags & SIZE_FIELD))
-	{
-		m_ui.sizeLabel->hide();
-		m_ui.expandToFillSpaceRadioButton->hide();
-		m_ui.customSizeRadioButton->hide();
-		m_ui.customSizeSpinBox->hide();
-	}
-
-	if (!(flags & EXISTING_FUNCTIONS_FIELD))
-	{
-		m_ui.existingFunctionsLabel->hide();
-		m_ui.shrinkExistingRadioButton->hide();
-		m_ui.doNotModifyExistingRadioButton->hide();
-	}
-
-	if (!(flags & TYPE_FIELD))
-	{
-		m_ui.typeLabel->hide();
-		m_ui.typeLineEdit->hide();
-	}
+	m_ui.form->setRowVisible(Row::SIZE, flags & SIZE_FIELD);
+	m_ui.form->setRowVisible(Row::EXISTING_FUNCTIONS, flags & EXISTING_FUNCTIONS_FIELD);
+	m_ui.form->setRowVisible(Row::TYPE, flags & TYPE_FIELD);
+	m_ui.form->setRowVisible(Row::FUNCTION, flags & FUNCTION_FIELD);
 
 	if (flags & FUNCTION_FIELD)
-	{
 		setupFunctionField();
-	}
-	else
-	{
-		m_ui.functionLabel->hide();
-		m_ui.functionComboBox->hide();
-	}
 
 	adjustSize();
 }
@@ -96,18 +73,9 @@ void NewSymbolDialog::onStorageTabChanged(int index)
 {
 	QString name = m_ui.storageTabBar->tabText(index);
 
-	bool global_storage = name == "Global";
-	bool register_storage = name == "Register";
-	bool stack_storage = name == "Stack";
-
-	m_ui.addressLabel->setVisible(global_storage);
-	m_ui.addressLineEdit->setVisible(global_storage);
-
-	m_ui.registerLabel->setVisible(register_storage);
-	m_ui.registerComboBox->setVisible(register_storage);
-
-	m_ui.stackPointerOffsetLabel->setVisible(stack_storage);
-	m_ui.stackPointerOffsetSpinBox->setVisible(stack_storage);
+	m_ui.form->setRowVisible(Row::ADDRESS, name == "Global");
+	m_ui.form->setRowVisible(Row::REGISTER, name == "Register");
+	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
 }
 
 u32 NewSymbolDialog::storageType() const
