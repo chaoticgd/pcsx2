@@ -1039,6 +1039,12 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 	if (!src)
 		src = FindSourceInMap(TEX0, TEXA, psm_s, clut, gpu_clut, compare_lod, region, is_fixed_tex0, m_src.m_map[lookup_page]);
 
+	if (src && src->m_from_target && GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::MergeTargets && GSLocalMemory::GetUnwrappedEndBlockAddress(TEX0.TBP0, TEX0.TBW, TEX0.PSM, r) > src->m_from_target->m_end_block)
+	{
+		m_src.RemoveAt(src);
+		src = nullptr;
+	}
+
 	Target* dst = nullptr;
 	bool half_right = false;
 	int x_offset = 0;
@@ -1620,8 +1626,17 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 							depth_TEX0.U32[1] = TEX0.U32[1];
 							src = LookupDepthSource(false, depth_TEX0, TEXA, CLAMP, req_rect, possible_shuffle, linear, frame_fbp, req_color, req_alpha);
 
-							if(src != nullptr)
+							if (src != nullptr)
+							{
+
+								if (TEX0.PSM == PSMT8H)
+								{
+									// Attach palette for GPU texture conversion
+									AttachPaletteToSource(src, psm_s.pal, true);
+								}
+
 								return src;
+							}
 						}
 						else
 						{
@@ -1634,7 +1649,15 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 								src = LookupDepthSource(false, TEX0, TEXA, CLAMP, req_rect, possible_shuffle, linear, frame_fbp, req_color, req_alpha, true);
 
 								if (src != nullptr)
+								{
+									if (TEX0.PSM == PSMT8H)
+									{
+										// Attach palette for GPU texture conversion
+										AttachPaletteToSource(src, psm_s.pal, true);
+									}
+
 									return src;
+								}
 							}
 						}
 					}

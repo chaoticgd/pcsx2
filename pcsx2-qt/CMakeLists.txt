@@ -77,6 +77,7 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/ControllerGlobalSettingsWidget.ui
 	Settings/ControllerMacroEditWidget.ui
 	Settings/ControllerMacroWidget.ui
+	Settings/ControllerMappingSettingsDialog.ui
 	Settings/ControllerMouseSettingsDialog.ui
 	Settings/ControllerSettingsWindow.cpp
 	Settings/ControllerSettingsWindow.h
@@ -267,4 +268,5 @@ if(WIN32)
 	)
 endif()
 
+fixup_file_properties(pcsx2-qt)
 setup_main_executable(pcsx2-qt)
