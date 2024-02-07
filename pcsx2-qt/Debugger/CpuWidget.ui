@@ -540,6 +540,11 @@
         <string>Locals</string>
        </attribute>
       </widget>
+      <widget class="QWidget" name="tabParameterVariables">
+       <attribute name="title">
+        <string>Parameters</string>
+       </attribute>
+      </widget>
      </widget>
     </widget>
    </item>

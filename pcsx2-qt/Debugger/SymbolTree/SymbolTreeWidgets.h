@@ -143,6 +143,23 @@ protected:
 	void onDeleteButtonPressed() override;
 };
 
+class ParameterVariableTreeWidget : public SymbolTreeWidget
+{
+	Q_OBJECT
+public:
+	explicit ParameterVariableTreeWidget(DebugInterface& cpu, QWidget* parent = nullptr);
+	virtual ~ParameterVariableTreeWidget();
+
+protected:
+	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
+		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+
+	void configureColumns() override;
+
+	void onNewButtonPressed() override;
+	void onDeleteButtonPressed() override;
+};
+
 struct SymbolFilters
 {
 	bool group_by_module = false;

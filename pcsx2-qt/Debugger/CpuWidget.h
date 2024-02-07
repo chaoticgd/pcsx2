@@ -105,6 +105,7 @@ public slots:
 		m_ui.disassemblyWidget->update();
 		m_ui.memoryviewWidget->update();
 		m_ui.tabLocalVariables->update();
+		m_ui.tabParameterVariables->update();
 	}
 
 	void onSearchButtonClicked();
@@ -147,4 +148,5 @@ private:
 	FunctionTreeWidget* m_function_tree = nullptr;
 	GlobalVariableTreeWidget* m_global_variable_tree = nullptr;
 	LocalVariableTreeWidget* m_local_variable_tree = nullptr;
+	ParameterVariableTreeWidget* m_parameter_variable_tree = nullptr;
 };

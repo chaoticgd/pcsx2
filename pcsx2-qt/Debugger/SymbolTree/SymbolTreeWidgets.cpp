@@ -404,6 +404,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 
 	for (const ccc::Function& function : database.functions)
 	{
+		if (!function.address().valid())
+			continue;
+
 		QString name;
 		if (!filters.test(function, function.source_file(), database, name))
 			continue;
@@ -482,6 +485,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 
 	for (const ccc::GlobalVariable& global_variable : database.global_variables)
 	{
+		if (!global_variable.address().valid())
+			continue;
+
 		QString name;
 		if (!filters.test(global_variable, global_variable.source_file(), database, name))
 			continue;
@@ -507,6 +513,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		for (const ccc::LocalVariable* local_variable : local_variables)
 		{
 			if (!std::holds_alternative<ccc::GlobalStorage>(local_variable->storage))
+				continue;
+
+			if (!local_variable->address().valid())
 				continue;
 
 			QString name;
@@ -595,10 +604,17 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 
 	for (const ccc::LocalVariable* local_variable : local_variables)
 	{
+		QString name;
+		if (!filters.test(*local_variable, ccc::SourceFileHandle(), database, name))
+			continue;
+
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+
 		node->name = QString::fromStdString(local_variable->name());
 		if (local_variable->type())
 			node->type = ccc::NodeHandle(*local_variable, local_variable->type());
+		node->live_range = local_variable->live_range;
+		node->symbol = ccc::MultiSymbolHandle(*local_variable);
 
 		if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable->storage))
 		{
@@ -619,8 +635,6 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 		{
 			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
 		}
-		node->live_range = local_variable->live_range;
-		node->symbol = ccc::MultiSymbolHandle(*local_variable);
 
 		nodes.emplace_back(std::move(node));
 	}
@@ -666,15 +680,103 @@ void LocalVariableTreeWidget::onDeleteButtonPressed()
 	update();
 }
 
+ParameterVariableTreeWidget::ParameterVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
+	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, cpu, parent)
+{
+}
+
+ParameterVariableTreeWidget::~ParameterVariableTreeWidget() = default;
+
+std::vector<std::unique_ptr<SymbolTreeNode>> ParameterVariableTreeWidget::populateSymbols(
+	const SymbolFilters& filters, const ccc::SymbolDatabase& database) const
+{
+	std::vector<std::unique_ptr<SymbolTreeNode>> nodes;
+
+	u32 program_counter = m_cpu.getPC();
+	u32 stack_pointer = m_cpu.getRegister(EECAT_GPR, 29);
+
+	const ccc::Function* function = database.functions.symbol_overlapping_address(program_counter);
+	if (!function)
+		return nodes;
+
+	std::vector<const ccc::ParameterVariable*> parameter_variables =
+		database.parameter_variables.optional_symbols_from_handles(function->parameter_variables());
+
+	for (const ccc::ParameterVariable* parameter_variable : parameter_variables)
+	{
+		QString name;
+		if (!filters.test(*parameter_variable, ccc::SourceFileHandle(), database, name))
+			continue;
+
+		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+
+		node->name = QString::fromStdString(parameter_variable->name());
+		if (parameter_variable->type())
+			node->type = ccc::NodeHandle(*parameter_variable, parameter_variable->type());
+		node->symbol = ccc::MultiSymbolHandle(*parameter_variable);
+
+		if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&parameter_variable->storage))
+		{
+			if (m_cpu.getCpuType() == BREAKPOINT_EE)
+				node->location.type = SymbolTreeLocation::EE_REGISTER;
+			else
+				node->location.type = SymbolTreeLocation::IOP_REGISTER;
+			node->location.address = storage->dbx_register_number;
+		}
+		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&parameter_variable->storage))
+		{
+			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
+		}
+
+		nodes.emplace_back(std::move(node));
+	}
+
+	return nodes;
+}
+
+void ParameterVariableTreeWidget::configureColumns()
+{
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::NAME, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::LOCATION, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::TYPE, false);
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::VALUE, false);
+
+	m_ui.treeView->header()->setSectionResizeMode(SymbolTreeModel::NAME, QHeaderView::Stretch);
+	m_ui.treeView->header()->setSectionResizeMode(SymbolTreeModel::TYPE, QHeaderView::Stretch);
+	m_ui.treeView->header()->setSectionResizeMode(SymbolTreeModel::VALUE, QHeaderView::Stretch);
+
+	m_ui.treeView->header()->setStretchLastSection(false);
+}
+
+void ParameterVariableTreeWidget::onNewButtonPressed()
+{
+	NewParameterVariableDialog* dialog = new NewParameterVariableDialog(m_cpu, this);
+	if (dialog->exec() == QDialog::Accepted)
+		update();
+}
+
+void ParameterVariableTreeWidget::onDeleteButtonPressed()
+{
+	SymbolTreeNode* node = currentNode();
+	if (!node)
+		return;
+
+	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::PARAMETER_VARIABLE)
+		return;
+
+	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+		database.parameter_variables.destroy_symbol(node->symbol.handle());
+	});
+
+	update();
+}
+
 bool SymbolFilters::test(
 	const ccc::Symbol& test_symbol,
 	ccc::SourceFileHandle test_source_file,
 	const ccc::SymbolDatabase& database,
 	QString& name_out) const
 {
-	if (!test_symbol.address().valid())
-		return false;
-
 	if (group_by_module && test_symbol.module_handle() != module_handle)
 		return false;
 

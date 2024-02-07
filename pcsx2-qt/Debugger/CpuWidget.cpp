@@ -149,18 +149,22 @@ void CpuWidget::setupSymbolTrees()
 	m_ui.tabFunctions->setLayout(new QVBoxLayout());
 	m_ui.tabGlobalVariables->setLayout(new QVBoxLayout());
 	m_ui.tabLocalVariables->setLayout(new QVBoxLayout());
+	m_ui.tabParameterVariables->setLayout(new QVBoxLayout());
 
 	m_ui.tabFunctions->layout()->setContentsMargins(0, 0, 0, 0);
 	m_ui.tabGlobalVariables->layout()->setContentsMargins(0, 0, 0, 0);
 	m_ui.tabLocalVariables->layout()->setContentsMargins(0, 0, 0, 0);
+	m_ui.tabParameterVariables->layout()->setContentsMargins(0, 0, 0, 0);
 
 	m_function_tree = new FunctionTreeWidget(m_cpu);
 	m_global_variable_tree = new GlobalVariableTreeWidget(m_cpu);
 	m_local_variable_tree = new LocalVariableTreeWidget(m_cpu);
+	m_parameter_variable_tree = new ParameterVariableTreeWidget(m_cpu);
 
 	m_ui.tabFunctions->layout()->addWidget(m_function_tree);
 	m_ui.tabGlobalVariables->layout()->addWidget(m_global_variable_tree);
 	m_ui.tabLocalVariables->layout()->addWidget(m_local_variable_tree);
+	m_ui.tabParameterVariables->layout()->addWidget(m_parameter_variable_tree);
 
 	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::update);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::update);
@@ -169,16 +173,19 @@ void CpuWidget::setupSymbolTrees()
 	connect(m_function_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
+	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 
 	connect(m_function_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 
 	connect(m_function_tree, &SymbolTreeWidget::nameColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_function_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 
 	connect(m_global_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 	connect(m_local_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_parameter_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 }
 
 void CpuWidget::paintEvent(QPaintEvent* event)

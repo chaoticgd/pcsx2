@@ -31,11 +31,14 @@ protected:
 	};
 
 	void setupRegisterField();
+	void setupFunctionField();
 	void onStorageTabChanged(int index);
 	u32 storageType() const;
 
 	DebugInterface& m_cpu;
 	Ui::NewSymbolDialog m_ui;
+	
+	std::vector<ccc::FunctionHandle> m_functions;
 };
 
 class NewFunctionDialog : public NewSymbolDialog
@@ -69,6 +72,15 @@ public:
 
 protected:
 	void createSymbol() override;
+};
 
-	std::vector<ccc::FunctionHandle> m_functions;
+class NewParameterVariableDialog : public NewSymbolDialog
+{
+	Q_OBJECT
+
+public:
+	NewParameterVariableDialog(DebugInterface& cpu, QWidget* parent = nullptr);
+
+protected:
+	void createSymbol() override;
 };
