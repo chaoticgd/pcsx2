@@ -5,7 +5,7 @@
 
 #include "DebugTools/ccc/ast.h"
 
-QString SymbolTreeNode::toString(const ccc::ast::Node& type)
+QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDatabase* database)
 {
 	switch (type.descriptor)
 	{
@@ -61,7 +61,27 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type)
 			}
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
-			return QString::number(location.read32(), 16);
+		{
+			const auto& pointer_or_reference = type.as<ccc::ast::PointerOrReference>();
+
+			QString result = QString::number(location.read32(), 16);
+
+			// For char* nodes add the value of the string to the output.
+			if (pointer_or_reference.is_pointer && database)
+			{
+				const ccc::ast::Node* value_type =
+					resolvePhysicalType(pointer_or_reference.value_type.get(), *database).first;
+				if (value_type->name == "char")
+				{
+					u32 pointer = location.read32();
+					const char* string = location.cpu().stringFromPointer(pointer);
+					if (string)
+						result += QString(" \"%1\"").arg(string);
+				}
+			}
+
+			return result;
+		}
 		default:
 		{
 		}
@@ -260,4 +280,18 @@ void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 
 	for (std::unique_ptr<SymbolTreeNode>& child : m_children)
 		child->sortChildrenRecursively(sort_by_if_type_is_known);
+}
+
+std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
+{
+	const ccc::DataType* symbol = nullptr;
+	for (s32 i = 0; i < 10 && type->descriptor == ccc::ast::TYPE_NAME; i++)
+	{
+		const ccc::DataType* data_type = database.data_types.symbol_from_handle(type->as<ccc::ast::TypeName>().data_type_handle);
+		if (!data_type || !data_type->type())
+			break;
+		type = data_type->type();
+		symbol = data_type;
+	}
+	return std::pair(type, symbol);
 }

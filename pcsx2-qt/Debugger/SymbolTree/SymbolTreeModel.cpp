@@ -143,7 +143,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				switch (role)
 				{
 					case Qt::DisplayRole:
-						result = node->toString(type);
+						result = node->toString(type, &database);
 						break;
 					case Qt::UserRole:
 						result = node->toVariant(type);
@@ -455,18 +455,4 @@ QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
 		row = 0;
 
 	return createIndex(row, 0, &node);
-}
-
-std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
-{
-	const ccc::DataType* symbol = nullptr;
-	for (s32 i = 0; i < 10 && type->descriptor == ccc::ast::TYPE_NAME; i++)
-	{
-		const ccc::DataType* data_type = database.data_types.symbol_from_handle(type->as<ccc::ast::TypeName>().data_type_handle);
-		if (!data_type || !data_type->type())
-			break;
-		type = data_type->type();
-		symbol = data_type;
-	}
-	return std::pair(type, symbol);
 }

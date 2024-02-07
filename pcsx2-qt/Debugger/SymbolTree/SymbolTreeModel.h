@@ -66,5 +66,3 @@ protected:
 	DebugInterface& m_cpu;
 	SymbolGuardian& m_guardian;
 };
-
-std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);

@@ -21,7 +21,7 @@ public:
 	ccc::MultiSymbolHandle symbol;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 	
-	QString toString(const ccc::ast::Node& type);
+	QString toString(const ccc::ast::Node& type, const ccc::SymbolDatabase* database);
 	QVariant toVariant(const ccc::ast::Node& type);
 	bool fromVariant(QVariant value, const ccc::ast::Node& type);
 	
@@ -41,3 +41,5 @@ protected:
 	std::vector<std::unique_ptr<SymbolTreeNode>> m_children;
 	bool m_children_fetched = false;
 };
+
+std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);
