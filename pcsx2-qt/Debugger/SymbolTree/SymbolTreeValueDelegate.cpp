@@ -6,6 +6,7 @@
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDoubleSpinBox>
+#include <QtWidgets/QLineEdit>
 #include "Int64SpinBox.h"
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
 
@@ -88,6 +89,11 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				for (auto [value, string] : enumeration.constants)
 					comboBox->addItem(QString::fromStdString(string));
 				result = comboBox;
+				break;
+			}
+			case ccc::ast::POINTER_OR_REFERENCE:
+			{
+				result = new QLineEdit(parent);
 				break;
 			}
 			default:
@@ -180,6 +186,16 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 						break;
 					}
 				}
+				break;
+			}
+			case ccc::ast::POINTER_OR_REFERENCE:
+			{
+				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+				Q_ASSERT(lineEdit);
+
+				lineEdit->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
+
+				break;
 			}
 			default:
 			{
@@ -265,6 +281,18 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					s32 value = enumeration.constants[comboIndex].first;
 					model->setData(index, QVariant(value), Qt::UserRole);
 				}
+				break;
+			}
+			case ccc::ast::POINTER_OR_REFERENCE:
+			{
+				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+				Q_ASSERT(lineEdit);
+
+				bool ok;
+				qulonglong address = lineEdit->text().toUInt(&ok, 16);
+				if (ok)
+					model->setData(index, address, Qt::UserRole);
+
 				break;
 			}
 			default:
