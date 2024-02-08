@@ -71,6 +71,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
+			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
 				result = new QLineEdit(parent);
 				break;
@@ -178,6 +179,7 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
+			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
 				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
 				Q_ASSERT(lineEdit);
@@ -294,6 +296,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
+			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
 				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
 				Q_ASSERT(lineEdit);

@@ -82,6 +82,8 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 
 			return result;
 		}
+		case ccc::ast::POINTER_TO_DATA_MEMBER:
+			return QString::number(location.read32(), 16);
 		default:
 		{
 		}
@@ -137,6 +139,7 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
 		case ccc::ast::ENUM:
 			return location.read32();
 		case ccc::ast::POINTER_OR_REFERENCE:
+		case ccc::ast::POINTER_TO_DATA_MEMBER:
 			return location.read32();
 		default:
 		{
@@ -208,6 +211,7 @@ bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type)
 			location.write32((u32)value.toULongLong());
 			break;
 		case ccc::ast::POINTER_OR_REFERENCE:
+		case ccc::ast::POINTER_TO_DATA_MEMBER:
 			location.write32((u32)value.toULongLong());
 			break;
 		default:
