@@ -21,8 +21,6 @@ target_sources(pcsx2-qt PRIVATE
 	DisplayWidget.cpp
 	DisplayWidget.h
 	EarlyHardwareCheck.cpp
-	Int64SpinBox.h
-	Int64SpinBox.cpp
 	LogWindow.cpp
 	LogWindow.h
 	MainWindow.cpp
