@@ -186,7 +186,7 @@ namespace MIPSAnalyst
 		u32 addr;
 		for (addr = startAddr; addr <= endAddr; addr += 4) {
 			// Use pre-existing symbol map info if available. May be more reliable.
-			FunctionStat existing_symbol = guardian.StatFunctionStartingAtAddress(addr);
+			FunctionInfo existing_symbol = guardian.FunctionStartingAtAddress(addr, SDA_BLOCK);
 			if (existing_symbol.address.valid() && existing_symbol.size > 0) {
 				addr = existing_symbol.address.value + existing_symbol.size - 4;
 				currentFunction.start = addr + 4;

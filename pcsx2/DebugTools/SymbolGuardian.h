@@ -14,12 +14,18 @@
 
 class DebugInterface;
 
-struct FunctionStat
+struct FunctionInfo
 {
 	ccc::FunctionHandle handle;
 	std::string name;
 	ccc::Address address;
 	u32 size = 0;
+};
+
+enum SymbolDatabaseAccessMode
+{
+	SDA_TRY, // If the symbol database is busy, do nothing and return.
+	SDA_BLOCK, // If the symbol database is busy, block until it's available.
 };
 
 struct SymbolGuardian
@@ -34,7 +40,7 @@ public:
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, nothing happens and we return false.
 	bool TryRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
-	
+
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, we block until it's available.
 	void BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
@@ -76,15 +82,17 @@ public:
 	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();
 
-	bool FunctionExistsWithStartingAddress(u32 address) const;
-	bool FunctionExistsThatOverlapsAddress(u32 address) const;
+	bool FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
+	bool FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 
 	// Copy commonly used attributes of a function so they can be used by the
 	// calling thread without needing to keep the lock held.
-	FunctionStat StatFunctionStartingAtAddress(u32 address) const;
-	FunctionStat StatFunctionOverlappingAddress(u32 address) const;
+	FunctionInfo FunctionStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode) const;
+	FunctionInfo FunctionOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 
 protected:
+	bool Read(SymbolDatabaseAccessMode mode, std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+
 	ccc::SymbolDatabase m_database;
 	ccc::SymbolSourceHandle m_user_defined;
 	ccc::ModuleHandle m_main_elf;

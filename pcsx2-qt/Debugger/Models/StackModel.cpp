@@ -33,7 +33,7 @@ QVariant StackModel::data(const QModelIndex& index, int role) const
 			case StackModel::ENTRY:
 				return QtUtils::FilledQStringFromValue(stackFrame.entry, 16);
 			case StackModel::ENTRY_LABEL:
-					return QString::fromStdString(m_cpu.GetSymbolGuardian().StatFunctionStartingAtAddress(stackFrame.entry).name);
+					return QString::fromStdString(m_cpu.GetSymbolGuardian().FunctionStartingAtAddress(stackFrame.entry, SDA_TRY).name);
 			case StackModel::PC:
 				return QtUtils::FilledQStringFromValue(stackFrame.pc, 16);
 			case StackModel::PC_OPCODE:
@@ -52,7 +52,7 @@ QVariant StackModel::data(const QModelIndex& index, int role) const
 			case StackModel::ENTRY:
 				return stackFrame.entry;
 			case StackModel::ENTRY_LABEL:
-				return QString::fromStdString(m_cpu.GetSymbolGuardian().StatFunctionStartingAtAddress(stackFrame.entry).name);
+				return QString::fromStdString(m_cpu.GetSymbolGuardian().FunctionStartingAtAddress(stackFrame.entry, SDA_BLOCK).name);
 			case StackModel::PC:
 				return stackFrame.pc;
 			case StackModel::PC_OPCODE:

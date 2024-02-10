@@ -38,19 +38,22 @@ SymbolGuardian::SymbolGuardian()
 
 bool SymbolGuardian::TryRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
 {
-	if (m_busy)
+	return Read(SDA_TRY, std::move(callback));
+}
+
+void SymbolGuardian::BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+{
+	Read(SDA_BLOCK, std::move(callback));
+}
+
+bool SymbolGuardian::Read(SymbolDatabaseAccessMode mode, std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+{
+	if(mode == SDA_TRY && m_busy)
 		return false;
 	m_big_symbol_lock.lock_shared();
 	callback(m_database);
 	m_big_symbol_lock.unlock_shared();
 	return true;
-}
-
-void SymbolGuardian::BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
-{
-	m_big_symbol_lock.lock_shared();
-	callback(m_database);
-	m_big_symbol_lock.unlock_shared();
 }
 
 bool SymbolGuardian::TryReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
@@ -323,57 +326,57 @@ void SymbolGuardian::ClearIrxModules()
 	});
 }
 
-bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
+bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const
 {
 	bool exists = false;
-	TryRead([&](const ccc::SymbolDatabase& database) {
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		exists = handle.valid();
 	});
 	return exists;
 }
 
-bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address) const
+bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const
 {
 	bool exists = false;
-	TryRead([&](const ccc::SymbolDatabase& database) {
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		exists = function != nullptr;
 	});
 	return exists;
 }
 
-FunctionStat SymbolGuardian::StatFunctionStartingAtAddress(u32 address) const
+FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode) const
 {
-	FunctionStat stat;
-	TryRead([&](const ccc::SymbolDatabase& database) {
+	FunctionInfo info;
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		const ccc::Function* function = database.functions.symbol_from_handle(handle);
 		if (function)
 		{
-			stat.handle = function->handle();
-			stat.name = function->name();
-			stat.address = function->address();
-			stat.size = function->size();
+			info.handle = function->handle();
+			info.name = function->name();
+			info.address = function->address();
+			info.size = function->size();
 		}
 	});
-	return stat;
+	return info;
 }
 
-FunctionStat SymbolGuardian::StatFunctionOverlappingAddress(u32 address) const
+FunctionInfo SymbolGuardian::FunctionOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode) const
 {
-	FunctionStat stat;
-	TryRead([&](const ccc::SymbolDatabase& database) {
+	FunctionInfo info;
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (function)
 		{
-			stat.handle = function->handle();
-			stat.name = function->name();
-			stat.address = function->address();
-			stat.size = function->size();
+			info.handle = function->handle();
+			info.name = function->name();
+			info.address = function->address();
+			info.size = function->size();
 		}
 	});
-	return stat;
+	return info;
 }
 
 SymbolMap R5900SymbolMap;
