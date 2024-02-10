@@ -43,7 +43,7 @@ void SymbolTreeWidget::update()
 	m_cpu.GetSymbolGuardian().UpdateFunctionHashes(m_cpu);
 
 	std::unique_ptr<SymbolTreeNode> root;
-	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();

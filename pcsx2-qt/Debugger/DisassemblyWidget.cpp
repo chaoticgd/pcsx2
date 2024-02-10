@@ -249,13 +249,13 @@ void DisassemblyWidget::contextRemoveFunction()
 {
 	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Function* curFunc = database.functions.symbol_overlapping_address(m_selectedAddressStart);
-		if(!curFunc)
+		if (!curFunc)
 			return;
-		
+
 		ccc::Function* previousFunc = database.functions.symbol_overlapping_address(curFunc->address().value - 4);
-		if(previousFunc)
+		if (previousFunc)
 			previousFunc->set_size(curFunc->size() + previousFunc->size());
-		
+
 		database.functions.destroy_symbol(curFunc->handle());
 	});
 }
@@ -269,9 +269,9 @@ void DisassemblyWidget::contextRenameFunction()
 		QMessageBox::warning(this, tr("Rename Function Error"), tr("No function / symbol is currently selected."));
 		return;
 	}
-	
+
 	QString oldName = QString::fromStdString(curFunc.name);
-	
+
 	bool ok;
 	QString newName = QInputDialog::getText(this, tr("Rename Function"), tr("Function name"), QLineEdit::Normal, oldName, &ok);
 	if (!ok)
@@ -290,12 +290,8 @@ void DisassemblyWidget::contextRenameFunction()
 
 void DisassemblyWidget::contextStubFunction()
 {
-	u32 address = m_selectedAddressStart;
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_overlapping_address(m_selectedAddressStart);
-		if (function)
-			address = function->address().value;
-	});
+	FunctionStat function = m_cpu->GetSymbolGuardian().StatFunctionOverlappingAddress(m_selectedAddressStart);
+	u32 address = function.address.valid() ? function.address.value : m_selectedAddressStart;
 
 	Host::RunOnCPUThread([this, address, cpu = m_cpu] {
 		this->m_stubbedFunctions.insert({address, {cpu->read32(address), cpu->read32(address + 4)}});
@@ -308,7 +304,7 @@ void DisassemblyWidget::contextStubFunction()
 void DisassemblyWidget::contextRestoreFunction()
 {
 	u32 address = m_selectedAddressStart;
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (function)
 			address = function->address().value;
@@ -729,12 +725,7 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 	const bool isConditionalMet = line.info.conditionMet;
 	const bool isCurrentPC = m_cpu->getPC() == address;
 
-	std::string addressSymbol;
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Symbol* symbol = database.first_symbol_from_starting_address(address);
-		if (symbol)
-			addressSymbol = symbol->name();
-	});
+	std::string addressSymbol = m_cpu->GetSymbolGuardian().StatFunctionStartingAtAddress(address).name;
 
 	QString lineString("  %1  %2 %3  %4 %5");
 
@@ -792,13 +783,7 @@ QColor DisassemblyWidget::GetAddressFunctionColor(u32 address)
 		};
 	}
 
-	ccc::FunctionHandle handle;
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
-		if (function)
-			handle = function->handle();
-	});
-
+	ccc::FunctionHandle handle = m_cpu->GetSymbolGuardian().StatFunctionOverlappingAddress(address).handle;
 	if (!handle.valid())
 		return palette().text().color();
 
@@ -862,10 +847,9 @@ bool DisassemblyWidget::AddressCanRestore(u32 start, u32 end)
 
 bool DisassemblyWidget::FunctionCanRestore(u32 address)
 {
-	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
-		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
-		if (function)
-			address = function->address().value;
-	});
+	FunctionStat function = m_cpu->GetSymbolGuardian().StatFunctionOverlappingAddress(address);
+	if (function.address.valid())
+		address = function.address.value;
+
 	return m_stubbedFunctions.find(address) != m_stubbedFunctions.end();
 }

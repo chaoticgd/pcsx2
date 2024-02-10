@@ -36,7 +36,7 @@ SymbolGuardian::SymbolGuardian()
 	Clear();
 }
 
-bool SymbolGuardian::Read(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+bool SymbolGuardian::TryRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
 {
 	if (m_busy)
 		return false;
@@ -326,7 +326,7 @@ void SymbolGuardian::ClearIrxModules()
 bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
 {
 	bool exists = false;
-	Read([&](const ccc::SymbolDatabase& database) {
+	TryRead([&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		exists = handle.valid();
 	});
@@ -336,7 +336,7 @@ bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
 bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address) const
 {
 	bool exists = false;
-	Read([&](const ccc::SymbolDatabase& database) {
+	TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		exists = function != nullptr;
 	});
@@ -346,7 +346,7 @@ bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address) const
 FunctionStat SymbolGuardian::StatFunctionStartingAtAddress(u32 address) const
 {
 	FunctionStat stat;
-	Read([&](const ccc::SymbolDatabase& database) {
+	TryRead([&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		const ccc::Function* function = database.functions.symbol_from_handle(handle);
 		if (function)
@@ -363,7 +363,7 @@ FunctionStat SymbolGuardian::StatFunctionStartingAtAddress(u32 address) const
 FunctionStat SymbolGuardian::StatFunctionOverlappingAddress(u32 address) const
 {
 	FunctionStat stat;
-	Read([&](const ccc::SymbolDatabase& database) {
+	TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (function)
 		{

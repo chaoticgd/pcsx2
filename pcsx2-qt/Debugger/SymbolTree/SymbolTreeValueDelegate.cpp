@@ -25,7 +25,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 	if (!node->type.valid())
 		return result;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
@@ -91,7 +91,7 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 	if (!node->type.valid())
 		return;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
@@ -201,7 +201,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 	if (!node->type.valid())
 		return;
 
-	m_guardian.Read([&](const ccc::SymbolDatabase& database) {
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
