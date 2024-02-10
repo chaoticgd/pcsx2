@@ -40,6 +40,8 @@ void SymbolTreeWidget::update()
 	if (!m_model)
 		setupTree();
 
+	m_cpu.GetSymbolGuardian().UpdateFunctionHashes(m_cpu);
+
 	std::unique_ptr<SymbolTreeNode> root;
 	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
 		SymbolFilters filters;

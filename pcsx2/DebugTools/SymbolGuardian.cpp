@@ -12,6 +12,7 @@
 #include "ccc/elf.h"
 #include "ccc/importer_flags.h"
 #include "ccc/symbol_file.h"
+#include "DebugInterface.h"
 
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
@@ -50,6 +51,16 @@ void SymbolGuardian::BlockingRead(std::function<void(const ccc::SymbolDatabase&)
 	m_big_symbol_lock.lock_shared();
 	callback(m_database);
 	m_big_symbol_lock.unlock_shared();
+}
+
+bool SymbolGuardian::TryReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
+{
+	if (m_busy)
+		return false;
+	m_big_symbol_lock.lock();
+	callback(m_database);
+	m_big_symbol_lock.unlock();
+	return true;
 }
 
 void SymbolGuardian::ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
@@ -108,8 +119,59 @@ void SymbolGuardian::ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> sy
 				return;
 			}
 
+			// TODO: Fix this.
+			ccc::ElfSymbolFile& symbol_file = *(ccc::ElfSymbolFile*)file.get();
+
+			// Hash all the functions so that we can tell if they get
+			// overwritten in memory.
+			for (ccc::Function& function : database.functions)
+			{
+
+				if (function.module_handle() != *module_handle)
+					continue;
+
+				if (!function.address().valid())
+					continue;
+
+				if (function.size() == 0)
+					continue;
+
+				ccc::Result<std::span<const u32>> text = symbol_file.elf().get_array_virtual<u32>(
+					function.address().value, function.size() / 4);
+				if (!text.success())
+				{
+					ccc::report_warning(module_handle.error());
+					break;
+				}
+
+				function.compute_original_hash(*text);
+			}
+
 			Console.WriteLn("Imported %d symbols.", database.symbol_count());
 		});
+	});
+}
+
+void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
+{
+	TryReadWrite([&](ccc::SymbolDatabase& database) {
+		for (ccc::Function& function : database.functions)
+		{
+			if (!function.address().valid())
+				continue;
+
+			if (function.size() == 0)
+				continue;
+
+			std::vector<u32> text(function.size() / 4);
+			for (u32 i = 0; i < function.size() / 4; i++)
+				text[i] = cpu.read32(function.address().value + i * 4);
+
+			function.compute_current_hash(text);
+		}
+
+		for (ccc::SourceFile& source_file : database.source_files)
+			source_file.check_functions_match(database);
 	});
 }
 

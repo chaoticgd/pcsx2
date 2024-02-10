@@ -12,6 +12,8 @@
 #include "DebugTools/ccc/symbol_database.h"
 #include "DebugTools/ccc/symbol_file.h"
 
+class DebugInterface;
+
 struct FunctionStat
 {
 	ccc::FunctionHandle handle;
@@ -37,6 +39,11 @@ public:
 	// symbol database is busy, we block until it's available.
 	void BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
 
+	// Take an exclusive lock on the symbol database. If the symbol database is
+	// busy, nothing happens and we return false. Read calls will block until
+	// the lock is released when the function returns.
+	bool TryReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
+
 	// Take an exclusive lock on the symbol database. Read calls will block
 	// until the lock is released when the function returns.
 	void ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
@@ -50,6 +57,10 @@ public:
 
 	// This should only be called from the CPU thread.
 	void ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file);
+
+	// Compute new hashes for all the functions to check if any of them have
+	// been overwritten.
+	void UpdateFunctionHashes(DebugInterface& cpu);
 
 	// Import user-defined symbols in a simple format.
 	bool ImportNocashSymbols(const std::string& filename);

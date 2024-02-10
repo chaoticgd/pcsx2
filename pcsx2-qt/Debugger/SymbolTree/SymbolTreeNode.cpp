@@ -59,6 +59,8 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 				if (test_value == value)
 					return QString::fromStdString(name);
 			}
+
+			break;
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
@@ -145,6 +147,7 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
 		{
 		}
 	}
+
 	return QVariant();
 }
 
