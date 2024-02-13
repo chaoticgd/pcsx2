@@ -22,5 +22,9 @@ public:
 	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
 
 protected:
+	// Without this, setModelData would only be called when a combo box was
+	// deselected rather than when an option was picked.
+	void onComboBoxIndexChanged(int index);
+
 	const SymbolGuardian& m_guardian;
 };

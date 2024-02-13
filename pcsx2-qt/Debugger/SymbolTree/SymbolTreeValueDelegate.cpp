@@ -67,6 +67,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				QComboBox* comboBox = new QComboBox(parent);
 				for (auto [value, string] : enumeration.constants)
 					comboBox->addItem(QString::fromStdString(string));
+				connect(comboBox, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
 				result = comboBox;
 				break;
 			}
@@ -313,4 +314,11 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			}
 		}
 	});
+}
+
+void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)
+{
+	QComboBox* comboBox = static_cast<QComboBox*>(sender());
+	if (comboBox)
+		commitData(comboBox);
 }
