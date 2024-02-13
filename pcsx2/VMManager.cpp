@@ -1107,7 +1107,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
 
-	R5900SymbolGuardian.Clear();
+	R5900SymbolGuardian.Reset();
 
 	// Load the symbols stored in the ELF file.
 	R5900SymbolGuardian.ImportElf(elfo.ReleaseData(), s_elf_path);

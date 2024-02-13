@@ -67,6 +67,9 @@ public:
 	// TryReadWrite calls will fail and return false.
 	void AsyncReadWrite(ReadWriteCallback callback) noexcept;
 
+	// Interrupt the import thread, delete all symbols, create built-ins.
+	void Reset();
+
 	void ImportElf(std::vector<u8> elf, std::string elf_file_name);
 
 	static ccc::ModuleHandle ImportSymbolTables(
@@ -76,10 +79,6 @@ public:
 	// Compute new hashes for all the functions to check if any of them have
 	// been overwritten.
 	void UpdateFunctionHashes(DebugInterface& cpu);
-
-	// Delete all symbols, including user-defined symbols. This will also
-	// interrupt any operations runnning on the symbol table import thread.
-	void Clear();
 
 	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();

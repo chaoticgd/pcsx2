@@ -18,8 +18,13 @@
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
 
-static ccc::ModuleHandle ImportSymbolTables(ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
-static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module);
+static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database);
+static void CreateBuiltInDataType(
+	ccc::SymbolDatabase& database, ccc::SymbolSourceHandle source, const char* name, ccc::ast::BuiltInClass bclass);
+static ccc::ModuleHandle ImportSymbolTables(
+	ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
+static void ComputeOriginalFunctionHashes(
+	ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module);
 
 static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
@@ -134,6 +139,75 @@ bool SymbolGuardian::ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback 
 	m_big_symbol_lock.unlock();
 
 	return true;
+}
+
+void SymbolGuardian::Reset()
+{
+	// Since the clear command is going to delete everything in the database, we
+	// can discard any pending async read/write operations.
+	m_work_queue_lock.lock();
+	m_work_queue = std::queue<ReadWriteCallback>();
+	m_work_queue_lock.unlock();
+
+	m_interrupt_import_thread = true;
+
+	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		database.clear();
+		m_interrupt_import_thread = false;
+
+		CreateDefaultBuiltInDataTypes(database);
+	});
+}
+
+static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database)
+{
+	ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Built-in");
+	if (!source.success())
+		return;
+
+	// Create some built-in data type symbols so that users still have some
+	// types to use even if there isn't a symbol table loaded. Maybe in the
+	// future we could add PS2-specific types like DMA tags here too.
+	CreateBuiltInDataType(database, *source, "char", ccc::ast::BuiltInClass::UNQUALIFIED_8);
+	CreateBuiltInDataType(database, *source, "signed char", ccc::ast::BuiltInClass::SIGNED_8);
+	CreateBuiltInDataType(database, *source, "unsigned char", ccc::ast::BuiltInClass::UNSIGNED_8);
+	CreateBuiltInDataType(database, *source, "short", ccc::ast::BuiltInClass::SIGNED_16);
+	CreateBuiltInDataType(database, *source, "unsigned short", ccc::ast::BuiltInClass::UNSIGNED_16);
+	CreateBuiltInDataType(database, *source, "int", ccc::ast::BuiltInClass::SIGNED_32);
+	CreateBuiltInDataType(database, *source, "unsigned int", ccc::ast::BuiltInClass::UNSIGNED_32);
+	CreateBuiltInDataType(database, *source, "unsigned", ccc::ast::BuiltInClass::UNSIGNED_32);
+	CreateBuiltInDataType(database, *source, "long", ccc::ast::BuiltInClass::SIGNED_64);
+	CreateBuiltInDataType(database, *source, "unsigned long", ccc::ast::BuiltInClass::UNSIGNED_64);
+	CreateBuiltInDataType(database, *source, "long long", ccc::ast::BuiltInClass::SIGNED_64);
+	CreateBuiltInDataType(database, *source, "unsigned long long", ccc::ast::BuiltInClass::UNSIGNED_64);
+	CreateBuiltInDataType(database, *source, "float", ccc::ast::BuiltInClass::FLOAT_32);
+	CreateBuiltInDataType(database, *source, "double", ccc::ast::BuiltInClass::FLOAT_64);
+	CreateBuiltInDataType(database, *source, "void", ccc::ast::BuiltInClass::VOID_TYPE);
+	CreateBuiltInDataType(database, *source, "s8", ccc::ast::BuiltInClass::SIGNED_8);
+	CreateBuiltInDataType(database, *source, "u8", ccc::ast::BuiltInClass::UNSIGNED_8);
+	CreateBuiltInDataType(database, *source, "s16", ccc::ast::BuiltInClass::SIGNED_16);
+	CreateBuiltInDataType(database, *source, "u16", ccc::ast::BuiltInClass::UNSIGNED_16);
+	CreateBuiltInDataType(database, *source, "s32", ccc::ast::BuiltInClass::SIGNED_32);
+	CreateBuiltInDataType(database, *source, "u32", ccc::ast::BuiltInClass::UNSIGNED_32);
+	CreateBuiltInDataType(database, *source, "s64", ccc::ast::BuiltInClass::SIGNED_64);
+	CreateBuiltInDataType(database, *source, "u64", ccc::ast::BuiltInClass::UNSIGNED_64);
+	CreateBuiltInDataType(database, *source, "s128", ccc::ast::BuiltInClass::SIGNED_128);
+	CreateBuiltInDataType(database, *source, "u128", ccc::ast::BuiltInClass::UNSIGNED_128);
+	CreateBuiltInDataType(database, *source, "f32", ccc::ast::BuiltInClass::FLOAT_32);
+	CreateBuiltInDataType(database, *source, "f64", ccc::ast::BuiltInClass::FLOAT_64);
+}
+
+static void CreateBuiltInDataType(
+	ccc::SymbolDatabase& database, ccc::SymbolSourceHandle source, const char* name, ccc::ast::BuiltInClass bclass)
+{
+	ccc::Result<ccc::DataType*> symbol = database.data_types.create_symbol(name, source, nullptr);
+	if (!symbol.success())
+		return;
+
+	std::unique_ptr<ccc::ast::BuiltIn> type = std::make_unique<ccc::ast::BuiltIn>();
+	type->computed_size_bytes = ccc::ast::builtin_class_size(bclass);
+	type->bclass = bclass;
+	(*symbol)->set_type(std::move(type));
 }
 
 void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name)
@@ -343,22 +417,6 @@ void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
 
 		for (ccc::SourceFile& source_file : database.source_files)
 			source_file.check_functions_match(database);
-	});
-}
-
-void SymbolGuardian::Clear()
-{
-	// Since the clear command is going to delete everything in the database, we
-	// can discard any pending async read/write operations.
-	m_work_queue_lock.lock();
-	m_work_queue = std::queue<ReadWriteCallback>();
-	m_work_queue_lock.unlock();
-	
-	m_interrupt_import_thread = true;
-	
-	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.clear();
-		m_interrupt_import_thread = false;
 	});
 }
 
