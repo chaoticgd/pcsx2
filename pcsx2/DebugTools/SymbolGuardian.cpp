@@ -263,13 +263,12 @@ ccc::ModuleHandle SymbolGuardian::ImportSymbolTables(
 
 bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const std::string& file_name)
 {
-	// TODO: leaking file handle here
-	FILE* f = FileSystem::OpenCFile(file_name.c_str(), "r");
-	if (!f)
-		return false;
-
 	ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Nocash Symbols");
 	if (!source.success())
+		return false;
+
+	FILE* f = FileSystem::OpenCFile(file_name.c_str(), "r");
+	if (!f)
 		return false;
 
 	while (!feof(f))
@@ -280,7 +279,7 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 			break;
 
 		u32 address;
-		if (sscanf(line, "%08X %s", &address, value) != 2)
+		if (sscanf(line, "%08x %255s", &address, value) != 2)
 			continue;
 		if (address == 0 && strcmp(value, "0") == 0)
 			continue;
@@ -294,7 +293,7 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 				*s = 0;
 
 				u32 size = 0;
-				if (sscanf(s + 1, "%04X", &size) != 1)
+				if (sscanf(s + 1, "%04x", &size) != 1)
 					continue;
 
 				std::unique_ptr<ccc::ast::BuiltIn> scalar_type = std::make_unique<ccc::ast::BuiltIn>();
@@ -326,7 +325,10 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 				ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(
 					line, address, *source, nullptr);
 				if (!global_variable.success())
+				{
+					fclose(f);
 					return false;
+				}
 
 				if (scalar_type->computed_size_bytes == (s32)size)
 				{
@@ -344,25 +346,33 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 		}
 		else
 		{ // labels
-			int size = 1;
+			u32 size = 1;
 			char* seperator = strchr(value, ',');
 			if (seperator != NULL)
 			{
 				*seperator = 0;
-				sscanf(seperator + 1, "%08X", &size);
+				sscanf(seperator + 1, "%08x", &size);
 			}
 
 			if (size != 1)
 			{
 				ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, address, *source, nullptr);
 				if (!function.success())
+				{
+					fclose(f);
 					return false;
+				}
+
+				(*function)->set_size(size);
 			}
 			else
 			{
 				ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, address, *source, nullptr);
 				if (!label.success())
+				{
+					fclose(f);
 					return false;
+				}
 			}
 		}
 	}
