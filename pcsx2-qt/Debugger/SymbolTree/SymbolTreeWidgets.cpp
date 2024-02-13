@@ -469,7 +469,7 @@ void FunctionTreeWidget::onDeleteButtonPressed()
 	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
 		return;
 
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.destroy_function(node->symbol.handle());
 	});
 
@@ -581,7 +581,7 @@ void GlobalVariableTreeWidget::onDeleteButtonPressed()
 	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
 		return;
 
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.global_variables.destroy_symbol(node->symbol.handle());
 	});
 
@@ -684,7 +684,7 @@ void LocalVariableTreeWidget::onDeleteButtonPressed()
 	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
 		return;
 
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.local_variables.destroy_symbol(node->symbol.handle());
 	});
 
@@ -779,7 +779,7 @@ void ParameterVariableTreeWidget::onDeleteButtonPressed()
 	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
 		return;
 
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.parameter_variables.destroy_symbol(node->symbol.handle());
 	});
 

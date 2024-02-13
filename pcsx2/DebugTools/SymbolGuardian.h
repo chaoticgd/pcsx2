@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <queue>
 #include <atomic>
 #include <thread>
 #include <functional>
@@ -26,6 +27,7 @@ enum SymbolDatabaseAccessMode
 {
 	SDA_TRY, // If the symbol database is busy, do nothing and return.
 	SDA_BLOCK, // If the symbol database is busy, block until it's available.
+	SDA_ASYNC // Submit the callback to be run on the work thread and return immediately.
 };
 
 struct SymbolGuardian
@@ -34,49 +36,49 @@ public:
 	SymbolGuardian();
 	SymbolGuardian(const SymbolGuardian& rhs) = delete;
 	SymbolGuardian(SymbolGuardian&& rhs) = delete;
+	~SymbolGuardian();
 	SymbolGuardian& operator=(const SymbolGuardian& rhs) = delete;
 	SymbolGuardian& operator=(SymbolGuardian&& rhs) = delete;
 
+	using ReadCallback = std::function<void(const ccc::SymbolDatabase&)>;
+	using ReadWriteCallback = std::function<void(ccc::SymbolDatabase&, const std::atomic_bool& interrupt)>;
+	using SynchronousReadWriteCallback = std::function<void(ccc::SymbolDatabase&)>;
+
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, nothing happens and we return false.
-	bool TryRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+	bool TryRead(ReadCallback callback) const noexcept;
 
 	// Take a shared lock on the symbol database and run the callback. If the
 	// symbol database is busy, we block until it's available.
-	void BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+	void BlockingRead(ReadCallback callback) const noexcept;
 
 	// Take an exclusive lock on the symbol database. If the symbol database is
-	// busy, nothing happens and we return false. Read calls will block until
-	// the lock is released when the function returns.
-	bool TryReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
+	// busy, nothing happens and we return false. TryRead and TryReadWrite calls
+	// will block until the lock is released when the function returns.
+	bool TryReadWrite(SynchronousReadWriteCallback callback) noexcept;
 
-	// Take an exclusive lock on the symbol database. Read calls will block
-	// until the lock is released when the function returns.
-	void ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
+	// Take an exclusive lock on the symbol database. If the symbol table is
+	// busy, we block until it's available. TryRead and TryReadWrite calls will
+	// block until the lock is released when the function returns.
+	void BlockingReadWrite(SynchronousReadWriteCallback callback) noexcept;
 
-	// Take an exclusive lock on the symbol database and set the busy flag while
-	// the callback in being run. Read calls will fail and return false.
-	void LongReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept;
+	// Push the callback onto a work queue so it can be run from the symbol
+	// table import thread. While the callback is running, TryRead and
+	// TryReadWrite calls will fail and return false.
+	void AsyncReadWrite(ReadWriteCallback callback) noexcept;
 
-	// This should only be called from the CPU thread.
-	void ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string file_name);
+	void ImportElf(std::vector<u8> elf, std::string elf_file_name);
 
-	// This should only be called from the CPU thread.
-	void ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file);
+	static ccc::ModuleHandle ImportSymbolTables(
+		ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
+	static bool ImportNocashSymbols(ccc::SymbolDatabase& database, const std::string& file_name);
 
 	// Compute new hashes for all the functions to check if any of them have
 	// been overwritten.
 	void UpdateFunctionHashes(DebugInterface& cpu);
 
-	// Import user-defined symbols in a simple format.
-	bool ImportNocashSymbols(const std::string& filename);
-
-	// This should only be called from the CPU thread.
-	void InterruptImportThread();
-
-	// Delete all symbols, including user-defined symbols. It is important to do
-	// it this way rather than assigning a new SymbolDatabase object so we
-	// don't get dangling symbol handles.
+	// Delete all symbols, including user-defined symbols. This will also
+	// interrupt any operations runnning on the symbol table import thread.
 	void Clear();
 
 	// Delete all symbols from modules that have the "is_irx" flag set.
@@ -91,16 +93,18 @@ public:
 	FunctionInfo FunctionOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 
 protected:
-	bool Read(SymbolDatabaseAccessMode mode, std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept;
+	bool Read(SymbolDatabaseAccessMode mode, ReadCallback callback) const noexcept;
+	bool ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback callback) noexcept;
 
 	ccc::SymbolDatabase m_database;
-	ccc::SymbolSourceHandle m_user_defined;
-	ccc::ModuleHandle m_main_elf;
 	mutable std::shared_mutex m_big_symbol_lock;
 	std::atomic_bool m_busy;
 
 	std::thread m_import_thread;
-	std::atomic_bool m_interrupt_import_thread;
+	std::atomic_bool m_shutdown_import_thread = false;
+	std::atomic_bool m_interrupt_import_thread = false;
+	std::queue<ReadWriteCallback> m_work_queue;
+	std::mutex m_work_queue_lock;
 };
 
 extern SymbolGuardian R5900SymbolGuardian;

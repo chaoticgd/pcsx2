@@ -101,7 +101,7 @@ NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
 void NewFunctionDialog::createSymbol()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		// Parse the user input.
 		bool ok;
 
@@ -148,7 +148,7 @@ NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* p
 void NewGlobalVariableDialog::createSymbol()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		// Parse the user input.
 		bool ok;
 
@@ -201,7 +201,7 @@ NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* par
 void NewLocalVariableDialog::createSymbol()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		// Parse the user input.
 		ccc::FunctionHandle function_handle = m_functions.at(m_ui.functionComboBox->currentIndex());
 		ccc::Function* function = database.functions.symbol_from_handle(function_handle);
@@ -295,7 +295,7 @@ NewParameterVariableDialog::NewParameterVariableDialog(DebugInterface& cpu, QWid
 void NewParameterVariableDialog::createSymbol()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		// Parse the user input.
 		ccc::FunctionHandle function_handle = m_functions.at(m_ui.functionComboBox->currentIndex());
 		ccc::Function* function = database.functions.symbol_from_handle(function_handle);

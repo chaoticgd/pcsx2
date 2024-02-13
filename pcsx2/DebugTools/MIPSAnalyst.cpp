@@ -174,7 +174,7 @@ namespace MIPSAnalyst
 		return furthestJumpbackAddr;
 	}
 
-	void ScanForFunctions(SymbolGuardian& guardian, u32 startAddr, u32 endAddr) {
+	void ScanForFunctions(ccc::SymbolDatabase& database, u32 startAddr, u32 endAddr) {
 		std::vector<MIPSAnalyst::AnalyzedFunction> functions;
 		AnalyzedFunction currentFunction = {startAddr};
 
@@ -186,9 +186,11 @@ namespace MIPSAnalyst
 		u32 addr;
 		for (addr = startAddr; addr <= endAddr; addr += 4) {
 			// Use pre-existing symbol map info if available. May be more reliable.
-			FunctionInfo existing_symbol = guardian.FunctionStartingAtAddress(addr, SDA_BLOCK);
-			if (existing_symbol.address.valid() && existing_symbol.size > 0) {
-				addr = existing_symbol.address.value + existing_symbol.size - 4;
+			ccc::FunctionHandle existing_symbol_handle = database.functions.first_handle_from_starting_address(addr);
+			const ccc::Function* existing_symbol = database.functions.symbol_from_handle(existing_symbol_handle);
+			
+			if (existing_symbol && existing_symbol->address().valid() && existing_symbol->size() > 0) {
+				addr = existing_symbol->address().value + existing_symbol->size() - 4;
 				currentFunction.start = addr + 4;
 				furthestBranch = 0;
 				looking = false;
@@ -284,43 +286,41 @@ namespace MIPSAnalyst
 
 		currentFunction.end = addr + 4;
 		functions.push_back(currentFunction);
+		
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Analysis");
+		if(!source->valid())
+			return;
 
-		guardian.LongReadWrite([&](ccc::SymbolDatabase& database) {
-			ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Analysis");
-			if(!source->valid())
-				return;
-
-			for (const AnalyzedFunction& function : functions) {
-				ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(function.start);
-				ccc::Function* symbol = database.functions.symbol_from_handle(handle);
+		for (const AnalyzedFunction& function : functions) {
+			ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(function.start);
+			ccc::Function* symbol = database.functions.symbol_from_handle(handle);
+			
+			if (!symbol) {
+				std::string name;
 				
-				if (!symbol) {
-					std::string name;
-					
-					// The SNDLL importer will create labels for symbols since
-					// it can't distinguish between functions and globals.
-					ccc::LabelHandle label_handle = database.labels.first_handle_from_starting_address(function.start);
-					ccc::Label* label = database.labels.symbol_from_handle(label_handle);
-					if(label) {
-						name = label->name();
-					}
-					
-					if (name.empty()) {
-						name = StringUtil::StdStringFromFormat("z_un_%08x", function.start);
-					}
-
-					ccc::Result<ccc::Function*> symbol_result = database.functions.create_symbol(
-						std::move(name), function.start, *source, nullptr);
-					if (!symbol_result.success())
-						return;
-					symbol = *symbol_result;
+				// The SNDLL importer will create labels for symbols since
+				// it can't distinguish between functions and globals.
+				ccc::LabelHandle label_handle = database.labels.first_handle_from_starting_address(function.start);
+				ccc::Label* label = database.labels.symbol_from_handle(label_handle);
+				if(label) {
+					name = label->name();
+				}
+				
+				if (name.empty()) {
+					name = StringUtil::StdStringFromFormat("z_un_%08x", function.start);
 				}
 
-				if (symbol->size() == 0) {
-					symbol->set_size(function.end - function.start + 4);
-				}
+				ccc::Result<ccc::Function*> symbol_result = database.functions.create_symbol(
+					std::move(name), function.start, *source, nullptr);
+				if (!symbol_result.success())
+					return;
+				symbol = *symbol_result;
 			}
-		});
+
+			if (symbol->size() == 0) {
+				symbol->set_size(function.end - function.start + 4);
+			}
+		}
 	}
 
 	MipsOpcodeInfo GetOpcodeInfo(DebugInterface* cpu, u32 address) {

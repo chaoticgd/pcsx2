@@ -1078,8 +1078,11 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	Patch::ReloadPatches(s_disc_serial, crc_to_report, false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
 
-	MIPSAnalyst::ScanForFunctions(
-		R5900SymbolGuardian, s_elf_text_range.first, s_elf_text_range.first + s_elf_text_range.second);
+	u32 text_begin = s_elf_text_range.first;
+	u32 text_size = s_elf_text_range.second;
+	R5900SymbolGuardian.AsyncReadWrite([text_begin, text_size](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
+		MIPSAnalyst::ScanForFunctions(database, text_begin, text_begin + text_size);
+	});
 }
 
 void VMManager::UpdateELFInfo(std::string elf_path)
@@ -1107,22 +1110,24 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	R5900SymbolGuardian.Clear();
 
 	// Load the symbols stored in the ELF file.
-	R5900SymbolGuardian.ImportElfSymbolTablesAsync(elfo.ReleaseData(), s_elf_path);
+	R5900SymbolGuardian.ImportElf(elfo.ReleaseData(), s_elf_path);
 
-	// Load symbols from a .sym file if it exists.
+	// Search for a .sym file to load symbols from.
 	CDVD_SourceType source_type = CDVDsys_GetSourceType();
 	if (source_type == CDVD_SourceType::Iso)
 	{
 		std::string iso_file_path = CDVDsys_GetFile(source_type);
 
-		std::string symName;
+		std::string sym_name;
 		std::string::size_type n = iso_file_path.rfind('.');
 		if (n == std::string::npos)
-			symName = iso_file_path + ".sym";
+			sym_name = iso_file_path + ".sym";
 		else
-			symName = iso_file_path.substr(0, n) + ".sym";
+			sym_name = iso_file_path.substr(0, n) + ".sym";
 
-		R5900SymbolGuardian.ImportNocashSymbols(symName.c_str());
+		R5900SymbolGuardian.AsyncReadWrite([sym_name](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
+			SymbolGuardian::ImportNocashSymbols(database, sym_name);
+		});
 	}
 }
 
@@ -1582,10 +1587,6 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	// clear out any potentially-incorrect settings from the last game
 	LoadSettings();
-
-	// Cancel any active symbol table import operations.
-	R3000SymbolGuardian.InterruptImportThread();
-	R5900SymbolGuardian.InterruptImportThread();
 }
 
 void VMManager::Reset()

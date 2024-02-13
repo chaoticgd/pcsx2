@@ -220,7 +220,7 @@ void DisassemblyWidget::contextAddFunction()
 		newFuncSize = m_selectedAddressEnd + 4 - m_selectedAddressStart;
 	}
 
-	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		if (curFuncNewSize != UINT32_MAX)
 		{
 			ccc::Function* currentFunction = database.functions.symbol_from_handle(curFunc.handle);
@@ -247,7 +247,7 @@ void DisassemblyWidget::contextCopyFunctionName()
 
 void DisassemblyWidget::contextRemoveFunction()
 {
-	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Function* curFunc = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (!curFunc)
 			return;
@@ -283,7 +283,7 @@ void DisassemblyWidget::contextRenameFunction()
 		return;
 	}
 
-	m_cpu->GetSymbolGuardian().ShortReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.functions.rename_symbol(curFunc.handle, newName.toStdString());
 	});
 }

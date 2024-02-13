@@ -314,7 +314,7 @@ QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_vi
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 
 	QString error_message;
-	m_guardian.ShortReadWrite([&](ccc::SymbolDatabase& database) -> void {
+	m_guardian.BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
 		// Parse the input string.
 		std::unique_ptr<ccc::ast::Node> type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty() || !type)

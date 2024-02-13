@@ -3,6 +3,7 @@
 
 #include "SymbolGuardian.h"
 
+#include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
@@ -16,6 +17,9 @@
 
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
+
+static ccc::ModuleHandle ImportSymbolTables(ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
+static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module);
 
 static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
@@ -33,56 +37,106 @@ static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 SymbolGuardian::SymbolGuardian()
 {
 	ccc::set_custom_error_callback(error_callback);
-	Clear();
+
+	m_import_thread = std::thread([this]() {
+		while (!m_shutdown_import_thread)
+		{
+			ReadWriteCallback callback;
+			m_work_queue_lock.lock();
+			if (!m_work_queue.empty() && !m_interrupt_import_thread)
+			{
+				ReadWriteCallback& front = m_work_queue.front();
+				callback = std::move(front);
+				m_work_queue.pop();
+			}
+			m_work_queue_lock.unlock();
+
+			if (callback)
+			{
+				m_busy = true;
+				m_big_symbol_lock.lock();
+				callback(m_database, m_interrupt_import_thread);
+				m_big_symbol_lock.unlock();
+				m_busy = false;
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	});
 }
 
-bool SymbolGuardian::TryRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+SymbolGuardian::~SymbolGuardian()
+{
+	m_shutdown_import_thread = true;
+	m_interrupt_import_thread = true;
+	if (m_import_thread.joinable())
+		m_import_thread.join();
+}
+
+bool SymbolGuardian::TryRead(ReadCallback callback) const noexcept
 {
 	return Read(SDA_TRY, std::move(callback));
 }
 
-void SymbolGuardian::BlockingRead(std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+void SymbolGuardian::BlockingRead(ReadCallback callback) const noexcept
 {
 	Read(SDA_BLOCK, std::move(callback));
 }
 
-bool SymbolGuardian::Read(SymbolDatabaseAccessMode mode, std::function<void(const ccc::SymbolDatabase&)> callback) const noexcept
+bool SymbolGuardian::Read(SymbolDatabaseAccessMode mode, ReadCallback callback) const noexcept
 {
-	if(mode == SDA_TRY && m_busy)
+	pxAssertRel(mode != SDA_ASYNC, "SDA_ASYNC not supported for read operations.");
+
+	if (mode == SDA_TRY && m_busy)
 		return false;
+
 	m_big_symbol_lock.lock_shared();
 	callback(m_database);
 	m_big_symbol_lock.unlock_shared();
+
 	return true;
 }
 
-bool SymbolGuardian::TryReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
+bool SymbolGuardian::TryReadWrite(SynchronousReadWriteCallback callback) noexcept
 {
-	if (m_busy)
+	return ReadWrite(SDA_TRY, [callback](ccc::SymbolDatabase& database, const std::atomic_bool&) {
+		return callback(database);
+	});
+}
+
+void SymbolGuardian::BlockingReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
+{
+	ReadWrite(SDA_BLOCK, [callback](ccc::SymbolDatabase& database, const std::atomic_bool&) {
+		callback(database);
+	});
+}
+
+void SymbolGuardian::AsyncReadWrite(ReadWriteCallback callback) noexcept
+{
+	ReadWrite(SDA_ASYNC, callback);
+}
+
+bool SymbolGuardian::ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback callback) noexcept
+{
+	if (mode == SDA_ASYNC)
+	{
+		m_work_queue_lock.lock();
+		m_work_queue.emplace(std::move(callback));
+		m_work_queue_lock.unlock();
+		return true;
+	}
+
+	if (mode == SDA_TRY && m_busy)
 		return false;
+
 	m_big_symbol_lock.lock();
-	callback(m_database);
+	callback(m_database, m_interrupt_import_thread);
 	m_big_symbol_lock.unlock();
+
 	return true;
 }
 
-void SymbolGuardian::ShortReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
-{
-	m_big_symbol_lock.lock();
-	callback(m_database);
-	m_big_symbol_lock.unlock();
-}
-
-void SymbolGuardian::LongReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
-{
-	m_busy = true;
-	m_big_symbol_lock.lock();
-	callback(m_database);
-	m_big_symbol_lock.unlock();
-	m_busy = false;
-}
-
-void SymbolGuardian::ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string file_name)
+void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name)
 {
 	ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(elf));
 	if (!parsed_elf.success())
@@ -91,68 +145,182 @@ void SymbolGuardian::ImportElfSymbolTablesAsync(std::vector<u8> elf, std::string
 		return;
 	}
 
-	std::unique_ptr<ccc::SymbolFile> symbol_file = std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf), std::move(file_name));
-	ImportSymbolTablesAsync(std::move(symbol_file));
+	std::unique_ptr<ccc::ElfSymbolFile> symbol_file =
+		std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf), std::move(elf_file_name));
+
+	AsyncReadWrite([file_pointer = symbol_file.release()](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
+		std::unique_ptr<ccc::ElfSymbolFile> symbol_file(file_pointer);
+
+		ccc::ModuleHandle module_handle = ImportSymbolTables(database, *symbol_file, &interrupt);
+
+		if (module_handle.valid())
+			ComputeOriginalFunctionHashes(database, symbol_file->elf(), module_handle);
+	});
 }
 
-void SymbolGuardian::ImportSymbolTablesAsync(std::unique_ptr<ccc::SymbolFile> symbol_file)
+ccc::ModuleHandle SymbolGuardian::ImportSymbolTables(
+	ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt)
 {
-	InterruptImportThread();
+	ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = symbol_file.get_all_symbol_tables();
+	if (!symbol_tables.success())
+	{
+		ccc::report_error(symbol_tables.error());
+		return ccc::ModuleHandle();
+	}
 
-	m_import_thread = std::thread([this, file = std::move(symbol_file)]() {
-		LongReadWrite([&](ccc::SymbolDatabase& database) {
-			ccc::Result<std::vector<std::unique_ptr<ccc::SymbolTable>>> symbol_tables = file->get_all_symbol_tables();
-			if (!symbol_tables.success())
+	ccc::DemanglerFunctions demangler;
+	demangler.cplus_demangle = cplus_demangle;
+	demangler.cplus_demangle_opname = cplus_demangle_opname;
+
+	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
+
+	ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
+		database, symbol_file.name(), *symbol_tables, importer_flags, demangler, interrupt);
+	if (!module_handle.success())
+	{
+		ccc::report_error(module_handle.error());
+		return ccc::ModuleHandle();
+	}
+
+	Console.WriteLn("Imported %d symbols.", database.symbol_count());
+
+	return *module_handle;
+}
+
+bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const std::string& file_name)
+{
+	// TODO: leaking file handle here
+	FILE* f = FileSystem::OpenCFile(file_name.c_str(), "r");
+	if (!f)
+		return false;
+
+	ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Nocash Symbols");
+	if (!source.success())
+		return false;
+
+	while (!feof(f))
+	{
+		char line[256], value[256] = {0};
+		char* p = fgets(line, 256, f);
+		if (p == NULL)
+			break;
+
+		u32 address;
+		if (sscanf(line, "%08X %s", &address, value) != 2)
+			continue;
+		if (address == 0 && strcmp(value, "0") == 0)
+			continue;
+
+		if (value[0] == '.')
+		{
+			// data directives
+			char* s = strchr(value, ':');
+			if (s != NULL)
 			{
-				ccc::report_error(symbol_tables.error());
-				return;
-			}
+				*s = 0;
 
-			ccc::DemanglerFunctions demangler;
-			demangler.cplus_demangle = cplus_demangle;
-			demangler.cplus_demangle_opname = cplus_demangle_opname;
-
-			u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
-
-			ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
-				database, file->name(), *symbol_tables, importer_flags, demangler, &m_interrupt_import_thread);
-			if (!module_handle.success())
-			{
-				ccc::report_error(module_handle.error());
-				return;
-			}
-
-			// TODO: Fix this.
-			ccc::ElfSymbolFile& symbol_file = *(ccc::ElfSymbolFile*)file.get();
-
-			// Hash all the functions so that we can tell if they get
-			// overwritten in memory.
-			for (ccc::Function& function : database.functions)
-			{
-
-				if (function.module_handle() != *module_handle)
+				u32 size = 0;
+				if (sscanf(s + 1, "%04X", &size) != 1)
 					continue;
 
-				if (!function.address().valid())
-					continue;
-
-				if (function.size() == 0)
-					continue;
-
-				ccc::Result<std::span<const u32>> text = symbol_file.elf().get_array_virtual<u32>(
-					function.address().value, function.size() / 4);
-				if (!text.success())
+				std::unique_ptr<ccc::ast::BuiltIn> scalar_type = std::make_unique<ccc::ast::BuiltIn>();
+				if (StringUtil::Strcasecmp(value, ".byt") == 0)
 				{
-					ccc::report_warning(module_handle.error());
-					break;
+					scalar_type->computed_size_bytes = 1;
+					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_8;
+				}
+				else if (StringUtil::Strcasecmp(value, ".wrd") == 0)
+				{
+					scalar_type->computed_size_bytes = 2;
+					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_16;
+				}
+				else if (StringUtil::Strcasecmp(value, ".dbl") == 0)
+				{
+					scalar_type->computed_size_bytes = 4;
+					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_32;
+				}
+				else if (StringUtil::Strcasecmp(value, ".asc") == 0)
+				{
+					scalar_type->computed_size_bytes = 1;
+					scalar_type->bclass = ccc::ast::BuiltInClass::UNQUALIFIED_8;
+				}
+				else
+				{
+					continue;
 				}
 
-				function.compute_original_hash(*text);
+				ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(
+					line, address, *source, nullptr);
+				if (!global_variable.success())
+					return false;
+
+				if (scalar_type->computed_size_bytes == (s32)size)
+				{
+					(*global_variable)->set_type(std::move(scalar_type));
+				}
+				else
+				{
+					std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
+					array->computed_size_bytes = (s32)size;
+					array->element_type = std::move(scalar_type);
+					array->element_count = size / array->element_type->computed_size_bytes;
+					(*global_variable)->set_type(std::move(array));
+				}
+			}
+		}
+		else
+		{ // labels
+			int size = 1;
+			char* seperator = strchr(value, ',');
+			if (seperator != NULL)
+			{
+				*seperator = 0;
+				sscanf(seperator + 1, "%08X", &size);
 			}
 
-			Console.WriteLn("Imported %d symbols.", database.symbol_count());
-		});
-	});
+			if (size != 1)
+			{
+				ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, address, *source, nullptr);
+				if (!function.success())
+					return false;
+			}
+			else
+			{
+				ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, address, *source, nullptr);
+				if (!label.success())
+					return false;
+			}
+		}
+	}
+
+	fclose(f);
+	return true;
+}
+
+static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module)
+{
+	for (ccc::Function& function : database.functions)
+	{
+
+		if (function.module_handle() != module)
+			continue;
+
+		if (!function.address().valid())
+			continue;
+
+		if (function.size() == 0)
+			continue;
+
+		ccc::Result<std::span<const u32>> text = elf.get_array_virtual<u32>(
+			function.address().value, function.size() / 4);
+		if (!text.success())
+		{
+			ccc::report_warning(text.error());
+			break;
+		}
+
+		function.compute_original_hash(*text);
+	}
 }
 
 void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
@@ -178,144 +346,25 @@ void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
 	});
 }
 
-bool SymbolGuardian::ImportNocashSymbols(const std::string& filename)
-{
-	bool success = false;
-
-	FILE* f = FileSystem::OpenCFile(filename.c_str(), "r");
-	if (!f)
-		return success;
-
-	LongReadWrite([&](ccc::SymbolDatabase& database) {
-		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Nocash Symbols");
-		if (!source.success())
-			return;
-
-		while (!feof(f))
-		{
-			char line[256], value[256] = {0};
-			char* p = fgets(line, 256, f);
-			if (p == NULL)
-				break;
-
-			u32 address;
-			if (sscanf(line, "%08X %s", &address, value) != 2)
-				continue;
-			if (address == 0 && strcmp(value, "0") == 0)
-				continue;
-
-			if (value[0] == '.')
-			{
-				// data directives
-				char* s = strchr(value, ':');
-				if (s != NULL)
-				{
-					*s = 0;
-
-					u32 size = 0;
-					if (sscanf(s + 1, "%04X", &size) != 1)
-						continue;
-
-					std::unique_ptr<ccc::ast::BuiltIn> scalar_type = std::make_unique<ccc::ast::BuiltIn>();
-					if (StringUtil::Strcasecmp(value, ".byt") == 0)
-					{
-						scalar_type->computed_size_bytes = 1;
-						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_8;
-					}
-					else if (StringUtil::Strcasecmp(value, ".wrd") == 0)
-					{
-						scalar_type->computed_size_bytes = 2;
-						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_16;
-					}
-					else if (StringUtil::Strcasecmp(value, ".dbl") == 0)
-					{
-						scalar_type->computed_size_bytes = 4;
-						scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_32;
-					}
-					else if (StringUtil::Strcasecmp(value, ".asc") == 0)
-					{
-						scalar_type->computed_size_bytes = 1;
-						scalar_type->bclass = ccc::ast::BuiltInClass::UNQUALIFIED_8;
-					}
-					else
-					{
-						continue;
-					}
-
-					ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(
-						line, address, *source, nullptr);
-					if (!global_variable.success())
-						return;
-
-					if (scalar_type->computed_size_bytes == (s32)size)
-					{
-						(*global_variable)->set_type(std::move(scalar_type));
-					}
-					else
-					{
-						std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
-						array->computed_size_bytes = (s32)size;
-						array->element_type = std::move(scalar_type);
-						array->element_count = size / array->element_type->computed_size_bytes;
-						(*global_variable)->set_type(std::move(array));
-					}
-				}
-			}
-			else
-			{ // labels
-				int size = 1;
-				char* seperator = strchr(value, ',');
-				if (seperator != NULL)
-				{
-					*seperator = 0;
-					sscanf(seperator + 1, "%08X", &size);
-				}
-
-				if (size != 1)
-				{
-					ccc::Result<ccc::Function*> function = database.functions.create_symbol(value, address, *source, nullptr);
-					if (!function.success())
-						return;
-				}
-				else
-				{
-					ccc::Result<ccc::Label*> label = database.labels.create_symbol(value, address, *source, nullptr);
-					if (!label.success())
-						return;
-				}
-			}
-		}
-
-		success = true;
-	});
-
-	fclose(f);
-	return success;
-}
-
-void SymbolGuardian::InterruptImportThread()
-{
-	m_interrupt_import_thread = true;
-	if (m_import_thread.joinable())
-		m_import_thread.join();
-	m_interrupt_import_thread = false;
-}
-
 void SymbolGuardian::Clear()
 {
-	LongReadWrite([&](ccc::SymbolDatabase& database) {
+	// Since the clear command is going to delete everything in the database, we
+	// can discard any pending async read/write operations.
+	m_work_queue_lock.lock();
+	m_work_queue = std::queue<ReadWriteCallback>();
+	m_work_queue_lock.unlock();
+	
+	m_interrupt_import_thread = true;
+	
+	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		database.clear();
-		m_main_elf = ccc::ModuleHandle();
-
-		ccc::Result<ccc::SymbolSource*> source = database.symbol_sources.create_symbol("User Defined", ccc::SymbolSourceHandle());
-		CCC_EXIT_IF_ERROR(source);
-		m_user_defined = (*source)->handle();
+		m_interrupt_import_thread = false;
 	});
 }
 
 void SymbolGuardian::ClearIrxModules()
 {
-	LongReadWrite([&](ccc::SymbolDatabase& database) {
+	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		std::vector<ccc::ModuleHandle> irx_modules;
 		for (const ccc::Module& module : m_database.modules)
 			if (module.is_irx)

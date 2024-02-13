@@ -28,7 +28,7 @@ namespace MIPSAnalyst
 		char name[64];
 	};
 
-	void ScanForFunctions(SymbolGuardian& guardian, u32 startAddr, u32 endAddr);
+	void ScanForFunctions(ccc::SymbolDatabase& database, u32 startAddr, u32 endAddr);
 
 	enum LoadStoreLRType { LOADSTORE_NORMAL, LOADSTORE_LEFT, LOADSTORE_RIGHT };
 
