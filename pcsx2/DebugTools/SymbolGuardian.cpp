@@ -393,7 +393,11 @@ static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const c
 			break;
 		}
 
-		function.compute_original_hash(*text);
+		ccc::FunctionHash hash;
+		for (u32 instruction : *text)
+			hash.update(instruction);
+
+		function.set_original_hash(hash.get());
 	}
 }
 
@@ -408,11 +412,11 @@ void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
 			if (function.size() == 0)
 				continue;
 
-			std::vector<u32> text(function.size() / 4);
+			ccc::FunctionHash hash;
 			for (u32 i = 0; i < function.size() / 4; i++)
-				text[i] = cpu.read32(function.address().value + i * 4);
+				hash.update(cpu.read32(function.address().value + i * 4));
 
-			function.compute_current_hash(text);
+			function.set_current_hash(hash);
 		}
 
 		for (ccc::SourceFile& source_file : database.source_files)
