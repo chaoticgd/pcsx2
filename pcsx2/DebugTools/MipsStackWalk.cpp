@@ -26,12 +26,11 @@ namespace MipsStackWalk
 
 	static u32 GuessEntry(DebugInterface* cpu, u32 pc)
 	{
-		SymbolInfo info;
-		if (cpu->GetSymbolMap().GetSymbolInfo(&info, pc))
-		{
-			return info.address;
-		}
-		return INVALIDTARGET;
+		FunctionInfo function = cpu->GetSymbolGuardian().FunctionOverlappingAddress(pc, SDA_TRY);
+		if(!function.address.valid())
+			return INVALIDTARGET;
+		
+		return function.address.value;
 	}
 
 	bool IsSWInstr(const R5900::OPCODE& op)
