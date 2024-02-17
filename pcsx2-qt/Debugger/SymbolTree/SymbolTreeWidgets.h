@@ -175,5 +175,5 @@ struct SymbolFilters
 		const ccc::Symbol& test_symbol,
 		ccc::SourceFileHandle test_source_file,
 		const ccc::SymbolDatabase& database,
-		QString& name_out) const;
+		QString* name_out) const;
 };

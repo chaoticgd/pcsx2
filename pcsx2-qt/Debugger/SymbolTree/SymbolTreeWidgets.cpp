@@ -410,7 +410,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 			continue;
 
 		QString name;
-		if (!filters.test(function, function.source_file(), database, name))
+		if (!filters.test(function, function.source_file(), database, &name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
@@ -494,7 +494,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			continue;
 
 		QString name;
-		if (!filters.test(global_variable, global_variable.source_file(), database, name))
+		if (!filters.test(global_variable, global_variable.source_file(), database, &name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -510,6 +510,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 	// because they have global storage. Why not.
 	for (const ccc::Function& function : database.functions)
 	{
+		if (!filters.test(function, function.source_file(), database, nullptr))
+			continue;
+
 		std::vector<std::unique_ptr<SymbolTreeNode>> local_variable_nodes;
 
 		std::vector<const ccc::LocalVariable*> local_variables =
@@ -524,7 +527,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 				continue;
 
 			QString name;
-			if (!filters.test(*local_variable, function.source_file(), database, name))
+			if (!filters.test(*local_variable, function.source_file(), database, &name))
 				continue;
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -613,7 +616,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 	for (const ccc::LocalVariable* local_variable : local_variables)
 	{
 		QString name;
-		if (!filters.test(*local_variable, ccc::SourceFileHandle(), database, name))
+		if (!filters.test(*local_variable, ccc::SourceFileHandle(), database, &name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -716,7 +719,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> ParameterVariableTreeWidget::popula
 	for (const ccc::ParameterVariable* parameter_variable : parameter_variables)
 	{
 		QString name;
-		if (!filters.test(*parameter_variable, ccc::SourceFileHandle(), database, name))
+		if (!filters.test(*parameter_variable, ccc::SourceFileHandle(), database, &name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -790,7 +793,7 @@ bool SymbolFilters::test(
 	const ccc::Symbol& test_symbol,
 	ccc::SourceFileHandle test_source_file,
 	const ccc::SymbolDatabase& database,
-	QString& name_out) const
+	QString* name_out) const
 {
 	if (group_by_module && test_symbol.module_handle() != module_handle)
 		return false;
@@ -824,10 +827,13 @@ bool SymbolFilters::test(
 		}
 	}
 
-	name_out = QString::fromStdString(test_symbol.name());
+	if (name_out)
+	{
+		*name_out = QString::fromStdString(test_symbol.name());
 
-	if (!string.isEmpty() && !name_out.contains(string, Qt::CaseInsensitive))
-		return false;
+		if (!string.isEmpty() && !name_out->contains(string, Qt::CaseInsensitive))
+			return false;
+	}
 
 	return true;
 }
