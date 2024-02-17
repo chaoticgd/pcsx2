@@ -15,6 +15,16 @@
 
 class DebugInterface;
 
+// TODO: When the symbol map is gone, rename this back to SymbolInfo.
+struct SymbolInfo2
+{
+	std::optional<ccc::SymbolDescriptor> descriptor;
+	u32 handle = (u32)-1;
+	std::string name;
+	ccc::Address address;
+	u32 size = 0;
+};
+
 struct FunctionInfo
 {
 	ccc::FunctionHandle handle;
@@ -82,6 +92,12 @@ public:
 
 	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();
+
+	// Copy commonly used attributes of a function, global variable or static
+	// local variable symbol into a temporary object.
+	SymbolInfo2 SymbolStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	SymbolInfo2 SymbolAfterAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	SymbolInfo2 SymbolOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
 
 	bool FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 	bool FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const;

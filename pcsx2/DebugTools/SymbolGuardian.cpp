@@ -447,6 +447,57 @@ void SymbolGuardian::ClearIrxModules()
 	});
 }
 
+SymbolInfo2 SymbolGuardian::SymbolStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+{
+	SymbolInfo2 info;
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
+		ccc::SymbolDescriptor descriptor;
+		const ccc::Symbol* symbol = database.first_symbol_starting_at_address(address, descriptors, &descriptor);
+		if (!symbol)
+			return;
+
+		info.descriptor = descriptor;
+		info.handle = symbol->raw_handle();
+		info.address = symbol->address();
+		info.size = symbol->size();
+	});
+	return info;
+}
+
+SymbolInfo2 SymbolGuardian::SymbolAfterAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+{
+	SymbolInfo2 info;
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
+		ccc::SymbolDescriptor descriptor;
+		const ccc::Symbol* symbol = database.first_symbol_after_address(address, descriptors, &descriptor);
+		if (!symbol)
+			return;
+
+		info.descriptor = descriptor;
+		info.handle = symbol->raw_handle();
+		info.address = symbol->address();
+		info.size = symbol->size();
+	});
+	return info;
+}
+
+SymbolInfo2 SymbolGuardian::SymbolOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+{
+	SymbolInfo2 info;
+	Read(mode, [&](const ccc::SymbolDatabase& database) {
+		ccc::SymbolDescriptor descriptor;
+		const ccc::Symbol* symbol = database.first_symbol_overlapping_address(address, descriptors, &descriptor);
+		if (!symbol)
+			return;
+
+		info.descriptor = descriptor;
+		info.handle = symbol->raw_handle();
+		info.address = symbol->address();
+		info.size = symbol->size();
+	});
+	return info;
+}
+
 bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const
 {
 	bool exists = false;
@@ -473,13 +524,13 @@ FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address, SymbolDataba
 	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		const ccc::Function* function = database.functions.symbol_from_handle(handle);
-		if (function)
-		{
-			info.handle = function->handle();
-			info.name = function->name();
-			info.address = function->address();
-			info.size = function->size();
-		}
+		if (!function)
+			return;
+
+		info.handle = function->handle();
+		info.name = function->name();
+		info.address = function->address();
+		info.size = function->size();
 	});
 	return info;
 }
@@ -489,13 +540,13 @@ FunctionInfo SymbolGuardian::FunctionOverlappingAddress(u32 address, SymbolDatab
 	FunctionInfo info;
 	Read(mode, [&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
-		if (function)
-		{
-			info.handle = function->handle();
-			info.name = function->name();
-			info.address = function->address();
-			info.size = function->size();
-		}
+		if (!function)
+			return;
+
+		info.handle = function->handle();
+		info.name = function->name();
+		info.address = function->address();
+		info.size = function->size();
 	});
 	return info;
 }
