@@ -76,7 +76,6 @@ public:
 	virtual bool isValidAddress(u32 address) = 0;
 	virtual u32 getCycles() = 0;
 	virtual BreakPointCpu getCpuType() = 0;
-	[[nodiscard]] virtual SymbolMap& GetSymbolMap() const = 0;
 	[[nodiscard]] virtual SymbolGuardian& GetSymbolGuardian() const = 0;
 	[[nodiscard]] virtual std::vector<std::unique_ptr<BiosThread>> GetThreadList() const = 0;
 
@@ -128,7 +127,6 @@ public:
 	bool getCPCOND0() override;
 	void setPc(u32 newPc) override;
 	void setRegister(int cat, int num, u128 newValue) override;
-	[[nodiscard]] SymbolMap& GetSymbolMap() const override;
 	[[nodiscard]] SymbolGuardian& GetSymbolGuardian() const override;
 	[[nodiscard]] std::vector<std::unique_ptr<BiosThread>> GetThreadList() const override;
 
@@ -172,7 +170,6 @@ public:
 	bool getCPCOND0() override;
 	void setPc(u32 newPc) override;
 	void setRegister(int cat, int num, u128 newValue) override;
-	[[nodiscard]] SymbolMap& GetSymbolMap() const override;
 	[[nodiscard]] SymbolGuardian& GetSymbolGuardian() const override;
 	[[nodiscard]] std::vector<std::unique_ptr<BiosThread>> GetThreadList() const override;
 

@@ -146,7 +146,7 @@ void DisassemblyManager::analyze(u32 address, u32 size = 1024)
 			continue;
 		}
 
-		SymbolInfo2 info = cpu->GetSymbolGuardian().SymbolOverlappingAddress(
+		SymbolInfo info = cpu->GetSymbolGuardian().SymbolOverlappingAddress(
 			address, SDA_TRY, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
 		
 		if (info.descriptor.has_value())
@@ -539,8 +539,8 @@ void DisassemblyFunction::load()
 	u32 funcPos = address;
 	u32 funcEnd = address+size;
 
-	SymbolInfo2 nextData = cpu->GetSymbolGuardian().SymbolAfterAddress(funcPos-1, SDA_TRY,
-		ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
+	SymbolInfo nextData = cpu->GetSymbolGuardian().SymbolAfterAddress(
+		funcPos-1, SDA_TRY, ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
 	u32 opcodeSequenceStart = funcPos;
 	while (funcPos < funcEnd)
 	{

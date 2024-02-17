@@ -15,8 +15,7 @@
 
 class DebugInterface;
 
-// TODO: When the symbol map is gone, rename this back to SymbolInfo.
-struct SymbolInfo2
+struct SymbolInfo
 {
 	std::optional<ccc::SymbolDescriptor> descriptor;
 	u32 handle = (u32)-1;
@@ -93,12 +92,16 @@ public:
 	// Delete all symbols from modules that have the "is_irx" flag set.
 	void ClearIrxModules();
 
-	// Copy commonly used attributes of a function, global variable or static
-	// local variable symbol into a temporary object.
-	SymbolInfo2 SymbolStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
-	SymbolInfo2 SymbolAfterAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
-	SymbolInfo2 SymbolOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
-
+	// Copy commonly used attributes of a symbol into a temporary object.
+	SymbolInfo SymbolStartingAtAddress(
+		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	SymbolInfo SymbolAfterAddress(
+		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	SymbolInfo SymbolOverlappingAddress(
+		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	SymbolInfo SymbolWithName(
+		const std::string& name, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+	
 	bool FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 	bool FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const;
 
@@ -124,104 +127,3 @@ protected:
 
 extern SymbolGuardian R5900SymbolGuardian;
 extern SymbolGuardian R3000SymbolGuardian;
-
-enum SymbolType
-{
-	ST_NONE = 0,
-	ST_FUNCTION = 1,
-	ST_DATA = 2,
-	ST_ALL = 3,
-};
-
-struct SymbolInfo
-{
-	SymbolType type;
-	u32 address;
-	u32 size;
-};
-
-struct SymbolEntry
-{
-	std::string name;
-	u32 address;
-	u32 size;
-};
-
-enum DataType
-{
-	DATATYPE_NONE,
-	DATATYPE_BYTE,
-	DATATYPE_HALFWORD,
-	DATATYPE_WORD,
-	DATATYPE_ASCII
-};
-
-class SymbolMap
-{
-public:
-	SymbolMap() {}
-	void Clear();
-	void SortSymbols();
-
-	SymbolType GetSymbolType(u32 address) const;
-	bool GetSymbolInfo(SymbolInfo* info, u32 address, SymbolType symmask = ST_FUNCTION) const;
-	u32 GetNextSymbolAddress(u32 address, SymbolType symmask);
-	std::string GetDescription(unsigned int address) const;
-	std::vector<SymbolEntry> GetAllSymbols(SymbolType symmask) const;
-
-	void AddFunction(const std::string& name, u32 address, u32 size);
-	u32 GetFunctionStart(u32 address) const;
-	int GetFunctionNum(u32 address) const;
-	u32 GetFunctionSize(u32 startAddress) const;
-	bool SetFunctionSize(u32 startAddress, u32 newSize);
-	bool RemoveFunction(u32 startAddress);
-
-	void AddLabel(const std::string& name, u32 address);
-	std::string GetLabelName(u32 address) const;
-	void SetLabelName(const std::string& name, u32 address);
-	bool GetLabelValue(const std::string& name, u32& dest);
-
-	void AddData(u32 address, u32 size, DataType type, int moduleIndex = -1);
-	u32 GetDataStart(u32 address) const;
-	u32 GetDataSize(u32 startAddress) const;
-	DataType GetDataType(u32 startAddress) const;
-
-	// Module functions for IOP symbols
-
-	static const u32 INVALID_ADDRESS = (u32)-1;
-
-	bool IsEmpty() const { return functions.empty() && labels.empty() && data.empty(); };
-
-private:
-	void AssignFunctionIndices();
-
-	struct FunctionEntry
-	{
-		u32 start;
-		u32 size;
-		int index;
-		std::string name;
-	};
-
-	struct LabelEntry
-	{
-		u32 addr;
-		std::string name;
-	};
-
-	struct DataEntry
-	{
-		DataType type;
-		u32 start;
-		u32 size;
-	};
-
-	std::map<u32, FunctionEntry> functions;
-	std::map<u32, LabelEntry> labels;
-	std::map<u32, DataEntry> data;
-
-	mutable std::recursive_mutex m_lock;
-};
-
-extern SymbolMap R5900SymbolMap;
-extern SymbolMap R3000SymbolMap;

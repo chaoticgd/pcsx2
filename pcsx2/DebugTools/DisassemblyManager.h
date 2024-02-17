@@ -94,7 +94,6 @@ private:
 	int num;
 };
 
-
 class DisassemblyMacro: public DisassemblyEntry
 {
 public:
@@ -124,6 +123,14 @@ private:
 	int dataSize;
 };
 
+enum DataType
+{
+	DATATYPE_NONE,
+	DATATYPE_BYTE,
+	DATATYPE_HALFWORD,
+	DATATYPE_WORD,
+	DATATYPE_ASCII
+};
 
 class DisassemblyData: public DisassemblyEntry
 {
