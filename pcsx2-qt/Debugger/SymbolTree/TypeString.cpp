@@ -5,6 +5,8 @@
 
 #include <QtWidgets/QApplication>
 
+#include "common/Pcsx2Types.h"
+
 std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out)
 {
 	size_t i = string.size();
