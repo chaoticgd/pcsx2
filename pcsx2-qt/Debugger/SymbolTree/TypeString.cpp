@@ -11,10 +11,16 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 {
 	size_t i = string.size();
 
-	// Parse array subscripts e.g. 'float[4][4]'.
-	std::vector<s32> array_subscripts;
+	// Parse array subscripts and pointer characters.
+	std::vector<s32> components;
 	for (; i > 0; i--)
 	{
+		if (string[i - 1] == '*' || string[i - 1] == '&')
+		{
+			components.emplace_back(-string[i - 1]);
+			continue;
+		}
+
 		if (string[i - 1] != ']' || i < 2)
 			break;
 
@@ -32,16 +38,10 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 			error_out = QCoreApplication::tr("Invalid array subscript.");
 			return nullptr;
 		}
-		array_subscripts.emplace_back(element_count);
+		
+		components.emplace_back(element_count);
 
 		i = j;
-	}
-
-	// Parse pointer characters e.g. 'char*&'.
-	std::vector<char> pointer_characters;
-	for (; i > 0 && string[i - 1] == '*' || string[i - 1] == '&'; i--)
-	{
-		pointer_characters.emplace_back(string[i - 1]);
 	}
 
 	// Lookup the type.
@@ -69,22 +69,28 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 	type_name->source = ccc::ast::TypeNameSource::REFERENCE;
 	result = std::move(type_name);
 
-	for (i = pointer_characters.size(); i > 0; i--)
+	for (i = components.size(); i > 0; i--)
 	{
-		std::unique_ptr<ccc::ast::PointerOrReference> pointer_or_reference = std::make_unique<ccc::ast::PointerOrReference>();
-		pointer_or_reference->computed_size_bytes = 4;
-		pointer_or_reference->is_pointer = pointer_characters[i - 1] == '*';
-		pointer_or_reference->value_type = std::move(result);
-		result = std::move(pointer_or_reference);
-	}
+		if (components[i - 1] < 0)
+		{
+			char pointer_character = -components[i - 1];
 
-	for (s32 element_count : array_subscripts)
-	{
-		std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
-		array->computed_size_bytes = element_count * result->computed_size_bytes;
-		array->element_type = std::move(result);
-		array->element_count = element_count;
-		result = std::move(array);
+			std::unique_ptr<ccc::ast::PointerOrReference> pointer_or_reference = std::make_unique<ccc::ast::PointerOrReference>();
+			pointer_or_reference->computed_size_bytes = 4;
+			pointer_or_reference->is_pointer = pointer_character == '*';
+			pointer_or_reference->value_type = std::move(result);
+			result = std::move(pointer_or_reference);
+		}
+		else
+		{
+			s32 element_count = components[i - 1];
+
+			std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
+			array->computed_size_bytes = element_count * result->computed_size_bytes;
+			array->element_type = std::move(result);
+			array->element_count = element_count;
+			result = std::move(array);
+		}
 	}
 
 	return result;
@@ -97,23 +103,14 @@ QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& data
 	// Traverse through arrays, pointers and references, and build a string
 	// to be appended to the end of the type name.
 	bool done_finding_arrays_pointers = false;
-	bool found_pointer = false;
 	while (!done_finding_arrays_pointers)
 	{
 		switch (type->descriptor)
 		{
 			case ccc::ast::ARRAY:
 			{
-				// If we see a pointer to an array we can't print that properly
-				// with C-like syntax so we just print the node type instead.
-				if (found_pointer)
-				{
-					done_finding_arrays_pointers = true;
-					break;
-				}
-
 				const ccc::ast::Array& array = type->as<ccc::ast::Array>();
-				suffix.append(QString("[%1]").arg(array.element_count));
+				suffix.prepend(QString("[%1]").arg(array.element_count));
 				type = array.element_type.get();
 				break;
 			}
@@ -122,7 +119,6 @@ QString typeToString(const ccc::ast::Node* type, const ccc::SymbolDatabase& data
 				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
 				suffix.prepend(pointer_or_reference.is_pointer ? '*' : '&');
 				type = pointer_or_reference.value_type.get();
-				found_pointer = true;
 				break;
 			}
 			default:

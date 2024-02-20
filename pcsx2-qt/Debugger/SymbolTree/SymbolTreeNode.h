@@ -15,7 +15,6 @@ struct SymbolTreeNode
 {
 public:
 	QString name;
-	s32 element_count = -1;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
 	ccc::AddressRange live_range;
