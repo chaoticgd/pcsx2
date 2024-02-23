@@ -56,6 +56,7 @@ protected:
 		SymbolTreeLocation location,
 		const ccc::ast::Node& logical_type,
 		ccc::NodeHandle parent_handle,
+		DebugInterface& cpu,
 		const ccc::SymbolDatabase& database);
 
 	static bool nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database);

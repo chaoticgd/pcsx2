@@ -5,7 +5,7 @@
 
 #include "DebugTools/ccc/ast.h"
 
-QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDatabase* database)
+QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase* database)
 {
 	switch (type.descriptor)
 	{
@@ -15,33 +15,33 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 			switch (builtIn.bclass)
 			{
 				case ccc::ast::BuiltInClass::UNSIGNED_8:
-					return QString::number(location.read8());
+					return QString::number(location.read8(cpu));
 				case ccc::ast::BuiltInClass::SIGNED_8:
-					return QString::number((s8)location.read8());
+					return QString::number((s8)location.read8(cpu));
 				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					return QString::number(location.read8());
+					return QString::number(location.read8(cpu));
 				case ccc::ast::BuiltInClass::BOOL_8:
-					return QString::number(location.read8());
+					return QString::number(location.read8(cpu));
 				case ccc::ast::BuiltInClass::UNSIGNED_16:
-					return QString::number(location.read16());
+					return QString::number(location.read16(cpu));
 				case ccc::ast::BuiltInClass::SIGNED_16:
-					return QString::number((s16)location.read16());
+					return QString::number((s16)location.read16(cpu));
 				case ccc::ast::BuiltInClass::UNSIGNED_32:
-					return QString::number(location.read32());
+					return QString::number(location.read32(cpu));
 				case ccc::ast::BuiltInClass::SIGNED_32:
-					return QString::number((s32)location.read32());
+					return QString::number((s32)location.read32(cpu));
 				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
-					u32 value = location.read32();
+					u32 value = location.read32(cpu);
 					return QString::number(*reinterpret_cast<float*>(&value));
 				}
 				case ccc::ast::BuiltInClass::UNSIGNED_64:
-					return QString::number(location.read64());
+					return QString::number(location.read64(cpu));
 				case ccc::ast::BuiltInClass::SIGNED_64:
-					return QString::number((s64)location.read64());
+					return QString::number((s64)location.read64(cpu));
 				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
-					u64 value = location.read64();
+					u64 value = location.read64(cpu);
 					return QString::number(*reinterpret_cast<double*>(&value));
 				}
 				default:
@@ -52,7 +52,7 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 		}
 		case ccc::ast::ENUM:
 		{
-			s32 value = (s32)location.read32();
+			s32 value = (s32)location.read32(cpu);
 			const auto& enum_type = type.as<ccc::ast::Enum>();
 			for (auto [test_value, name] : enum_type.constants)
 			{
@@ -66,7 +66,7 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 		{
 			const auto& pointer_or_reference = type.as<ccc::ast::PointerOrReference>();
 
-			QString result = QString::number(location.read32(), 16);
+			QString result = QString::number(location.read32(cpu), 16);
 
 			// For char* nodes add the value of the string to the output.
 			if (pointer_or_reference.is_pointer && database)
@@ -75,8 +75,8 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 					resolvePhysicalType(pointer_or_reference.value_type.get(), *database).first;
 				if (value_type->name == "char")
 				{
-					u32 pointer = location.read32();
-					const char* string = location.cpu().stringFromPointer(pointer);
+					u32 pointer = location.read32(cpu);
+					const char* string = cpu.stringFromPointer(pointer);
 					if (string)
 						result += QString(" \"%1\"").arg(string);
 				}
@@ -85,7 +85,7 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 			return result;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
-			return QString::number(location.read32(), 16);
+			return QString::number(location.read32(cpu), 16);
 		default:
 		{
 		}
@@ -93,7 +93,7 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, const ccc::SymbolDa
 	return QString();
 }
 
-QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
+QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type, DebugInterface& cpu)
 {
 	switch (type.descriptor)
 	{
@@ -103,33 +103,33 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
 			switch (builtIn.bclass)
 			{
 				case ccc::ast::BuiltInClass::UNSIGNED_8:
-					return (qulonglong)location.read8();
+					return (qulonglong)location.read8(cpu);
 				case ccc::ast::BuiltInClass::SIGNED_8:
-					return (qlonglong)(s8)location.read8();
+					return (qlonglong)(s8)location.read8(cpu);
 				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					return (qulonglong)location.read8();
+					return (qulonglong)location.read8(cpu);
 				case ccc::ast::BuiltInClass::BOOL_8:
-					return (bool)location.read8();
+					return (bool)location.read8(cpu);
 				case ccc::ast::BuiltInClass::UNSIGNED_16:
-					return (qulonglong)location.read16();
+					return (qulonglong)location.read16(cpu);
 				case ccc::ast::BuiltInClass::SIGNED_16:
-					return (qlonglong)(s16)location.read16();
+					return (qlonglong)(s16)location.read16(cpu);
 				case ccc::ast::BuiltInClass::UNSIGNED_32:
-					return (qulonglong)location.read32();
+					return (qulonglong)location.read32(cpu);
 				case ccc::ast::BuiltInClass::SIGNED_32:
-					return (qlonglong)(s32)location.read32();
+					return (qlonglong)(s32)location.read32(cpu);
 				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
-					u32 value = location.read32();
+					u32 value = location.read32(cpu);
 					return *reinterpret_cast<float*>(&value);
 				}
 				case ccc::ast::BuiltInClass::UNSIGNED_64:
-					return (qulonglong)location.read64();
+					return (qulonglong)location.read64(cpu);
 				case ccc::ast::BuiltInClass::SIGNED_64:
-					return (qlonglong)(s64)location.read64();
+					return (qlonglong)(s64)location.read64(cpu);
 				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
-					u64 value = location.read64();
+					u64 value = location.read64(cpu);
 					return *reinterpret_cast<double*>(&value);
 				}
 				default:
@@ -139,10 +139,10 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
 			break;
 		}
 		case ccc::ast::ENUM:
-			return location.read32();
+			return location.read32(cpu);
 		case ccc::ast::POINTER_OR_REFERENCE:
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
-			return location.read32();
+			return location.read32(cpu);
 		default:
 		{
 		}
@@ -151,7 +151,7 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type)
 	return QVariant();
 }
 
-bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type)
+bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu)
 {
 	switch (type.descriptor)
 	{
@@ -162,45 +162,45 @@ bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type)
 			switch (built_in.bclass)
 			{
 				case ccc::ast::BuiltInClass::UNSIGNED_8:
-					location.write8((u8)value.toULongLong());
+					location.write8((u8)value.toULongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::SIGNED_8:
-					location.write8((u8)(s8)value.toLongLong());
+					location.write8((u8)(s8)value.toLongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					location.write8((u8)value.toULongLong());
+					location.write8((u8)value.toULongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::BOOL_8:
-					location.write8((u8)value.toBool());
+					location.write8((u8)value.toBool(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::UNSIGNED_16:
-					location.write16((u16)value.toULongLong());
+					location.write16((u16)value.toULongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::SIGNED_16:
-					location.write16((u16)(s16)value.toLongLong());
+					location.write16((u16)(s16)value.toLongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::UNSIGNED_32:
-					location.write32((u32)value.toULongLong());
+					location.write32((u32)value.toULongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::SIGNED_32:
-					location.write32((u32)(s32)value.toLongLong());
+					location.write32((u32)(s32)value.toLongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
 					float f = value.toFloat();
-					location.write32(*reinterpret_cast<u32*>(&f));
+					location.write32(*reinterpret_cast<u32*>(&f), cpu);
 					break;
 				}
 				case ccc::ast::BuiltInClass::UNSIGNED_64:
-					location.write64((u64)value.toULongLong());
+					location.write64((u64)value.toULongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::SIGNED_64:
-					location.write64((u64)(s64)value.toLongLong());
+					location.write64((u64)(s64)value.toLongLong(), cpu);
 					break;
 				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
 					double d = value.toDouble();
-					location.write64(*reinterpret_cast<u64*>(&d));
+					location.write64(*reinterpret_cast<u64*>(&d), cpu);
 					break;
 				}
 				default:
@@ -211,11 +211,11 @@ bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type)
 			break;
 		}
 		case ccc::ast::ENUM:
-			location.write32((u32)value.toULongLong());
+			location.write32((u32)value.toULongLong(), cpu);
 			break;
 		case ccc::ast::POINTER_OR_REFERENCE:
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
-			location.write32((u32)value.toULongLong());
+			location.write32((u32)value.toULongLong(), cpu);
 			break;
 		default:
 		{

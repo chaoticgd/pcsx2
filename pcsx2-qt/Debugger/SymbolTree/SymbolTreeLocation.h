@@ -13,37 +13,34 @@ class DebugInterface;
 // A memory location, either a register or an address.
 struct SymbolTreeLocation
 {
-	enum
+	enum Type
 	{
-		EE_REGISTER,
-		IOP_REGISTER,
-		EE_MEMORY,
-		IOP_MEMORY,
-		NONE // Put NONE last so it sorts last.
-	} type = NONE;
+		REGISTER,
+		MEMORY,
+		NONE // Put NONE last so nodes of this type sort to the bottom.
+	};
+	
+	Type type = NONE;
 	u32 address = 0;
-	
+
 	SymbolTreeLocation();
-	SymbolTreeLocation(DebugInterface& cpu, u32 addr);
-	
-	QString name() const;
-	
+	SymbolTreeLocation(Type type_arg, u32 address_arg);
+
+	QString name(DebugInterface& cpu) const;
+
 	SymbolTreeLocation addOffset(u32 offset) const;
-	SymbolTreeLocation createAddress(u32 address) const;
-	
-	DebugInterface& cpu() const;
-	
-	u8 read8();
-	u16 read16();
-	u32 read32();
-	u64 read64();
-	u128 read128();
-	
-	void write8(u8 value);
-	void write16(u16 value);
-	void write32(u32 value);
-	void write64(u64 value);
-	void write128(u128 value);
-	
+
+	u8 read8(DebugInterface& cpu);
+	u16 read16(DebugInterface& cpu);
+	u32 read32(DebugInterface& cpu);
+	u64 read64(DebugInterface& cpu);
+	u128 read128(DebugInterface& cpu);
+
+	void write8(u8 value, DebugInterface& cpu);
+	void write16(u16 value, DebugInterface& cpu);
+	void write32(u32 value, DebugInterface& cpu);
+	void write64(u64 value, DebugInterface& cpu);
+	void write128(u128 value, DebugInterface& cpu);
+
 	friend auto operator<=>(const SymbolTreeLocation& lhs, const SymbolTreeLocation& rhs) = default;
 };

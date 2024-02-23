@@ -7,24 +7,18 @@
 
 SymbolTreeLocation::SymbolTreeLocation() = default;
 
-SymbolTreeLocation::SymbolTreeLocation(DebugInterface& cpu, u32 addr)
-	: type((cpu.getCpuType() == BREAKPOINT_EE) ? EE_MEMORY : IOP_MEMORY)
-	, address(addr)
-{
-}
+SymbolTreeLocation::SymbolTreeLocation(Type type_arg, u32 address_arg)
+	: type(type_arg), address(address_arg) {}
 
-QString SymbolTreeLocation::name() const
+QString SymbolTreeLocation::name(DebugInterface& cpu) const
 {
 	switch (type)
 	{
-		case EE_REGISTER:
-			return r5900Debug.getRegisterName(EECAT_GPR, address);
-		case IOP_REGISTER:
-			return r3000Debug.getRegisterName(IOPCAT_GPR, address);
-		case EE_MEMORY:
+		case REGISTER:
+			if (address < 32)
+				return cpu.getRegisterName(0, address);
+		case MEMORY:
 			return QString("%1").arg(address, 8, 16);
-		case IOP_MEMORY:
-			return QString("IOP:%1").arg(address, 8, 16);
 		default:
 		{
 		}
@@ -37,13 +31,11 @@ SymbolTreeLocation SymbolTreeLocation::addOffset(u32 offset) const
 	SymbolTreeLocation location;
 	switch (type)
 	{
-		case EE_REGISTER:
-		case IOP_REGISTER:
+		case REGISTER:
 			if (offset == 0)
 				location = *this;
 			break;
-		case EE_MEMORY:
-		case IOP_MEMORY:
+		case MEMORY:
 			location.type = type;
 			location.address = address + offset;
 			break;
@@ -54,55 +46,16 @@ SymbolTreeLocation SymbolTreeLocation::addOffset(u32 offset) const
 	return location;
 }
 
-SymbolTreeLocation SymbolTreeLocation::createAddress(u32 address) const
-{
-	SymbolTreeLocation location;
-	switch (type)
-	{
-		case EE_REGISTER:
-			location.type = EE_MEMORY;
-			location.address = address;
-			break;
-		case IOP_REGISTER:
-			location.type = IOP_MEMORY;
-			location.address = address;
-			break;
-		case EE_MEMORY:
-		case IOP_MEMORY:
-			location.type = type;
-			location.address = address;
-			break;
-		default:
-		{
-		}
-	}
-	return location;
-}
-
-DebugInterface& SymbolTreeLocation::cpu() const
-{
-	if (type == IOP_REGISTER || type == IOP_MEMORY)
-		return r3000Debug;
-	else
-		return r5900Debug;
-}
-
-u8 SymbolTreeLocation::read8()
+u8 SymbolTreeLocation::read8(DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				return r5900Debug.getRegister(EECAT_GPR, address)._u8[0];
+				return cpu.getRegister(EECAT_GPR, address)._u8[0];
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				return r3000Debug.getRegister(IOPCAT_GPR, address)._u8[0];
-			break;
-		case EE_MEMORY:
-			return (u8)r5900Debug.read8(address);
-		case IOP_MEMORY:
-			return (u8)r3000Debug.read8(address);
+		case MEMORY:
+			return (u8)cpu.read8(address);
 		default:
 		{
 		}
@@ -110,22 +63,16 @@ u8 SymbolTreeLocation::read8()
 	return 0;
 }
 
-u16 SymbolTreeLocation::read16()
+u16 SymbolTreeLocation::read16(DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				return r5900Debug.getRegister(EECAT_GPR, address)._u16[0];
+				return cpu.getRegister(EECAT_GPR, address)._u16[0];
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				return r3000Debug.getRegister(IOPCAT_GPR, address)._u16[0];
-			break;
-		case EE_MEMORY:
-			return (u16)r5900Debug.read16(address);
-		case IOP_MEMORY:
-			return (u16)r3000Debug.read16(address);
+		case MEMORY:
+			return (u16)cpu.read16(address);
 		default:
 		{
 		}
@@ -133,22 +80,16 @@ u16 SymbolTreeLocation::read16()
 	return 0;
 }
 
-u32 SymbolTreeLocation::read32()
+u32 SymbolTreeLocation::read32(DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				return r5900Debug.getRegister(EECAT_GPR, address)._u32[0];
+				return cpu.getRegister(EECAT_GPR, address)._u32[0];
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				return r3000Debug.getRegister(IOPCAT_GPR, address)._u32[0];
-			break;
-		case EE_MEMORY:
-			return r5900Debug.read32(address);
-		case IOP_MEMORY:
-			return r3000Debug.read32(address);
+		case MEMORY:
+			return cpu.read32(address);
 		default:
 		{
 		}
@@ -156,22 +97,16 @@ u32 SymbolTreeLocation::read32()
 	return 0;
 }
 
-u64 SymbolTreeLocation::read64()
+u64 SymbolTreeLocation::read64(DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				return r5900Debug.getRegister(EECAT_GPR, address)._u64[0];
+				return cpu.getRegister(EECAT_GPR, address)._u64[0];
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				return r3000Debug.getRegister(IOPCAT_GPR, address)._u64[0];
-			break;
-		case EE_MEMORY:
-			return r5900Debug.read64(address);
-		case IOP_MEMORY:
-			return r3000Debug.read64(address);
+		case MEMORY:
+			return cpu.read64(address);
 		default:
 		{
 		}
@@ -179,22 +114,16 @@ u64 SymbolTreeLocation::read64()
 	return 0;
 }
 
-u128 SymbolTreeLocation::read128()
+u128 SymbolTreeLocation::read128(DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				return r5900Debug.getRegister(EECAT_GPR, address);
+				return cpu.getRegister(EECAT_GPR, address);
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				return r3000Debug.getRegister(IOPCAT_GPR, address);
-			break;
-		case EE_MEMORY:
-			return r5900Debug.read128(address);
-		case IOP_MEMORY:
-			return r3000Debug.read128(address);
+		case MEMORY:
+			return cpu.read128(address);
 		default:
 		{
 		}
@@ -202,23 +131,16 @@ u128 SymbolTreeLocation::read128()
 	return u128::From32(0);
 }
 
-void SymbolTreeLocation::write8(u8 value)
+void SymbolTreeLocation::write8(u8 value, DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
+				cpu.setRegister(0, address, u128::From32(value));
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
-			break;
-		case EE_MEMORY:
-			r5900Debug.write8(address, value);
-			break;
-		case IOP_MEMORY:
-			r3000Debug.write8(address, value);
+		case MEMORY:
+			cpu.write8(address, value);
 			break;
 		default:
 		{
@@ -226,23 +148,16 @@ void SymbolTreeLocation::write8(u8 value)
 	}
 }
 
-void SymbolTreeLocation::write16(u16 value)
+void SymbolTreeLocation::write16(u16 value, DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
+				cpu.setRegister(0, address, u128::From32(value));
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
-			break;
-		case EE_MEMORY:
-			r5900Debug.write16(address, value);
-			break;
-		case IOP_MEMORY:
-			r3000Debug.write16(address, value);
+		case MEMORY:
+			cpu.write16(address, value);
 			break;
 		default:
 		{
@@ -250,23 +165,16 @@ void SymbolTreeLocation::write16(u16 value)
 	}
 }
 
-void SymbolTreeLocation::write32(u32 value)
+void SymbolTreeLocation::write32(u32 value, DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				r5900Debug.setRegister(EECAT_GPR, address, u128::From32(value));
+				cpu.setRegister(0, address, u128::From32(value));
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From32(value));
-			break;
-		case EE_MEMORY:
-			r5900Debug.write32(address, value);
-			break;
-		case IOP_MEMORY:
-			r3000Debug.write32(address, value);
+		case MEMORY:
+			cpu.write32(address, value);
 			break;
 		default:
 		{
@@ -274,23 +182,16 @@ void SymbolTreeLocation::write32(u32 value)
 	}
 }
 
-void SymbolTreeLocation::write64(u64 value)
+void SymbolTreeLocation::write64(u64 value, DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				r5900Debug.setRegister(EECAT_GPR, address, u128::From64(value));
+				cpu.setRegister(0, address, u128::From64(value));
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				r3000Debug.setRegister(IOPCAT_GPR, address, u128::From64(value));
-			break;
-		case EE_MEMORY:
-			r5900Debug.write64(address, value);
-			break;
-		case IOP_MEMORY:
-			r3000Debug.write64(address, value);
+		case MEMORY:
+			cpu.write64(address, value);
 			break;
 		default:
 		{
@@ -298,23 +199,16 @@ void SymbolTreeLocation::write64(u64 value)
 	}
 }
 
-void SymbolTreeLocation::write128(u128 value)
+void SymbolTreeLocation::write128(u128 value, DebugInterface& cpu)
 {
 	switch (type)
 	{
-		case EE_REGISTER:
+		case REGISTER:
 			if (address < 32)
-				r5900Debug.setRegister(EECAT_GPR, address, value);
+				cpu.setRegister(0, address, value);
 			break;
-		case IOP_REGISTER:
-			if (address < 32)
-				r3000Debug.setRegister(IOPCAT_GPR, address, value);
-			break;
-		case EE_MEMORY:
-			r5900Debug.write128(address, value);
-			break;
-		case IOP_MEMORY:
-			r3000Debug.write128(address, value);
+		case MEMORY:
+			cpu.write128(address, value);
 			break;
 		default:
 		{

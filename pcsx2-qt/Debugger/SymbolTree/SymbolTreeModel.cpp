@@ -118,7 +118,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LOCATION:
 		{
-			return node->location.name();
+			return node->location.name(m_cpu);
 		}
 		case TYPE:
 		{
@@ -159,10 +159,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				switch (role)
 				{
 					case Qt::DisplayRole:
-						result = node->toString(type, &database);
+						result = node->toString(type, m_cpu, &database);
 						break;
 					case Qt::UserRole:
-						result = node->toVariant(type);
+						result = node->toVariant(type, m_cpu);
 						break;
 				}
 			});
@@ -191,7 +191,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 			return;
 
 		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		result = node->fromVariant(value, type);
+		result = node->fromVariant(value, type, m_cpu);
 	});
 
 	if (result)
@@ -215,7 +215,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 		if (!logical_parent_type)
 			return;
 
-		children = populateChildren(parent_node->location, *logical_parent_type, parent_node->type, database);
+		children = populateChildren(parent_node->location, *logical_parent_type, parent_node->type, m_cpu, database);
 	});
 
 	if (!children.empty())
@@ -351,6 +351,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 	SymbolTreeLocation location,
 	const ccc::ast::Node& logical_type,
 	ccc::NodeHandle parent_handle,
+	DebugInterface& cpu,
 	const ccc::SymbolDatabase& database)
 {
 	auto [type, symbol] = resolvePhysicalType(&logical_type, database);
@@ -380,14 +381,14 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
-			u32 address = location.read32();
-			if (location.cpu().isValidAddress(address))
+			u32 address = location.read32(cpu);
+			if (cpu.isValidAddress(address))
 			{
 				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
 				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
 				element->name = QString("*%1").arg(QString::number(address, 16));
 				element->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
-				element->location = location.createAddress(address);
+				element->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
 				children.emplace_back(std::move(element));
 			}
 			break;
@@ -401,7 +402,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 				if (base_class_location.type != SymbolTreeLocation::NONE)
 				{
 					std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
-						base_class_location, *base_class.get(), parent_handle, database);
+						base_class_location, *base_class.get(), parent_handle, cpu, database);
 					children.insert(children.end(),
 						std::make_move_iterator(fields.begin()),
 						std::make_move_iterator(fields.end()));

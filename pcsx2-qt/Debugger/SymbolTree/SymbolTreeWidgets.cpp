@@ -416,7 +416,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
 
 		function_node->name = std::move(name);
-		function_node->location = SymbolTreeLocation(m_cpu, function.address().value);
+		function_node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, function.address().value);
 		function_node->symbol = ccc::MultiSymbolHandle(function);
 
 		for (auto pair : database.labels.handles_from_address_range(function.address_range()))
@@ -427,7 +427,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 
 			std::unique_ptr<SymbolTreeNode> label_node = std::make_unique<SymbolTreeNode>();
 			label_node->name = QString::fromStdString(label->name());
-			label_node->location = SymbolTreeLocation(m_cpu, label->address().value);
+			label_node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, label->address().value);
 			function_node->emplaceChild(std::move(label_node));
 		}
 
@@ -501,7 +501,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		node->name = std::move(name);
 		if (global_variable.type())
 			node->type = ccc::NodeHandle(global_variable, global_variable.type());
-		node->location = SymbolTreeLocation(m_cpu, global_variable.address().value);
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, global_variable.address().value);
 		node->symbol = ccc::MultiSymbolHandle(global_variable);
 		nodes.emplace_back(std::move(node));
 	}
@@ -534,7 +534,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			node->name = std::move(name);
 			if (local_variable->type())
 				node->type = ccc::NodeHandle(*local_variable, local_variable->type());
-			node->location = SymbolTreeLocation(m_cpu, local_variable->address().value);
+			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable->address().value);
 			local_variable_nodes.emplace_back(std::move(node));
 		}
 
@@ -632,20 +632,12 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 			if (!local_variable->address().valid())
 				continue;
 
-			node->location = SymbolTreeLocation(m_cpu, stack_pointer + local_variable->address().value);
+			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, stack_pointer + local_variable->address().value);
 		}
 		else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable->storage))
-		{
-			if (m_cpu.getCpuType() == BREAKPOINT_EE)
-				node->location.type = SymbolTreeLocation::EE_REGISTER;
-			else
-				node->location.type = SymbolTreeLocation::IOP_REGISTER;
-			node->location.address = storage->dbx_register_number;
-		}
+			node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable->storage))
-		{
-			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
-		}
+			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, stack_pointer + storage->stack_pointer_offset);
 
 		nodes.emplace_back(std::move(node));
 	}
@@ -730,17 +722,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> ParameterVariableTreeWidget::popula
 		node->symbol = ccc::MultiSymbolHandle(*parameter_variable);
 
 		if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&parameter_variable->storage))
-		{
-			if (m_cpu.getCpuType() == BREAKPOINT_EE)
-				node->location.type = SymbolTreeLocation::EE_REGISTER;
-			else
-				node->location.type = SymbolTreeLocation::IOP_REGISTER;
-			node->location.address = storage->dbx_register_number;
-		}
+			node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 		else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&parameter_variable->storage))
-		{
-			node->location = SymbolTreeLocation(m_cpu, stack_pointer + storage->stack_pointer_offset);
-		}
+			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, stack_pointer + storage->stack_pointer_offset);
 
 		nodes.emplace_back(std::move(node));
 	}

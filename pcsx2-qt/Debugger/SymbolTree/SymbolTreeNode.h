@@ -21,9 +21,9 @@ public:
 	ccc::MultiSymbolHandle symbol;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 	
-	QString toString(const ccc::ast::Node& type, const ccc::SymbolDatabase* database);
-	QVariant toVariant(const ccc::ast::Node& type);
-	bool fromVariant(QVariant value, const ccc::ast::Node& type);
+	QString toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase* database);
+	QVariant toVariant(const ccc::ast::Node& type, DebugInterface& cpu);
+	bool fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu);
 	
 	const SymbolTreeNode* parent() const;
 	
