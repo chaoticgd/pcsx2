@@ -141,6 +141,11 @@ bool SymbolGuardian::ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback 
 	return true;
 }
 
+bool SymbolGuardian::IsBusy() const
+{
+	return m_busy;
+}
+
 void SymbolGuardian::Reset()
 {
 	// Since the clear command is going to delete everything in the database, we

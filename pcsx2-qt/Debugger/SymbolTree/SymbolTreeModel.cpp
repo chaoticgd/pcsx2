@@ -254,7 +254,7 @@ Qt::ItemFlags SymbolTreeModel::flags(const QModelIndex& index) const
 
 	Qt::ItemFlags flags = QAbstractItemModel::flags(index);
 
-	if (index.column() == VALUE)
+	if (index.column() == LOCATION || index.column() == VALUE)
 		flags |= Qt::ItemIsEditable;
 
 	return flags;

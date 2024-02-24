@@ -187,8 +187,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/SymbolTree/SymbolTreeModel.h
 	Debugger/SymbolTree/SymbolTreeNode.cpp
 	Debugger/SymbolTree/SymbolTreeNode.h
-	Debugger/SymbolTree/SymbolTreeValueDelegate.cpp
-	Debugger/SymbolTree/SymbolTreeValueDelegate.h
+	Debugger/SymbolTree/SymbolTreeDelegates.cpp
+	Debugger/SymbolTree/SymbolTreeDelegates.h
 	Debugger/SymbolTree/SymbolTreeWidgets.cpp
 	Debugger/SymbolTree/SymbolTreeWidgets.h
 	Debugger/SymbolTree/SymbolTreeWidget.ui

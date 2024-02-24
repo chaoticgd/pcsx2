@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
 // SPDX-License-Identifier: LGPL-3.0+
 
-#include "SymbolTreeValueDelegate.h"
+#include "SymbolTreeDelegates.h"
 
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
@@ -9,8 +9,87 @@
 #include <QtWidgets/QLineEdit>
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
 
+SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
+	SymbolGuardian& guardian,
+	QObject* parent)
+	: QStyledItemDelegate(parent)
+	, m_guardian(guardian)
+{
+}
+
+QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return nullptr;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+		return nullptr;
+
+	if (m_guardian.IsBusy())
+		return nullptr;
+
+	return new QLineEdit(parent);
+}
+
+void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(lineEdit);
+
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol || !symbol->address().valid())
+			return;
+
+		lineEdit->setText(QString::number(symbol->address().value, 16));
+	});
+}
+
+void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+		return;
+
+	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(lineEdit);
+
+	SymbolTreeModel* symbolTreeModel = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbolTreeModel);
+
+	bool ok;
+	u32 address = lineEdit->text().toUInt(&ok, 16);
+	if (!ok)
+		return;
+
+	bool moved = false;
+	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		if (node->symbol.move_symbol(address, database))
+			moved = true;
+	});
+
+	if (moved)
+	{
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
+		symbolTreeModel->resetChildren(index);
+	}
+}
+
+// *****************************************************************************
+
 SymbolTreeValueDelegate::SymbolTreeValueDelegate(
-	const SymbolGuardian& guardian,
+	SymbolGuardian& guardian,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
 	, m_guardian(guardian)
@@ -19,11 +98,14 @@ SymbolTreeValueDelegate::SymbolTreeValueDelegate(
 
 QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-	QWidget* result = nullptr;
+	if (!index.isValid())
+		return nullptr;
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
-		return result;
+		return nullptr;
+
+	QWidget* result = nullptr;
 
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
@@ -88,6 +170,9 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 
 void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
+	if (!index.isValid())
+		return;
+
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
 		return;
@@ -198,6 +283,9 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 
 void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
+	if (!index.isValid())
+		return;
+
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	if (!node->type.valid())
 		return;
@@ -318,7 +406,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 
 void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)
 {
-	QComboBox* comboBox = static_cast<QComboBox*>(sender());
+	QComboBox* comboBox = qobject_cast<QComboBox*>(sender());
 	if (comboBox)
 		commitData(comboBox);
 }

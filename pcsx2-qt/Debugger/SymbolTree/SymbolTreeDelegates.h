@@ -7,14 +7,30 @@
 
 #include "DebugTools/SymbolGuardian.h"
 
-// This manages the editor widgets in the symbol trees.
+class SymbolTreeLocationDelegate : public QStyledItemDelegate
+{
+	Q_OBJECT
+
+public:
+	SymbolTreeLocationDelegate(
+		SymbolGuardian& guardian,
+		QObject* parent = nullptr);
+
+	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+	void setEditorData(QWidget* editor, const QModelIndex& index) const override;
+	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
+
+protected:
+	SymbolGuardian& m_guardian;
+};
+
 class SymbolTreeValueDelegate : public QStyledItemDelegate
 {
 	Q_OBJECT
 
 public:
 	SymbolTreeValueDelegate(
-		const SymbolGuardian& guardian,
+		SymbolGuardian& guardian,
 		QObject* parent = nullptr);
 
 	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -26,5 +42,5 @@ protected:
 	// deselected rather than when an option was picked.
 	void onComboBoxIndexChanged(int index);
 
-	const SymbolGuardian& m_guardian;
+	SymbolGuardian& m_guardian;
 };

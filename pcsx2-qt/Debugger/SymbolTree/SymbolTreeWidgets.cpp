@@ -10,7 +10,7 @@
 
 #include "common/Assertions.h"
 #include "NewSymbolDialogs.h"
-#include "SymbolTreeValueDelegate.h"
+#include "SymbolTreeDelegates.h"
 
 SymbolTreeWidget::SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent)
 	: QWidget(parent)
@@ -66,8 +66,11 @@ void SymbolTreeWidget::setupTree()
 	m_model = new SymbolTreeModel(m_cpu, this);
 	m_ui.treeView->setModel(m_model);
 
-	auto delegate = new SymbolTreeValueDelegate(m_cpu.GetSymbolGuardian(), this);
-	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, delegate);
+	auto location_delegate = new SymbolTreeLocationDelegate(m_cpu.GetSymbolGuardian(), this);
+	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::LOCATION, location_delegate);
+
+	auto value_delegate = new SymbolTreeValueDelegate(m_cpu.GetSymbolGuardian(), this);
+	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, value_delegate);
 
 	m_ui.treeView->setAlternatingRowColors(true);
 	m_ui.treeView->setEditTriggers(QTreeView::AllEditTriggers);

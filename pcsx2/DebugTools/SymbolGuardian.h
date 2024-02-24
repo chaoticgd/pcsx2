@@ -72,9 +72,11 @@ public:
 	void BlockingReadWrite(SynchronousReadWriteCallback callback) noexcept;
 
 	// Push the callback onto a work queue so it can be run from the symbol
-	// table import thread. While the callback is running, TryRead and
-	// TryReadWrite calls will fail and return false.
+	// table import thread. TryRead and TryReadWrite calls will fail and return
+	// false until the lock is released when the function returns.
 	void AsyncReadWrite(ReadWriteCallback callback) noexcept;
+
+	bool IsBusy() const;
 
 	// Interrupt the import thread, delete all symbols, create built-ins.
 	void Reset();
