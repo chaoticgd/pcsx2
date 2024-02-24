@@ -56,6 +56,7 @@ public slots:
 	void contextRemoveFunction();
 	void contextStubFunction();
 	void contextRestoreFunction();
+	void contextShowOpcode();
 
 	void gotoAddressAndSetFocus(u32 address);
 	void gotoAddress(u32 address, bool should_set_focus);
@@ -80,7 +81,7 @@ private:
 	std::map<u32, std::tuple<u32, u32>> m_stubbedFunctions;
 
 	bool m_demangleFunctions = true;
-
+	bool m_showInstructionOpcode = true;
 	DisassemblyManager m_disassemblyManager;
 
 	inline QString DisassemblyStringFromAddress(u32 address, QFont font, u32 pc, bool selected);
