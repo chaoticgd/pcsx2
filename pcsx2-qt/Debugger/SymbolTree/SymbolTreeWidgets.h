@@ -78,8 +78,6 @@ protected:
 	QAction* m_group_by_section = nullptr;
 	QAction* m_group_by_source_file = nullptr;
 	QAction* m_sort_by_if_type_is_known = nullptr;
-	QAction* m_reset_children = nullptr;
-	QAction* m_change_type_temporarily = nullptr;
 
 	enum Flags
 	{

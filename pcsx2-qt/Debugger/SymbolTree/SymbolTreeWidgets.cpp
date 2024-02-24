@@ -141,14 +141,14 @@ void SymbolTreeWidget::setupMenu()
 	{
 		m_context_menu->addSeparator();
 
-		m_reset_children = new QAction(tr("Reset children"), this);
-		m_context_menu->addAction(m_reset_children);
+		QAction* reset_children = new QAction(tr("Reset children"), this);
+		m_context_menu->addAction(reset_children);
 
-		m_change_type_temporarily = new QAction(tr("Change type temporarily"), this);
-		m_context_menu->addAction(m_change_type_temporarily);
+		QAction* change_type_temporarily = new QAction(tr("Change type temporarily"), this);
+		m_context_menu->addAction(change_type_temporarily);
 
-		connect(m_reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
-		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
+		connect(reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
+		connect(change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
 	}
 }
 
