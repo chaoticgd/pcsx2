@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <QDialog>
+#include <QtWidgets/QDialog>
 
 #include "DebugTools/DebugInterface.h"
 #include "ui_NewSymbolDialog.h"

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <QString>
+#include <QtCore/QString>
 
 #include "common/Pcsx2Types.h"
 #include "DebugTools/DebugInterface.h"

@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include <QString>
-#include <QVariant>
+#include <QtCore/QString>
+#include <QtCore/QVariant>
 
 #include "SymbolTreeLocation.h"
 

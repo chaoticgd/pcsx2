@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <QWidget>
+#include <QtWidgets/QWidget>
 #include "SymbolTreeModel.h"
 
 #include "ui_SymbolTreeWidget.h"

@@ -3,9 +3,9 @@
 
 #include "SymbolTreeModel.h"
 
-#include <QApplication>
-#include <QBrush>
-#include <QPalette>
+#include <QtWidgets/QApplication>
+#include <QtGui/QBrush>
+#include <QtGui/QPalette>
 
 #include "common/Assertions.h"
 
