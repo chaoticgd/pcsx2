@@ -146,6 +146,10 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
 	Q_ASSERT(lineEdit);
 
+	QString text = lineEdit->text();
+	if (text.isEmpty())
+		return;
+
 	SymbolTreeModel* symbolTreeModel = qobject_cast<SymbolTreeModel*>(model);
 	Q_ASSERT(symbolTreeModel);
 
@@ -153,19 +157,22 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol)
+		{
+			error_message = tr("Symbol no longer exists.");
 			return;
+		}
 
-		std::unique_ptr<ccc::ast::Node> type = stringToType(lineEdit->text().toStdString(), database, error_message);
+		std::unique_ptr<ccc::ast::Node> type = stringToType(text.toStdString(), database, error_message);
 		if (!type)
 			return;
 
 		symbol->set_type(std::move(type));
 		node->type = ccc::NodeHandle(node->symbol.descriptor(), *symbol, symbol->type());
-
-		symbolTreeModel->resetChildren(index);
 	});
 
-	if (!error_message.isEmpty())
+	if (error_message.isEmpty())
+		symbolTreeModel->resetChildren(index);
+	else
 		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
 }
 

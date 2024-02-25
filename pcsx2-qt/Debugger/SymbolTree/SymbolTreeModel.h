@@ -46,7 +46,7 @@ public:
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
 	// Remove all the children of a given node, and allow fetching again.
-	bool resetChildren(QModelIndex index);
+	void resetChildren(QModelIndex index);
 
 	QString changeTypeTemporarily(QModelIndex index, std::string_view type_string);
 	std::optional<QString> typeFromModelIndexToString(QModelIndex index);

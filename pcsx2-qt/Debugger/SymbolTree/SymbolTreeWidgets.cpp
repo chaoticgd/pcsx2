@@ -168,6 +168,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 		if (!module_children.empty())
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->tag = SymbolTreeTag::GROUP;
 			node->name = "(unknown module)";
 			node->setChildren(std::move(module_children));
 			nodes.emplace_back(std::move(node));
@@ -181,6 +182,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateModules(
 			if (!module_children.empty())
 			{
 				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+				node->tag = SymbolTreeTag::GROUP;
 				node->name = QString::fromStdString(module_symbol.name());
 				if (module_symbol.is_irx)
 				{
@@ -214,6 +216,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 		if (!section_children.empty())
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->tag = SymbolTreeTag::GROUP;
 			node->name = "(unknown section)";
 			node->setChildren(std::move(section_children));
 			nodes.emplace_back(std::move(node));
@@ -221,19 +224,20 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSections(
 
 		for (const ccc::Section& section : database.sections)
 		{
-			if (section.address().valid())
-			{
-				filters.section = section.handle();
+			if (!section.address().valid())
+				continue;
 
-				auto section_children = populateSourceFiles(filters, database);
-				if (section_children.empty())
-					continue;
+			filters.section = section.handle();
 
-				std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
-				node->name = QString::fromStdString(section.name());
-				node->setChildren(std::move(section_children));
-				nodes.emplace_back(std::move(node));
-			}
+			auto section_children = populateSourceFiles(filters, database);
+			if (section_children.empty())
+				continue;
+
+			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->tag = SymbolTreeTag::GROUP;
+			node->name = QString::fromStdString(section.name());
+			node->setChildren(std::move(section_children));
+			nodes.emplace_back(std::move(node));
 		}
 	}
 	else
@@ -257,6 +261,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 		if (!source_file_children.empty())
 		{
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->tag = SymbolTreeTag::GROUP;
 			node->name = "(unknown source file)";
 			node->setChildren(std::move(source_file_children));
 			nodes.emplace_back(std::move(node));
@@ -271,6 +276,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeWidget::populateSourceFil
 				continue;
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
+			node->tag = SymbolTreeTag::GROUP;
 			if (!source_file.command_line_path.empty())
 				node->name = QString::fromStdString(source_file.command_line_path);
 			else
@@ -336,8 +342,7 @@ void SymbolTreeWidget::onResetChildren()
 	if (!index.isValid())
 		return;
 
-	if (!m_model->resetChildren(index))
-		QMessageBox::warning(this, tr("Cannot Reset Children"), tr("That node doesn't have a type."));
+	m_model->resetChildren(index);
 }
 
 void SymbolTreeWidget::onChangeTypeTemporarily()
@@ -354,7 +359,7 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 	std::optional<QString> old_type = m_model->typeFromModelIndexToString(index);
 	if (!old_type.has_value())
 	{
-		QMessageBox::warning(this, tr("Cannot Change Type"), tr("That node doesn't have a type."));
+		QMessageBox::warning(this, tr("Cannot Change Type"), tr("That node cannot have a type."));
 		return;
 	}
 
