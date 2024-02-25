@@ -43,15 +43,15 @@ void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelInde
 	if (!node->symbol.valid())
 		return;
 
-	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(lineEdit);
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
 
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol || !symbol->address().valid())
 			return;
 
-		lineEdit->setText(QString::number(symbol->address().value, 16));
+		line_edit->setText(QString::number(symbol->address().value, 16));
 	});
 }
 
@@ -64,14 +64,14 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
 		return;
 
-	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(lineEdit);
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
 
-	SymbolTreeModel* symbolTreeModel = qobject_cast<SymbolTreeModel*>(model);
-	Q_ASSERT(symbolTreeModel);
+	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbol_tree_model);
 
 	bool ok;
-	u32 address = lineEdit->text().toUInt(&ok, 16);
+	u32 address = line_edit->text().toUInt(&ok, 16);
 	if (!ok)
 		return;
 
@@ -84,7 +84,7 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	if (success)
 	{
 		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
-		symbolTreeModel->resetChildren(index);
+		symbol_tree_model->resetChildren(index);
 	}
 }
 
@@ -122,15 +122,15 @@ void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& i
 	if (!node->symbol.valid())
 		return;
 
-	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(lineEdit);
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
 
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol || !symbol->type())
 			return;
 
-		lineEdit->setText(typeToString(symbol->type(), database));
+		line_edit->setText(typeToString(symbol->type(), database));
 	});
 }
 
@@ -143,15 +143,15 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	if (!node->symbol.valid())
 		return;
 
-	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(lineEdit);
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
 
-	QString text = lineEdit->text();
+	QString text = line_edit->text();
 	if (text.isEmpty())
 		return;
 
-	SymbolTreeModel* symbolTreeModel = qobject_cast<SymbolTreeModel*>(model);
-	Q_ASSERT(symbolTreeModel);
+	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbol_tree_model);
 
 	QString error_message;
 	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
@@ -171,7 +171,7 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	});
 
 	if (error_message.isEmpty())
-		symbolTreeModel->resetChildren(index);
+		symbol_tree_model->resetChildren(index);
 	else
 		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
 }
@@ -236,11 +236,11 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QComboBox* comboBox = new QComboBox(parent);
+				QComboBox* combo_box = new QComboBox(parent);
 				for (auto [value, string] : enumeration.constants)
-					comboBox->addItem(QString::fromStdString(string));
-				connect(comboBox, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
-				result = comboBox;
+					combo_box->addItem(QString::fromStdString(string));
+				connect(combo_box, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
+				result = combo_box;
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
@@ -287,10 +287,10 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 					case ccc::ast::BuiltInClass::UNSIGNED_32:
 					case ccc::ast::BuiltInClass::UNSIGNED_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
-						lineEdit->setText(QString::number(index.data(Qt::UserRole).toULongLong()));
+						line_edit->setText(QString::number(index.data(Qt::UserRole).toULongLong()));
 
 						break;
 					}
@@ -299,37 +299,37 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 					case ccc::ast::BuiltInClass::SIGNED_32:
 					case ccc::ast::BuiltInClass::SIGNED_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
-						lineEdit->setText(QString::number(index.data(Qt::UserRole).toLongLong()));
+						line_edit->setText(QString::number(index.data(Qt::UserRole).toLongLong()));
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
-						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
-						Q_ASSERT(checkBox);
+						QCheckBox* check_box = qobject_cast<QCheckBox*>(editor);
+						Q_ASSERT(check_box);
 
-						checkBox->setChecked(index.data(Qt::UserRole).toBool());
+						check_box->setChecked(index.data(Qt::UserRole).toBool());
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
-						lineEdit->setText(QString::number(index.data(Qt::UserRole).toFloat()));
+						line_edit->setText(QString::number(index.data(Qt::UserRole).toFloat()));
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
-						lineEdit->setText(QString::number(index.data(Qt::UserRole).toDouble()));
+						line_edit->setText(QString::number(index.data(Qt::UserRole).toDouble()));
 
 						break;
 					}
@@ -342,13 +342,13 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QComboBox* comboBox = static_cast<QComboBox*>(editor);
+				QComboBox* combo_box = static_cast<QComboBox*>(editor);
 				QVariant data = index.data(Qt::UserRole);
 				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
 				{
 					if (enumeration.constants[i].first == data.toInt())
 					{
-						comboBox->setCurrentIndex(i);
+						combo_box->setCurrentIndex(i);
 						break;
 					}
 				}
@@ -357,10 +357,10 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 			case ccc::ast::POINTER_OR_REFERENCE:
 			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
-				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-				Q_ASSERT(lineEdit);
+				QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+				Q_ASSERT(line_edit);
 
-				lineEdit->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
+				line_edit->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
 
 				break;
 			}
@@ -400,11 +400,11 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					case ccc::ast::BuiltInClass::UNSIGNED_32:
 					case ccc::ast::BuiltInClass::UNSIGNED_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
 						bool ok;
-						qulonglong value = lineEdit->text().toULongLong(&ok);
+						qulonglong value = line_edit->text().toULongLong(&ok);
 						if (ok)
 							model->setData(index, value, Qt::UserRole);
 
@@ -415,11 +415,11 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					case ccc::ast::BuiltInClass::SIGNED_32:
 					case ccc::ast::BuiltInClass::SIGNED_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
 						bool ok;
-						qlonglong value = lineEdit->text().toLongLong(&ok);
+						qlonglong value = line_edit->text().toLongLong(&ok);
 						if (ok)
 							model->setData(index, value, Qt::UserRole);
 
@@ -427,18 +427,18 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
-						QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
-						model->setData(index, checkBox->isChecked(), Qt::UserRole);
+						QCheckBox* check_box = qobject_cast<QCheckBox*>(editor);
+						model->setData(index, check_box->isChecked(), Qt::UserRole);
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
 						bool ok;
-						float value = lineEdit->text().toFloat(&ok);
+						float value = line_edit->text().toFloat(&ok);
 						if (ok)
 							model->setData(index, value, Qt::UserRole);
 
@@ -446,11 +446,11 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 					}
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
-						QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(lineEdit);
+						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+						Q_ASSERT(line_edit);
 
 						bool ok;
-						double value = lineEdit->text().toDouble(&ok);
+						double value = line_edit->text().toDouble(&ok);
 						if (ok)
 							model->setData(index, value, Qt::UserRole);
 
@@ -465,8 +465,8 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QComboBox* comboBox = static_cast<QComboBox*>(editor);
-				s32 comboIndex = comboBox->currentIndex();
+				QComboBox* combo_box = static_cast<QComboBox*>(editor);
+				s32 comboIndex = combo_box->currentIndex();
 				if (comboIndex < (s32)enumeration.constants.size())
 				{
 					s32 value = enumeration.constants[comboIndex].first;
@@ -477,11 +477,11 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			case ccc::ast::POINTER_OR_REFERENCE:
 			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
-				QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-				Q_ASSERT(lineEdit);
+				QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+				Q_ASSERT(line_edit);
 
 				bool ok;
-				qulonglong address = lineEdit->text().toUInt(&ok, 16);
+				qulonglong address = line_edit->text().toUInt(&ok, 16);
 				if (ok)
 					model->setData(index, address, Qt::UserRole);
 
@@ -496,7 +496,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 
 void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)
 {
-	QComboBox* comboBox = qobject_cast<QComboBox*>(sender());
-	if (comboBox)
-		commitData(comboBox);
+	QComboBox* combo_box = qobject_cast<QComboBox*>(sender());
+	if (combo_box)
+		commitData(combo_box);
 }
