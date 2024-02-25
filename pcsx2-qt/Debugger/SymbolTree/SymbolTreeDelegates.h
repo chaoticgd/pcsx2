@@ -24,6 +24,23 @@ protected:
 	SymbolGuardian& m_guardian;
 };
 
+class SymbolTreeTypeDelegate : public QStyledItemDelegate
+{
+	Q_OBJECT
+
+public:
+	SymbolTreeTypeDelegate(
+		SymbolGuardian& guardian,
+		QObject* parent = nullptr);
+
+	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+	void setEditorData(QWidget* editor, const QModelIndex& index) const override;
+	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
+
+protected:
+	SymbolGuardian& m_guardian;
+};
+
 class SymbolTreeValueDelegate : public QStyledItemDelegate
 {
 	Q_OBJECT

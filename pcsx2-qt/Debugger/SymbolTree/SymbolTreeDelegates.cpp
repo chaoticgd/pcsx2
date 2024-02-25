@@ -7,7 +7,9 @@
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QMessageBox>
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
+#include "Debugger/SymbolTree/TypeString.h"
 
 SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
 	SymbolGuardian& guardian,
@@ -73,17 +75,98 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	if (!ok)
 		return;
 
-	bool moved = false;
+	bool success = false;
 	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		if (node->symbol.move_symbol(address, database))
-			moved = true;
+			success = true;
 	});
 
-	if (moved)
+	if (success)
 	{
 		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
 		symbolTreeModel->resetChildren(index);
 	}
+}
+
+// *****************************************************************************
+
+SymbolTreeTypeDelegate::SymbolTreeTypeDelegate(
+	SymbolGuardian& guardian,
+	QObject* parent)
+	: QStyledItemDelegate(parent)
+	, m_guardian(guardian)
+{
+}
+
+QWidget* SymbolTreeTypeDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return nullptr;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return nullptr;
+
+	if (m_guardian.IsBusy())
+		return nullptr;
+
+	return new QLineEdit(parent);
+}
+
+void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(lineEdit);
+
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol || !symbol->type())
+			return;
+
+		lineEdit->setText(typeToString(symbol->type(), database));
+	});
+}
+
+void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(lineEdit);
+
+	SymbolTreeModel* symbolTreeModel = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbolTreeModel);
+
+	QString error_message;
+	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol)
+			return;
+
+		std::unique_ptr<ccc::ast::Node> type = stringToType(lineEdit->text().toStdString(), database, error_message);
+		if (!type)
+			return;
+
+		symbol->set_type(std::move(type));
+		node->type = ccc::NodeHandle(node->symbol.descriptor(), *symbol, symbol->type());
+
+		symbolTreeModel->resetChildren(index);
+	});
+
+	if (!error_message.isEmpty())
+		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
 }
 
 // *****************************************************************************

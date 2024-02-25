@@ -69,6 +69,9 @@ void SymbolTreeWidget::setupTree()
 	auto location_delegate = new SymbolTreeLocationDelegate(m_cpu.GetSymbolGuardian(), this);
 	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::LOCATION, location_delegate);
 
+	auto type_delegate = new SymbolTreeTypeDelegate(m_cpu.GetSymbolGuardian(), this);
+	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::TYPE, type_delegate);
+
 	auto value_delegate = new SymbolTreeValueDelegate(m_cpu.GetSymbolGuardian(), this);
 	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::VALUE, value_delegate);
 
