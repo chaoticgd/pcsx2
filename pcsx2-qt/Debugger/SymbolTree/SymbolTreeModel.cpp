@@ -118,7 +118,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LOCATION:
 		{
-			return node->location.name(m_cpu);
+			return node->location.toString(m_cpu).rightJustified(8);
 		}
 		case TYPE:
 		{

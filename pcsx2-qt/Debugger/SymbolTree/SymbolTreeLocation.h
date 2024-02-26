@@ -26,7 +26,7 @@ struct SymbolTreeLocation
 	SymbolTreeLocation();
 	SymbolTreeLocation(Type type_arg, u32 address_arg);
 
-	QString name(DebugInterface& cpu) const;
+	QString toString(DebugInterface& cpu) const;
 
 	SymbolTreeLocation addOffset(u32 offset) const;
 

@@ -298,10 +298,12 @@ void SymbolTreeWidget::onCopyName()
 	if (!m_model)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::NAME);
-	QVariant data = m_model->data(index, Qt::DisplayRole);
-	if (data.isValid())
-		QApplication::clipboard()->setText(data.toString());
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	QApplication::clipboard()->setText(node->name);
 }
 
 void SymbolTreeWidget::onCopyLocation()
@@ -309,10 +311,12 @@ void SymbolTreeWidget::onCopyLocation()
 	if (!m_model)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex().siblingAtRow(SymbolTreeModel::LOCATION);
-	QVariant data = m_model->data(index, Qt::DisplayRole);
-	if (data.isValid())
-		QApplication::clipboard()->setText(data.toString());
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	QApplication::clipboard()->setText(node->location.toString(m_cpu));
 }
 
 void SymbolTreeWidget::onGoToInDisassembly()
