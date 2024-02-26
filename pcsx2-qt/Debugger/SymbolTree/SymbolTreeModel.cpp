@@ -72,15 +72,16 @@ int SymbolTreeModel::columnCount(const QModelIndex& parent) const
 
 bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 {
-	bool result = true;
-
 	if (!parent.isValid())
-		return result;
+		return true;
 
+	// If a node doesn't have a type, it can't generate any children, so all the
+	// children that will exist must already be there.
 	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	if (!parent_node->type.valid())
-		return result;
+		return !parent_node->children().empty();
 
+	bool result = true;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* type = parent_node->type.lookup_node(database);
 		if (!type)
