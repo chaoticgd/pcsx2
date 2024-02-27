@@ -72,6 +72,16 @@ Result<void> import_symbols(
 			continue;
 		}
 		
+		if(!(importer_flags & DONT_DEDUPLICATE_SYMBOLS)) {
+			if(database.functions.first_handle_from_starting_address(address).valid()) {
+				continue;
+			}
+			
+			if(database.global_variables.first_handle_from_starting_address(address).valid()) {
+				continue;
+			}
+		}
+		
 		const char* string = get_string(strtab, symbol->name);
 		CCC_CHECK(string, "Symbol string out of range.");
 		
@@ -80,6 +90,14 @@ Result<void> import_symbols(
 				Result<Label*> label = database.labels.create_symbol(
 					string, group.source, group.module_symbol, address, importer_flags, demangler);
 				CCC_RETURN_IF_ERROR(label);
+				
+				// These symbols get emitted at the same addresses as functions
+				// and aren't extremely useful, so we want to mark them to
+				// prevent them from possibly being used as function names.
+				(*label)->is_junk =
+					(*label)->name() == "__gnu_compiled_c" ||
+					(*label)->name() == "__gnu_compiled_cplusplus" ||
+					(*label)->name() == "gcc2_compiled.";
 				
 				break;
 			}

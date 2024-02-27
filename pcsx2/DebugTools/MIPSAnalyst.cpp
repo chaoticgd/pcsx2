@@ -302,7 +302,7 @@ namespace MIPSAnalyst
 				// it can't distinguish between functions and globals.
 				ccc::LabelHandle label_handle = database.labels.first_handle_from_starting_address(function.start);
 				ccc::Label* label = database.labels.symbol_from_handle(label_handle);
-				if(label) {
+				if(label && !label->is_junk) {
 					name = label->name();
 				}
 				

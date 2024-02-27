@@ -217,7 +217,7 @@ static void CreateBuiltInDataType(
 
 void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name)
 {
-	ccc::Result<ccc::ElfFile> parsed_elf = ccc::parse_elf_file(std::move(elf));
+	ccc::Result<ccc::ElfFile> parsed_elf = ccc::ElfFile::parse(std::move(elf));
 	if (!parsed_elf.success())
 	{
 		ccc::report_error(parsed_elf.error());

@@ -294,18 +294,6 @@ Result<SymbolType*> SymbolList<SymbolType>::create_symbol(
 	
 	std::string& non_mangled_name = demangled_name.empty() ? name : demangled_name;
 	
-	// Since we parse all the symbol tables in a file, we're gonna encounter
-	// duplicate symbols for functions and global variables. This logic filters
-	// out said symbols.
-	if((importer_flags & DONT_DEDUPLICATE_SYMBOLS) == 0 && address.valid()) {
-		for(const auto& [existing_address, existing_handle] : handles_from_starting_address(address)) {
-			SymbolType* existing_symbol = symbol_from_handle(existing_handle);
-			if(existing_symbol && existing_symbol->name() == non_mangled_name) {
-				return nullptr;
-			}
-		}
-	}
-	
 	Result<SymbolType*> symbol = create_symbol(non_mangled_name, address, source, module_symbol);
 	CCC_RETURN_IF_ERROR(symbol);
 	
@@ -644,6 +632,16 @@ const std::string& GlobalVariable::mangled_name() const
 void GlobalVariable::set_mangled_name(std::string mangled)
 {
 	m_mangled_name = std::move(mangled);
+}
+
+bool Section::contains_code() const
+{
+	return name() == ".text";
+}
+
+bool Section::contains_data() const
+{
+	return name() == ".bss" || name() == ".data" || name() == ".rodata" || name() == ".sbss";
 }
 
 const std::vector<FunctionHandle>& SourceFile::functions() const
