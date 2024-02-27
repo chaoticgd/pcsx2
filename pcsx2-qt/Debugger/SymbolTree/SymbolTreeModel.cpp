@@ -310,9 +310,13 @@ QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_vi
 
 	QString error_message;
 	m_guardian.BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
-		std::unique_ptr<ccc::ast::Node> type = stringToType(type_string, database, error_message);
-		if (!error_message.isEmpty() || !type)
-			return;
+		std::unique_ptr<ccc::ast::Node> type;
+		if (!type_string.empty())
+		{
+			type = stringToType(type_string, database, error_message);
+			if (!error_message.isEmpty() || !type)
+				return;
+		}
 
 		SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 		node->temporary_type = std::move(type);

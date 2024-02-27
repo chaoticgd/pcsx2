@@ -146,10 +146,6 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
 	Q_ASSERT(line_edit);
 
-	QString text = line_edit->text();
-	if (text.isEmpty())
-		return;
-
 	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
 	Q_ASSERT(symbol_tree_model);
 
@@ -162,9 +158,13 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 			return;
 		}
 
-		std::unique_ptr<ccc::ast::Node> type = stringToType(text.toStdString(), database, error_message);
-		if (!type)
-			return;
+		std::unique_ptr<ccc::ast::Node> type;
+		if (!line_edit->text().isEmpty())
+		{
+			type = stringToType(line_edit->text().toStdString(), database, error_message);
+			if (!type)
+				return;
+		}
 
 		symbol->set_type(std::move(type));
 		node->type = ccc::NodeHandle(node->symbol.descriptor(), *symbol, symbol->type());
