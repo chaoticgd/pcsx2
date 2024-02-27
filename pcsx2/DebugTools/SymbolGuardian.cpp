@@ -21,8 +21,6 @@ SymbolGuardian R3000SymbolGuardian;
 static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database);
 static void CreateBuiltInDataType(
 	ccc::SymbolDatabase& database, ccc::SymbolSourceHandle source, const char* name, ccc::ast::BuiltInClass bclass);
-static ccc::ModuleHandle ImportSymbolTables(
-	ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
 static void ComputeOriginalFunctionHashes(
 	ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module);
 
