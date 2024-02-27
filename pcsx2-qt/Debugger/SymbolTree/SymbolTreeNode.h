@@ -29,7 +29,7 @@ public:
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 
 	QString toString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	QString toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	QString toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database, bool allow_recursion) const;
 	QVariant toVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
 	QVariant toVariant(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
 	bool fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu) const;

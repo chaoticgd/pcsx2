@@ -13,7 +13,7 @@ QString SymbolTreeNode::toString(DebugInterface& cpu, const ccc::SymbolDatabase&
 	if (logical_type)
 	{
 		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		result = toString(type, cpu, database);
+		result = toString(type, cpu, database, true);
 	}
 
 	if (result.isEmpty())
@@ -31,10 +31,44 @@ QString SymbolTreeNode::toString(DebugInterface& cpu, const ccc::SymbolDatabase&
 	return result;
 }
 
-QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+QString SymbolTreeNode::toString(
+	const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database, bool allow_recursion) const
 {
 	switch (type.descriptor)
 	{
+		case ccc::ast::ARRAY:
+		{
+			const ccc::ast::Array& array = type.as<ccc::ast::Array>();
+
+			if (!allow_recursion)
+				return "array";
+
+			QString result;
+			result += "{";
+
+			s32 elements_to_display = std::min(array.element_count, 8);
+			for (s32 i = 0; i < elements_to_display; i++)
+			{
+				SymbolTreeNode node;
+				node.location = location.addOffset(i * array.element_type->computed_size_bytes);
+
+				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
+
+				QString element = node.toString(element_type, cpu, database, false);
+				if (element.isEmpty())
+					element = ccc::ast::node_type_to_string(element_type);
+				result += element;
+
+				if (i + 1 != elements_to_display)
+					result += ",";
+			}
+
+			if (elements_to_display != array.element_count)
+				result += ",...";
+
+			result += "}";
+			return result;
+		}
 		case ccc::ast::BUILTIN:
 		{
 			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
@@ -111,7 +145,44 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu
 			return result;
 		}
 		case ccc::ast::POINTER_TO_DATA_MEMBER:
+		{
 			return QString::number(location.read32(cpu), 16);
+		}
+		case ccc::ast::STRUCT_OR_UNION:
+		{
+			const ccc::ast::StructOrUnion& struct_or_union = type.as<ccc::ast::StructOrUnion>();
+
+			if (!allow_recursion || !struct_or_union.is_struct)
+				return ccc::ast::node_type_to_string(type);
+
+			QString result;
+			result += "{";
+
+			s32 fields_to_display = std::min((s32)struct_or_union.fields.size(), 8);
+			for (s32 i = 0; i < fields_to_display; i++)
+			{
+				QString field_name = QString::fromStdString(struct_or_union.fields[i]->name);
+
+				SymbolTreeNode node;
+				node.location = location.addOffset(struct_or_union.fields[i]->offset_bytes);
+
+				const ccc::ast::Node& field_type = *resolvePhysicalType(struct_or_union.fields[i].get(), database).first;
+
+				QString field_value = node.toString(field_type, cpu, database, false);
+				if (field_value.isEmpty())
+					field_value = ccc::ast::node_type_to_string(field_type);
+				result += QString(".%1=%2").arg(field_name).arg(field_value);
+
+				if (i + 1 != fields_to_display)
+					result += ",";
+			}
+
+			if (fields_to_display != (s32)struct_or_union.fields.size())
+				result += ",...";
+
+			result += "}";
+			return result;
+		}
 		default:
 		{
 		}
