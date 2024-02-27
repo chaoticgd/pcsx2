@@ -423,8 +423,11 @@ std::vector<std::unique_ptr<SymbolTreeNode>> FunctionTreeWidget::populateSymbols
 		if (!function.address().valid())
 			continue;
 
-		QString name;
-		if (!filters.test(function, function.source_file(), database, &name))
+		if (!filters.testGroups(function, function.source_file(), database))
+			continue;
+
+		QString name = QString::fromStdString(function.name());
+		if (!filters.testName(name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
@@ -507,9 +510,10 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 		if (!global_variable.address().valid())
 			continue;
 
-		QString name;
-		if (!filters.test(global_variable, global_variable.source_file(), database, &name))
+		if (!filters.testGroups(global_variable, global_variable.source_file(), database))
 			continue;
+
+		QString name = QString::fromStdString(global_variable.name());
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
@@ -524,10 +528,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 	// because they have global storage. Why not.
 	for (const ccc::Function& function : database.functions)
 	{
-		if (!filters.test(function, function.source_file(), database, nullptr))
+		if (!filters.testGroups(function, function.source_file(), database))
 			continue;
-
-		std::vector<std::unique_ptr<SymbolTreeNode>> local_variable_nodes;
 
 		std::vector<const ccc::LocalVariable*> local_variables =
 			database.local_variables.optional_symbols_from_handles(function.local_variables());
@@ -540,8 +542,13 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			if (!local_variable->address().valid())
 				continue;
 
-			QString name;
-			if (!filters.test(*local_variable, function.source_file(), database, &name))
+			if (!filters.testGroups(*local_variable, function.source_file(), database))
+				continue;
+
+			QString name = QString("%1 (%2)")
+							   .arg(QString::fromStdString(local_variable->name()))
+							   .arg(QString::fromStdString(function.name()));
+			if (!filters.testName(name))
 				continue;
 
 			std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -549,16 +556,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			if (local_variable->type())
 				node->type = ccc::NodeHandle(*local_variable, local_variable->type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable->address().value);
-			local_variable_nodes.emplace_back(std::move(node));
+			nodes.emplace_back(std::move(node));
 		}
-
-		if (local_variable_nodes.empty())
-			continue;
-
-		std::unique_ptr<SymbolTreeNode> function_node = std::make_unique<SymbolTreeNode>();
-		function_node->name = QString::fromStdString(function.name());
-		function_node->setChildren(std::move(local_variable_nodes));
-		nodes.emplace_back(std::move(function_node));
 	}
 
 	return nodes;
@@ -629,8 +628,11 @@ std::vector<std::unique_ptr<SymbolTreeNode>> LocalVariableTreeWidget::populateSy
 
 	for (const ccc::LocalVariable* local_variable : local_variables)
 	{
-		QString name;
-		if (!filters.test(*local_variable, ccc::SourceFileHandle(), database, &name))
+		if (!filters.testGroups(*local_variable, ccc::SourceFileHandle(), database))
+			continue;
+
+		QString name = QString::fromStdString(local_variable->name());
+		if (!filters.testName(name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -724,8 +726,11 @@ std::vector<std::unique_ptr<SymbolTreeNode>> ParameterVariableTreeWidget::popula
 
 	for (const ccc::ParameterVariable* parameter_variable : parameter_variables)
 	{
-		QString name;
-		if (!filters.test(*parameter_variable, ccc::SourceFileHandle(), database, &name))
+		if (!filters.testGroups(*parameter_variable, ccc::SourceFileHandle(), database))
+			continue;
+
+		QString name = QString::fromStdString(parameter_variable->name());
+		if (!filters.testName(name))
 			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
@@ -787,11 +792,10 @@ void ParameterVariableTreeWidget::onDeleteButtonPressed()
 	update();
 }
 
-bool SymbolFilters::test(
+bool SymbolFilters::testGroups(
 	const ccc::Symbol& test_symbol,
 	ccc::SourceFileHandle test_source_file,
-	const ccc::SymbolDatabase& database,
-	QString* name_out) const
+	const ccc::SymbolDatabase& database) const
 {
 	if (group_by_module && test_symbol.module_handle() != module_handle)
 		return false;
@@ -825,13 +829,10 @@ bool SymbolFilters::test(
 		}
 	}
 
-	if (name_out)
-	{
-		*name_out = QString::fromStdString(test_symbol.name());
-
-		if (!string.isEmpty() && !name_out->contains(string, Qt::CaseInsensitive))
-			return false;
-	}
-
 	return true;
+}
+
+bool SymbolFilters::testName(const QString& test_name) const
+{
+	return string.isEmpty() || test_name.contains(string, Qt::CaseInsensitive);
 }

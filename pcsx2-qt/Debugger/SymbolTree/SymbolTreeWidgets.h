@@ -169,9 +169,10 @@ struct SymbolFilters
 	ccc::SectionHandle section;
 	const ccc::SourceFile* source_file = nullptr;
 
-	bool test(
+	bool testGroups(
 		const ccc::Symbol& test_symbol,
 		ccc::SourceFileHandle test_source_file,
-		const ccc::SymbolDatabase& database,
-		QString* name_out) const;
+		const ccc::SymbolDatabase& database) const;
+	
+	bool testName(const QString& test_name) const;
 };

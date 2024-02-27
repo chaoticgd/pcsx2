@@ -275,11 +275,9 @@ void SymbolTreeNode::clearChildren()
 void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 {
 	auto comparator = [&](const std::unique_ptr<SymbolTreeNode>& lhs, const std::unique_ptr<SymbolTreeNode>& rhs) -> bool {
-		// Sort the nodes that actually have type information to the top since
-		// these will be the most useful for editing.
 		if (sort_by_if_type_is_known && lhs->type.valid() != rhs->type.valid())
 			return lhs->type.valid() > rhs->type.valid();
-		// Next, sort nodes that have a valid location to the top.
+
 		return lhs->location < rhs->location;
 	};
 
