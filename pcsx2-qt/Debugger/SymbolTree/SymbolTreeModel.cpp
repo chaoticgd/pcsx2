@@ -146,6 +146,9 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case VALUE:
 		{
+			if (node->tag != SymbolTreeTag::OBJECT)
+				return QVariant();
+
 			QVariant result;
 			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::ast::Node* logical_type = node->type.lookup_node(database);
