@@ -556,6 +556,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			if (local_variable->type())
 				node->type = ccc::NodeHandle(*local_variable, local_variable->type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable->address().value);
+			node->symbol = ccc::MultiSymbolHandle(*local_variable);
 			nodes.emplace_back(std::move(node));
 		}
 	}
