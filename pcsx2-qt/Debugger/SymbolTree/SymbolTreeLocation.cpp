@@ -46,7 +46,7 @@ SymbolTreeLocation SymbolTreeLocation::addOffset(u32 offset) const
 	return location;
 }
 
-u8 SymbolTreeLocation::read8(DebugInterface& cpu)
+u8 SymbolTreeLocation::read8(DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -63,7 +63,7 @@ u8 SymbolTreeLocation::read8(DebugInterface& cpu)
 	return 0;
 }
 
-u16 SymbolTreeLocation::read16(DebugInterface& cpu)
+u16 SymbolTreeLocation::read16(DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -80,7 +80,7 @@ u16 SymbolTreeLocation::read16(DebugInterface& cpu)
 	return 0;
 }
 
-u32 SymbolTreeLocation::read32(DebugInterface& cpu)
+u32 SymbolTreeLocation::read32(DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -97,7 +97,7 @@ u32 SymbolTreeLocation::read32(DebugInterface& cpu)
 	return 0;
 }
 
-u64 SymbolTreeLocation::read64(DebugInterface& cpu)
+u64 SymbolTreeLocation::read64(DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -114,7 +114,7 @@ u64 SymbolTreeLocation::read64(DebugInterface& cpu)
 	return 0;
 }
 
-u128 SymbolTreeLocation::read128(DebugInterface& cpu)
+u128 SymbolTreeLocation::read128(DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -131,7 +131,7 @@ u128 SymbolTreeLocation::read128(DebugInterface& cpu)
 	return u128::From32(0);
 }
 
-void SymbolTreeLocation::write8(u8 value, DebugInterface& cpu)
+void SymbolTreeLocation::write8(u8 value, DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -148,7 +148,7 @@ void SymbolTreeLocation::write8(u8 value, DebugInterface& cpu)
 	}
 }
 
-void SymbolTreeLocation::write16(u16 value, DebugInterface& cpu)
+void SymbolTreeLocation::write16(u16 value, DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -165,7 +165,7 @@ void SymbolTreeLocation::write16(u16 value, DebugInterface& cpu)
 	}
 }
 
-void SymbolTreeLocation::write32(u32 value, DebugInterface& cpu)
+void SymbolTreeLocation::write32(u32 value, DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -182,7 +182,7 @@ void SymbolTreeLocation::write32(u32 value, DebugInterface& cpu)
 	}
 }
 
-void SymbolTreeLocation::write64(u64 value, DebugInterface& cpu)
+void SymbolTreeLocation::write64(u64 value, DebugInterface& cpu) const
 {
 	switch (type)
 	{
@@ -199,7 +199,7 @@ void SymbolTreeLocation::write64(u64 value, DebugInterface& cpu)
 	}
 }
 
-void SymbolTreeLocation::write128(u128 value, DebugInterface& cpu)
+void SymbolTreeLocation::write128(u128 value, DebugInterface& cpu) const
 {
 	switch (type)
 	{

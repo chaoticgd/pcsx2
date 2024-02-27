@@ -30,17 +30,17 @@ struct SymbolTreeLocation
 
 	SymbolTreeLocation addOffset(u32 offset) const;
 
-	u8 read8(DebugInterface& cpu);
-	u16 read16(DebugInterface& cpu);
-	u32 read32(DebugInterface& cpu);
-	u64 read64(DebugInterface& cpu);
-	u128 read128(DebugInterface& cpu);
+	u8 read8(DebugInterface& cpu) const;
+	u16 read16(DebugInterface& cpu) const;
+	u32 read32(DebugInterface& cpu) const;
+	u64 read64(DebugInterface& cpu) const;
+	u128 read128(DebugInterface& cpu) const;
 
-	void write8(u8 value, DebugInterface& cpu);
-	void write16(u16 value, DebugInterface& cpu);
-	void write32(u32 value, DebugInterface& cpu);
-	void write64(u64 value, DebugInterface& cpu);
-	void write128(u128 value, DebugInterface& cpu);
+	void write8(u8 value, DebugInterface& cpu) const;
+	void write16(u16 value, DebugInterface& cpu) const;
+	void write32(u32 value, DebugInterface& cpu) const;
+	void write64(u64 value, DebugInterface& cpu) const;
+	void write128(u128 value, DebugInterface& cpu) const;
 
 	friend auto operator<=>(const SymbolTreeLocation& lhs, const SymbolTreeLocation& rhs) = default;
 };

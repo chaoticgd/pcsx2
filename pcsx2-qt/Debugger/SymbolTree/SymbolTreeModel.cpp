@@ -151,31 +151,14 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 
 			QVariant result;
 			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
-				const ccc::ast::Node* logical_type = node->type.lookup_node(database);
-				if (logical_type)
+				switch (role)
 				{
-					const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-
-					switch (role)
-					{
-						case Qt::DisplayRole:
-							result = node->toString(type, m_cpu, &database);
-							break;
-						case Qt::UserRole:
-							result = node->toVariant(type, m_cpu);
-							break;
-					}
-				}
-				else if (role == Qt::DisplayRole)
-				{
-					// We don't have any type information so just display the
-					// next 4 bytes as hex.
-					u32 value = node->location.read32(m_cpu);
-					result = QString("%1 %2 %3 %4")
-								 .arg(value & 0xff, 2, 16, QChar('0'))
-								 .arg((value >> 8) & 0xff, 2, 16, QChar('0'))
-								 .arg((value >> 16) & 0xff, 2, 16, QChar('0'))
-								 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
+					case Qt::DisplayRole:
+						result = node->toString(m_cpu, database);
+						break;
+					case Qt::UserRole:
+						result = node->toVariant(m_cpu, database);
+						break;
 				}
 			});
 

@@ -5,7 +5,33 @@
 
 #include "DebugTools/ccc/ast.h"
 
-QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase* database)
+QString SymbolTreeNode::toString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+{
+	QString result;
+
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (logical_type)
+	{
+		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
+		result = toString(type, cpu, database);
+	}
+
+	if (result.isEmpty())
+	{
+		// We don't know how to display objects of this type, so just show the
+		// first 4 bytes of it as a hex dump.
+		u32 value = location.read32(cpu);
+		result = QString("%1 %2 %3 %4")
+					 .arg(value & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 8) & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 16) & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
+	}
+
+	return result;
+}
+
+QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
 	switch (type.descriptor)
 	{
@@ -69,10 +95,10 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu
 			QString result = QString::number(location.read32(cpu), 16);
 
 			// For char* nodes add the value of the string to the output.
-			if (pointer_or_reference.is_pointer && database)
+			if (pointer_or_reference.is_pointer)
 			{
 				const ccc::ast::Node* value_type =
-					resolvePhysicalType(pointer_or_reference.value_type.get(), *database).first;
+					resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
 				if (value_type->name == "char")
 				{
 					u32 pointer = location.read32(cpu);
@@ -90,10 +116,21 @@ QString SymbolTreeNode::toString(const ccc::ast::Node& type, DebugInterface& cpu
 		{
 		}
 	}
+
 	return QString();
 }
 
-QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type, DebugInterface& cpu)
+QVariant SymbolTreeNode::toVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+{
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (!logical_type)
+		return QVariant();
+
+	const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
+	return toVariant(type, cpu, database);
+}
+
+QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
 	switch (type.descriptor)
 	{
@@ -151,7 +188,7 @@ QVariant SymbolTreeNode::toVariant(const ccc::ast::Node& type, DebugInterface& c
 	return QVariant();
 }
 
-bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu)
+bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu) const
 {
 	switch (type.descriptor)
 	{
