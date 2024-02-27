@@ -134,7 +134,6 @@ void SymbolTreeWidget::setupMenu()
 
 		m_sort_by_if_type_is_known = new QAction(tr("Sort by if type is known"), this);
 		m_sort_by_if_type_is_known->setCheckable(true);
-		m_sort_by_if_type_is_known->setChecked(true);
 		m_context_menu->addAction(m_sort_by_if_type_is_known);
 
 		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
