@@ -514,6 +514,8 @@ std::vector<std::unique_ptr<SymbolTreeNode>> GlobalVariableTreeWidget::populateS
 			continue;
 
 		QString name = QString::fromStdString(global_variable.name());
+		if (!filters.testName(name))
+			continue;
 
 		std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 		node->name = std::move(name);
