@@ -29,9 +29,6 @@
   <PropertyGroup>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PublicIncludeDirectories>$(ProjectDir)include</PublicIncludeDirectories>
-  </PropertyGroup>
   <ItemGroup>
     <ClInclude Include="include\ansidecl.h" />
     <ClInclude Include="include\cp-demangle.h" />
@@ -63,7 +60,6 @@
       <PreprocessorDefinitions>HAVE_DECL_BASENAME=1;HAVE_LIMITS_H;HAVE_STDLIB_H=1;HAVE_STRING_H=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
