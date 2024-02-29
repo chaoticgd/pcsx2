@@ -366,7 +366,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
 				element->name = QString("[%1]").arg(i);
 				element->type = parent_handle.handle_for_child(array.element_type.get());
-				element->location = location.addOffset(i * array.element_type->computed_size_bytes);
+				element->location = location.addOffset(i * array.element_type->size_bytes);
 				if (element->location.type != SymbolTreeLocation::NONE)
 					children.emplace_back(std::move(element));
 			}

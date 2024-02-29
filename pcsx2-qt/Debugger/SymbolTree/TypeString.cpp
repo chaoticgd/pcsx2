@@ -64,7 +64,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 
 	// Create the AST.
 	std::unique_ptr<ccc::ast::TypeName> type_name = std::make_unique<ccc::ast::TypeName>();
-	type_name->computed_size_bytes = data_type->type()->computed_size_bytes;
+	type_name->size_bytes = data_type->type()->size_bytes;
 	type_name->data_type_handle = data_type->handle();
 	type_name->source = ccc::ast::TypeNameSource::REFERENCE;
 	result = std::move(type_name);
@@ -76,7 +76,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 			char pointer_character = -components[i - 1];
 
 			std::unique_ptr<ccc::ast::PointerOrReference> pointer_or_reference = std::make_unique<ccc::ast::PointerOrReference>();
-			pointer_or_reference->computed_size_bytes = 4;
+			pointer_or_reference->size_bytes = 4;
 			pointer_or_reference->is_pointer = pointer_character == '*';
 			pointer_or_reference->value_type = std::move(result);
 			result = std::move(pointer_or_reference);
@@ -86,7 +86,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 			s32 element_count = components[i - 1];
 
 			std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
-			array->computed_size_bytes = element_count * result->computed_size_bytes;
+			array->size_bytes = element_count * result->size_bytes;
 			array->element_type = std::move(result);
 			array->element_count = element_count;
 			result = std::move(array);

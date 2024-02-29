@@ -208,7 +208,7 @@ static void CreateBuiltInDataType(
 		return;
 
 	std::unique_ptr<ccc::ast::BuiltIn> type = std::make_unique<ccc::ast::BuiltIn>();
-	type->computed_size_bytes = ccc::ast::builtin_class_size(bclass);
+	type->size_bytes = ccc::ast::builtin_class_size(bclass);
 	type->bclass = bclass;
 	(*symbol)->set_type(std::move(type));
 }
@@ -302,22 +302,22 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 				std::unique_ptr<ccc::ast::BuiltIn> scalar_type = std::make_unique<ccc::ast::BuiltIn>();
 				if (StringUtil::Strcasecmp(value, ".byt") == 0)
 				{
-					scalar_type->computed_size_bytes = 1;
+					scalar_type->size_bytes = 1;
 					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_8;
 				}
 				else if (StringUtil::Strcasecmp(value, ".wrd") == 0)
 				{
-					scalar_type->computed_size_bytes = 2;
+					scalar_type->size_bytes = 2;
 					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_16;
 				}
 				else if (StringUtil::Strcasecmp(value, ".dbl") == 0)
 				{
-					scalar_type->computed_size_bytes = 4;
+					scalar_type->size_bytes = 4;
 					scalar_type->bclass = ccc::ast::BuiltInClass::UNSIGNED_32;
 				}
 				else if (StringUtil::Strcasecmp(value, ".asc") == 0)
 				{
-					scalar_type->computed_size_bytes = 1;
+					scalar_type->size_bytes = 1;
 					scalar_type->bclass = ccc::ast::BuiltInClass::UNQUALIFIED_8;
 				}
 				else
@@ -333,16 +333,16 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 					return false;
 				}
 
-				if (scalar_type->computed_size_bytes == (s32)size)
+				if (scalar_type->size_bytes == (s32)size)
 				{
 					(*global_variable)->set_type(std::move(scalar_type));
 				}
 				else
 				{
 					std::unique_ptr<ccc::ast::Array> array = std::make_unique<ccc::ast::Array>();
-					array->computed_size_bytes = (s32)size;
+					array->size_bytes = (s32)size;
 					array->element_type = std::move(scalar_type);
-					array->element_count = size / array->element_type->computed_size_bytes;
+					array->element_count = size / array->element_type->size_bytes;
 					(*global_variable)->set_type(std::move(array));
 				}
 			}

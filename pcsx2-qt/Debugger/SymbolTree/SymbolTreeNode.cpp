@@ -50,7 +50,7 @@ QString SymbolTreeNode::toString(
 			for (s32 i = 0; i < elements_to_display; i++)
 			{
 				SymbolTreeNode node;
-				node.location = location.addOffset(i * array.element_type->computed_size_bytes);
+				node.location = location.addOffset(i * array.element_type->size_bytes);
 
 				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
 
