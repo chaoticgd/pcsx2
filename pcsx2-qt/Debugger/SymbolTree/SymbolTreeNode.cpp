@@ -104,6 +104,25 @@ QString SymbolTreeNode::toString(
 					u64 value = location.read64(cpu);
 					return QString::number(*reinterpret_cast<double*>(&value));
 				}
+				case ccc::ast::BuiltInClass::UNSIGNED_128:
+				case ccc::ast::BuiltInClass::SIGNED_128:
+				case ccc::ast::BuiltInClass::UNQUALIFIED_128:
+				case ccc::ast::BuiltInClass::FLOAT_128:
+				{
+					if (!allow_recursion)
+						return "(128-bit value)";
+
+					QString result;
+					for (s32 i = 0; i < 16; i++)
+					{
+						u8 value = location.addOffset(i).read8(cpu);
+						result += QString("%1 ").arg(value, 2, 16, QChar('0'));
+						if ((i + 1) % 4 == 0)
+							result += " ";
+					}
+
+					return result;
+				}
 				default:
 				{
 				}
