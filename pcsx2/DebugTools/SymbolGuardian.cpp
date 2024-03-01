@@ -555,6 +555,7 @@ FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address, SymbolDataba
 		info.name = function->name();
 		info.address = function->address();
 		info.size = function->size();
+		info.is_no_return = function->is_no_return;
 	});
 	return info;
 }
@@ -571,6 +572,7 @@ FunctionInfo SymbolGuardian::FunctionOverlappingAddress(u32 address, SymbolDatab
 		info.name = function->name();
 		info.address = function->address();
 		info.size = function->size();
+		info.is_no_return = function->is_no_return;
 	});
 	return info;
 }

@@ -751,28 +751,37 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 	const bool isConditionalMet = line.info.conditionMet;
 	const bool isCurrentPC = m_cpu->getPC() == address;
 
-	std::string addressSymbol = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(address, SDA_TRY).name;
+	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(address, SDA_TRY);
 	const bool showOpcode = m_showInstructionOpcode && m_cpu->isAlive();
 
 	QString lineString;
 	if (showOpcode)
 	{
-		lineString = QString("  %1 %2  %3 %4  %5 %6");
+		lineString = QString(" %1 %2 %3  %4 %5  %6 %7");
 	}
 	else
 	{
-		lineString = QString("  %1  %2 %3  %4 %5");
+		lineString = QString(" %1 %2  %3 %4  %5 %6");
 	}
 
-	if (addressSymbol.empty()) // The address wont have symbol text if it's the start of a function for example
+	if(function.is_no_return)
+	{
+		lineString = lineString.arg("NR");
+	}
+	else
+	{
+		lineString = lineString.arg("  ");
+	}
+
+	if (function.name.empty()) // The address wont have symbol text if it's the start of a function for example
 		lineString = lineString.arg(address, 8, 16, QChar('0')).toUpper();
 	else
 	{
 		// We want this text elided
 		QFontMetrics metric(font);
-		QString symbolString = QString::fromStdString(addressSymbol);
+		QString symbolString = QString::fromStdString(function.name);
 
-		lineString = lineString.arg(metric.elidedText(symbolString, Qt::ElideRight, (selected ? 32.0f : 7.5f) * font.pointSize()));
+		lineString = lineString.arg(metric.elidedText(symbolString, Qt::ElideRight, (selected ? 32 : 7) * font.pointSize()));
 	}
 
 	if (showOpcode)

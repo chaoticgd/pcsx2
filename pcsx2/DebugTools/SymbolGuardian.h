@@ -30,6 +30,7 @@ struct FunctionInfo
 	std::string name;
 	ccc::Address address;
 	u32 size = 0;
+	bool is_no_return = false;
 };
 
 enum SymbolDatabaseAccessMode

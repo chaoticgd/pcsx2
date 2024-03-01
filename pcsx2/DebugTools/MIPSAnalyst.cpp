@@ -182,6 +182,7 @@ namespace MIPSAnalyst
 		bool looking = false;
 		bool end = false;
 		bool isStraightLeaf = true;
+		bool suspectedNoReturn = false;
 
 		u32 addr;
 		for (addr = startAddr; addr <= endAddr; addr += 4) {
@@ -205,6 +206,16 @@ namespace MIPSAnalyst
 				isStraightLeaf = false;
 				if (target > furthestBranch) {
 					furthestBranch = target;
+				}
+
+				// beq $zero, $zero, xyz
+				if ((op >> 16) == 0x1000)
+				{
+					// If it's backwards, and there's no other branch passing it, treat as noreturn
+					if(target < addr && furthestBranch < addr)
+					{
+						end = suspectedNoReturn = true;
+					}
 				}
 			} else if ((op & 0xFC000000) == 0x08000000) {
 				u32 sureTarget = GetJumpTarget(addr);
@@ -273,11 +284,13 @@ namespace MIPSAnalyst
 
 				currentFunction.end = addr + 4;
 				currentFunction.isStraightLeaf = isStraightLeaf;
+				currentFunction.suspectedNoReturn = suspectedNoReturn;
 				functions.push_back(currentFunction);
 				furthestBranch = 0;
 				addr += 4;
 				looking = false;
 				end = false;
+				suspectedNoReturn = false;
 				isStraightLeaf = true;
 
 				currentFunction.start = addr+4;
@@ -320,6 +333,8 @@ namespace MIPSAnalyst
 			if (symbol->size() == 0) {
 				symbol->set_size(function.end - function.start + 4);
 			}
+			
+			symbol->is_no_return = function.suspectedNoReturn;
 		}
 	}
 
