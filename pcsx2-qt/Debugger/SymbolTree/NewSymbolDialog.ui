@@ -87,12 +87,25 @@
      <item row="4" column="1">
       <layout class="QVBoxLayout" name="sizeLayout">
        <item>
-        <widget class="QRadioButton" name="expandToFillSpaceRadioButton">
+        <widget class="QRadioButton" name="fillExistingFunctionRadioButton">
          <property name="text">
-          <string>Expand to fill empty space</string>
+          <string/>
          </property>
          <property name="checked">
           <bool>true</bool>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">sizeButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="fillEmptySpaceRadioButton">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
          </property>
          <attribute name="buttonGroup">
           <string notr="true">sizeButtonGroup</string>
@@ -118,7 +131,11 @@
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="customSizeSpinBox"/>
+          <widget class="QSpinBox" name="customSizeSpinBox">
+           <property name="readOnly">
+            <bool>false</bool>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -249,7 +266,7 @@
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="existingFunctionsButtonGroup"/>
   <buttongroup name="sizeButtonGroup"/>
+  <buttongroup name="existingFunctionsButtonGroup"/>
  </buttongroups>
 </ui>

@@ -14,7 +14,9 @@ class NewSymbolDialog : public QDialog
 	Q_OBJECT
 
 public:
-	virtual void createSymbol() = 0;
+	// Used to apply default settings.
+	void setAddress(u32 address);
+	void setCustomSize(u32 size);
 
 protected:
 	explicit NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent = nullptr);
@@ -43,14 +45,30 @@ protected:
 		FUNCTION
 	};
 
+	virtual void createSymbol() = 0;
+
 	void setupRegisterField();
+	void setupSizeField();
 	void setupFunctionField();
-	void onStorageTabChanged(int index);
+
+	enum FunctionSizeType
+	{
+		FILL_EXISTING_FUNCTION,
+		FILL_EMPTY_SPACE,
+		CUSTOM_SIZE
+	};
+
+	FunctionSizeType functionSizeType() const;
+	void updateSizeField();
+	std::optional<u32> fillExistingFunctionSize(u32 address, const ccc::SymbolDatabase& database);
+	std::optional<u32> fillEmptySpaceSize(u32 address, const ccc::SymbolDatabase& database);
+
 	u32 storageType() const;
+	void onStorageTabChanged(int index);
 
 	DebugInterface& m_cpu;
 	Ui::NewSymbolDialog m_ui;
-	
+
 	std::vector<ccc::FunctionHandle> m_functions;
 };
 

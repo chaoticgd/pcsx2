@@ -36,19 +36,38 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent
 	m_ui.form->setRowVisible(Row::TYPE, flags & TYPE_FIELD);
 	m_ui.form->setRowVisible(Row::FUNCTION, flags & FUNCTION_FIELD);
 
+	if (flags & SIZE_FIELD)
+		setupSizeField();
+
 	if (flags & FUNCTION_FIELD)
 		setupFunctionField();
 
+	updateSizeField();
 	adjustSize();
+}
+
+void NewSymbolDialog::setAddress(u32 address)
+{
+	m_ui.addressLineEdit->setText(QString::number(address, 16));
+}
+
+void NewSymbolDialog::setCustomSize(u32 size)
+{
+	m_ui.customSizeRadioButton->setChecked(true);
+	m_ui.customSizeSpinBox->setValue(size);
 }
 
 void NewSymbolDialog::setupRegisterField()
 {
 	m_ui.registerComboBox->clear();
 	for (int i = 0; i < m_cpu.getRegisterCount(0); i++)
-	{
 		m_ui.registerComboBox->addItem(m_cpu.getRegisterName(0, i));
-	}
+}
+
+void NewSymbolDialog::setupSizeField()
+{
+	connect(m_ui.customSizeRadioButton, &QRadioButton::toggled, m_ui.customSizeSpinBox, &QSpinBox::setEnabled);
+	connect(m_ui.addressLineEdit, &QLineEdit::textChanged, this, &NewSymbolDialog::updateSizeField);
 }
 
 void NewSymbolDialog::setupFunctionField()
@@ -69,13 +88,69 @@ void NewSymbolDialog::setupFunctionField()
 	});
 }
 
-void NewSymbolDialog::onStorageTabChanged(int index)
+NewSymbolDialog::FunctionSizeType NewSymbolDialog::functionSizeType() const
 {
-	QString name = m_ui.storageTabBar->tabText(index);
+	if (m_ui.fillExistingFunctionRadioButton->isChecked())
+		return FILL_EXISTING_FUNCTION;
 
-	m_ui.form->setRowVisible(Row::ADDRESS, name == "Global");
-	m_ui.form->setRowVisible(Row::REGISTER, name == "Register");
-	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
+	if (m_ui.fillEmptySpaceRadioButton->isChecked())
+		return FILL_EMPTY_SPACE;
+
+	return CUSTOM_SIZE;
+}
+
+void NewSymbolDialog::updateSizeField()
+{
+	bool ok;
+	u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+	if (ok)
+	{
+		m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+			std::optional<u32> fill_existing_function_size = fillExistingFunctionSize(address, database);
+			if (fill_existing_function_size.has_value())
+				m_ui.fillExistingFunctionRadioButton->setText(
+					tr("Fill existing function (%1 bytes)").arg(*fill_existing_function_size));
+			else
+				m_ui.fillExistingFunctionRadioButton->setText(
+					tr("Fill existing function (no existing function)"));
+			m_ui.fillExistingFunctionRadioButton->setEnabled(fill_existing_function_size.has_value());
+
+			std::optional<u32> fill_empty_space_size = fillEmptySpaceSize(address, database);
+			if (fill_empty_space_size.has_value())
+				m_ui.fillEmptySpaceRadioButton->setText(
+					tr("Fill space (%1 bytes)").arg(*fill_empty_space_size));
+			else
+				m_ui.fillEmptySpaceRadioButton->setText(tr("Fill space (no next symbol)"));
+			m_ui.fillEmptySpaceRadioButton->setEnabled(fill_empty_space_size.has_value());
+		});
+	}
+	else
+	{
+		// Add some padding to the end of the radio button text so that the
+		// layout engine knows we need some more space for the size.
+		QString padding(16, ' ');
+		m_ui.fillExistingFunctionRadioButton->setText(tr("Fill existing function").append(padding));
+		m_ui.fillEmptySpaceRadioButton->setText(tr("Fill space").append(padding));
+	}
+}
+
+std::optional<u32> NewSymbolDialog::fillExistingFunctionSize(u32 address, const ccc::SymbolDatabase& database)
+{
+	const ccc::Function* existing_function = database.functions.symbol_overlapping_address(address);
+	if (!existing_function)
+		return std::nullopt;
+
+	return existing_function->address_range().high.value - address;
+}
+
+std::optional<u32> NewSymbolDialog::fillEmptySpaceSize(u32 address, const ccc::SymbolDatabase& database)
+{
+	const ccc::Symbol* next_symbol = database.symbol_after_address(
+		address, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
+	if (!next_symbol)
+		return std::nullopt;
+
+	return next_symbol->address().value - address;
 }
 
 u32 NewSymbolDialog::storageType() const
@@ -91,6 +166,17 @@ u32 NewSymbolDialog::storageType() const
 
 	return 0;
 }
+
+void NewSymbolDialog::onStorageTabChanged(int index)
+{
+	QString name = m_ui.storageTabBar->tabText(index);
+
+	m_ui.form->setRowVisible(Row::ADDRESS, name == "Global");
+	m_ui.form->setRowVisible(Row::REGISTER, name == "Register");
+	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
+}
+
+// *****************************************************************************
 
 NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
 	: NewSymbolDialog(GLOBAL_STORAGE | SIZE_FIELD | EXISTING_FUNCTIONS_FIELD, cpu, parent)
@@ -113,10 +199,66 @@ void NewFunctionDialog::createSymbol()
 		}
 
 		u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-		if (!ok)
+		if (!ok || address % 4 != 0)
 		{
 			error_message = tr("Invalid address.");
 			return;
+		}
+
+		u32 size = 0;
+		switch (functionSizeType())
+		{
+			case FILL_EXISTING_FUNCTION:
+			{
+				std::optional<u32> fill_existing_function_size = fillExistingFunctionSize(address, database);
+				if (!fill_existing_function_size.has_value())
+				{
+					error_message = tr("No existing function found.");
+					return;
+				}
+
+				size = *fill_existing_function_size;
+
+				break;
+			}
+			case FILL_EMPTY_SPACE:
+			{
+				std::optional<u32> fill_space_size = fillEmptySpaceSize(address, database);
+				if (!fill_space_size.has_value())
+				{
+					error_message = tr("No next symbol found.");
+					return;
+				}
+
+				size = *fill_space_size;
+
+				break;
+			}
+			case CUSTOM_SIZE:
+			{
+				size = m_ui.customSizeSpinBox->value();
+				break;
+			}
+		}
+
+		if (size == 0 || size > 256 * 1024 * 1024 || size % 4 != 0)
+		{
+			error_message = tr("Invalid size.");
+			return;
+		}
+
+		// Handle an existing function if it exists.
+		ccc::Function* existing_function = database.functions.symbol_overlapping_address(address);
+		if (existing_function->address().value == address)
+		{
+			error_message = tr("A function already exists at that address.");
+			return;
+		}
+
+		u32 new_existing_function_size = 0;
+		if (m_ui.shrinkExistingRadioButton->isChecked() && existing_function)
+		{
+			new_existing_function_size = address - existing_function->address().value;
 		}
 
 		// Create the symbol.
@@ -133,11 +275,17 @@ void NewFunctionDialog::createSymbol()
 			error_message = tr("Cannot create symbol.");
 			return;
 		}
+
+		(*function)->set_size(size);
+		if (existing_function && new_existing_function_size != 0)
+			existing_function->set_size(new_existing_function_size);
 	});
 
 	if (!error_message.isEmpty())
 		QMessageBox::warning(this, tr("Cannot Create Function"), error_message);
 }
+
+// *****************************************************************************
 
 NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* parent)
 	: NewSymbolDialog(GLOBAL_STORAGE | TYPE_FIELD, cpu, parent)
@@ -191,6 +339,8 @@ void NewGlobalVariableDialog::createSymbol()
 	if (!error_message.isEmpty())
 		QMessageBox::warning(this, tr("Cannot Create Global Variable"), error_message);
 }
+
+// *****************************************************************************
 
 NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* parent)
 	: NewSymbolDialog(GLOBAL_STORAGE | REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, cpu, parent)
@@ -285,6 +435,8 @@ void NewLocalVariableDialog::createSymbol()
 	if (!error_message.isEmpty())
 		QMessageBox::warning(this, tr("Cannot Create Local Variable"), error_message);
 }
+
+// *****************************************************************************
 
 NewParameterVariableDialog::NewParameterVariableDialog(DebugInterface& cpu, QWidget* parent)
 	: NewSymbolDialog(REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, cpu, parent)
