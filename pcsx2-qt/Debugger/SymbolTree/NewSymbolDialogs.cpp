@@ -53,6 +53,11 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent
 	});
 }
 
+void NewSymbolDialog::setName(QString name)
+{
+	m_ui.nameLineEdit->setText(name);
+}
+
 void NewSymbolDialog::setAddress(u32 address)
 {
 	m_ui.addressLineEdit->setText(QString::number(address, 16));

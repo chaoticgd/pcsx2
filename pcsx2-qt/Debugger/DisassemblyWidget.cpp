@@ -180,6 +180,7 @@ void DisassemblyWidget::contextGoToAddress()
 void DisassemblyWidget::contextAddFunction()
 {
 	NewFunctionDialog* dialog = new NewFunctionDialog(*m_cpu, this);
+	dialog->setName(QString("func_%1").arg(m_selectedAddressStart, 8, 16, QChar('0')));
 	dialog->setAddress(m_selectedAddressStart);
 	if (m_selectedAddressEnd != m_selectedAddressStart)
 		dialog->setCustomSize(m_selectedAddressEnd - m_selectedAddressStart + 4);

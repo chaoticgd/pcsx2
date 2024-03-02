@@ -15,6 +15,7 @@ class NewSymbolDialog : public QDialog
 
 public:
 	// Used to apply default settings.
+	void setName(QString name);
 	void setAddress(u32 address);
 	void setCustomSize(u32 size);
 
