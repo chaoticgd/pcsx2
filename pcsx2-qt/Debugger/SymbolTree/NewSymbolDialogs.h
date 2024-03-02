@@ -45,11 +45,18 @@ protected:
 		FUNCTION
 	};
 
+protected slots:
+	virtual bool parseUserInput() = 0;
+	
+protected:
 	virtual void createSymbol() = 0;
 
 	void setupRegisterField();
 	void setupSizeField();
 	void setupFunctionField();
+	
+	void connectInputWidgets();
+	void updateErrorMessage(QString error_message);
 
 	enum FunctionSizeType
 	{
@@ -80,7 +87,14 @@ public:
 	NewFunctionDialog(DebugInterface& cpu, QWidget* parent = nullptr);
 
 protected:
+	bool parseUserInput() override;
 	void createSymbol() override;
+	
+	std::string m_name;
+	u32 m_address = 0;
+	u32 m_size = 0;
+	ccc::FunctionHandle m_existing_function;
+	u32 m_new_existing_function_size = 0;
 };
 
 class NewGlobalVariableDialog : public NewSymbolDialog
@@ -91,7 +105,12 @@ public:
 	NewGlobalVariableDialog(DebugInterface& cpu, QWidget* parent = nullptr);
 
 protected:
+	bool parseUserInput() override;
 	void createSymbol() override;
+	
+	std::string m_name;
+	u32 m_address;
+	std::unique_ptr<ccc::ast::Node> m_type;
 };
 
 class NewLocalVariableDialog : public NewSymbolDialog
@@ -102,7 +121,14 @@ public:
 	NewLocalVariableDialog(DebugInterface& cpu, QWidget* parent = nullptr);
 
 protected:
+	bool parseUserInput() override;
 	void createSymbol() override;
+	
+	std::string m_name;
+	std::variant<ccc::GlobalStorage, ccc::RegisterStorage, ccc::StackStorage> m_storage;
+	u32 m_address = 0;
+	std::unique_ptr<ccc::ast::Node> m_type;
+	ccc::FunctionHandle m_function;
 };
 
 class NewParameterVariableDialog : public NewSymbolDialog
@@ -113,5 +139,11 @@ public:
 	NewParameterVariableDialog(DebugInterface& cpu, QWidget* parent = nullptr);
 
 protected:
+	bool parseUserInput() override;
 	void createSymbol() override;
+	
+	std::string m_name;
+	std::variant<ccc::RegisterStorage, ccc::StackStorage> m_storage;
+	std::unique_ptr<ccc::ast::Node> m_type;
+	ccc::FunctionHandle m_function;
 };

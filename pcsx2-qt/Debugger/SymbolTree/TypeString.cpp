@@ -9,6 +9,9 @@
 
 std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc::SymbolDatabase& database, QString& error_out)
 {
+	if (string.empty())
+		return nullptr;
+
 	size_t i = string.size();
 
 	// Parse array subscripts and pointer characters.
@@ -38,7 +41,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 			error_out = QCoreApplication::tr("Invalid array subscript.");
 			return nullptr;
 		}
-		
+
 		components.emplace_back(element_count);
 
 		i = j;

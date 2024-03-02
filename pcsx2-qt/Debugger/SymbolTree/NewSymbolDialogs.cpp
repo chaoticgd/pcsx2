@@ -4,6 +4,7 @@
 #include "NewSymbolDialogs.h"
 
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QPushButton>
 
 #include "TypeString.h"
 
@@ -42,8 +43,14 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent
 	if (flags & FUNCTION_FIELD)
 		setupFunctionField();
 
+	connectInputWidgets();
+
 	updateSizeField();
 	adjustSize();
+
+	QTimer::singleShot(0, this, [&]() {
+		parseUserInput();
+	});
 }
 
 void NewSymbolDialog::setAddress(u32 address)
@@ -88,6 +95,29 @@ void NewSymbolDialog::setupFunctionField()
 	});
 }
 
+void NewSymbolDialog::connectInputWidgets()
+{
+	QMetaMethod parse_user_input = metaObject()->method(metaObject()->indexOfSlot("parseUserInput()"));
+	for (QObject* child : children())
+	{
+		QWidget* widget = qobject_cast<QWidget*>(child);
+		if (!widget)
+			continue;
+
+		QMetaProperty property = widget->metaObject()->userProperty();
+		if (!property.isValid() || !property.hasNotifySignal())
+			continue;
+
+		connect(widget, property.notifySignal(), this, parse_user_input);
+	}
+}
+
+void NewSymbolDialog::updateErrorMessage(QString error_message)
+{
+	m_ui.buttonBox->button(QDialogButtonBox::Ok)->setEnabled(error_message.isEmpty());
+	m_ui.errorMessage->setText(error_message);
+}
+
 NewSymbolDialog::FunctionSizeType NewSymbolDialog::functionSizeType() const
 {
 	if (m_ui.fillExistingFunctionRadioButton->isChecked())
@@ -112,7 +142,7 @@ void NewSymbolDialog::updateSizeField()
 					tr("Fill existing function (%1 bytes)").arg(*fill_existing_function_size));
 			else
 				m_ui.fillExistingFunctionRadioButton->setText(
-					tr("Fill existing function (no existing function)"));
+					tr("Fill existing function (none found)"));
 			m_ui.fillExistingFunctionRadioButton->setEnabled(fill_existing_function_size.has_value());
 
 			std::optional<u32> fill_empty_space_size = fillEmptySpaceSize(address, database);
@@ -184,84 +214,112 @@ NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
 	setWindowTitle("New Function");
 }
 
-void NewFunctionDialog::createSymbol()
+bool NewFunctionDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		// Parse the user input.
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+		m_name = m_ui.nameLineEdit->text().toStdString();
+		if (m_name.empty())
+		{
+			error_message = tr("Name is empty.");
+			return;
+		}
+
 		bool ok;
-
-		std::string name = m_ui.nameLineEdit->text().toStdString();
-		if (name.empty())
+		m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+		if (!ok)
 		{
-			error_message = tr("No name provided.");
+			error_message = tr("Address is not valid.");
 			return;
 		}
 
-		u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-		if (!ok || address % 4 != 0)
+		if (m_address % 4 != 0)
 		{
-			error_message = tr("Invalid address.");
+			error_message = tr("Address not aligned.");
 			return;
 		}
 
-		u32 size = 0;
+		m_size = 0;
 		switch (functionSizeType())
 		{
 			case FILL_EXISTING_FUNCTION:
 			{
-				std::optional<u32> fill_existing_function_size = fillExistingFunctionSize(address, database);
+				std::optional<u32> fill_existing_function_size = fillExistingFunctionSize(m_address, database);
 				if (!fill_existing_function_size.has_value())
 				{
 					error_message = tr("No existing function found.");
 					return;
 				}
 
-				size = *fill_existing_function_size;
+				m_size = *fill_existing_function_size;
 
 				break;
 			}
 			case FILL_EMPTY_SPACE:
 			{
-				std::optional<u32> fill_space_size = fillEmptySpaceSize(address, database);
+				std::optional<u32> fill_space_size = fillEmptySpaceSize(m_address, database);
 				if (!fill_space_size.has_value())
 				{
 					error_message = tr("No next symbol found.");
 					return;
 				}
 
-				size = *fill_space_size;
+				m_size = *fill_space_size;
 
 				break;
 			}
 			case CUSTOM_SIZE:
 			{
-				size = m_ui.customSizeSpinBox->value();
+				m_size = m_ui.customSizeSpinBox->value();
 				break;
 			}
 		}
 
-		if (size == 0 || size > 256 * 1024 * 1024 || size % 4 != 0)
+		if (m_size == 0 || m_size > 256 * 1024 * 1024)
 		{
-			error_message = tr("Invalid size.");
+			error_message = tr("Size is invalid.");
+			return;
+		}
+
+		if (m_size % 4 != 0)
+		{
+			error_message = tr("Size is not a multiple of 4.");
 			return;
 		}
 
 		// Handle an existing function if it exists.
-		ccc::Function* existing_function = database.functions.symbol_overlapping_address(address);
-		if (existing_function->address().value == address)
+		const ccc::Function* existing_function = database.functions.symbol_overlapping_address(m_address);
+		m_existing_function = ccc::FunctionHandle();
+		if (existing_function)
 		{
-			error_message = tr("A function already exists at that address.");
+			if (existing_function->address().value == m_address)
+			{
+				error_message = tr("A function already exists at that address.");
+				return;
+			}
+
+			if (m_ui.shrinkExistingRadioButton->isChecked())
+			{
+				m_new_existing_function_size = m_address - existing_function->address().value;
+				m_existing_function = existing_function->handle();
+			}
+		}
+	});
+
+	updateErrorMessage(error_message);
+	return error_message.isEmpty();
+}
+
+void NewFunctionDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		if (!parseUserInput())
+		{
+			error_message = tr("Cannot parse user input.");
 			return;
 		}
 
-		u32 new_existing_function_size = 0;
-		if (m_ui.shrinkExistingRadioButton->isChecked() && existing_function)
-		{
-			new_existing_function_size = address - existing_function->address().value;
-		}
-
-		// Create the symbol.
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -269,16 +327,18 @@ void NewFunctionDialog::createSymbol()
 			return;
 		}
 
-		ccc::Result<ccc::Function*> function = database.functions.create_symbol(std::move(name), address, *source, nullptr);
+		ccc::Result<ccc::Function*> function = database.functions.create_symbol(std::move(m_name), m_address, *source, nullptr);
 		if (!function.success())
 		{
 			error_message = tr("Cannot create symbol.");
 			return;
 		}
 
-		(*function)->set_size(size);
-		if (existing_function && new_existing_function_size != 0)
-			existing_function->set_size(new_existing_function_size);
+		(*function)->set_size(m_size);
+
+		ccc::Function* existing_function = database.functions.symbol_from_handle(m_existing_function);
+		if (existing_function)
+			existing_function->set_size(m_new_existing_function_size);
 	});
 
 	if (!error_message.isEmpty())
@@ -293,32 +353,50 @@ NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* p
 	setWindowTitle("New Global Variable");
 }
 
+bool NewGlobalVariableDialog::parseUserInput()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+		m_name = m_ui.nameLineEdit->text().toStdString();
+		if (m_name.empty())
+		{
+			error_message = tr("Name is empty.");
+			return;
+		}
+
+		bool ok;
+		m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+		if (!ok)
+		{
+			error_message = tr("Address is not valid.");
+			return;
+		}
+
+		if (m_address % 4 != 0)
+		{
+			error_message = tr("Address not aligned.");
+			return;
+		}
+
+		m_type = stringToType(m_ui.typeLineEdit->text().toStdString(), database, error_message);
+		if (!error_message.isEmpty())
+			return;
+	});
+
+	updateErrorMessage(error_message);
+	return error_message.isEmpty();
+}
+
 void NewGlobalVariableDialog::createSymbol()
 {
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		// Parse the user input.
-		bool ok;
-
-		std::string name = m_ui.nameLineEdit->text().toStdString();
-		if (name.empty())
+		if (!parseUserInput())
 		{
-			error_message = tr("No name provided.");
+			error_message = tr("Cannot parse user input.");
 			return;
 		}
 
-		u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-		if (!ok)
-		{
-			error_message = tr("Invalid address.");
-			return;
-		}
-
-		std::unique_ptr<ccc::ast::Node> type = stringToType(m_ui.typeLineEdit->text().toStdString(), database, error_message);
-		if (!type)
-			return;
-
-		// Create the symbol.
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -326,14 +404,14 @@ void NewGlobalVariableDialog::createSymbol()
 			return;
 		}
 
-		ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(std::move(name), address, *source, nullptr);
+		ccc::Result<ccc::GlobalVariable*> global_variable = database.global_variables.create_symbol(std::move(m_name), m_address, *source, nullptr);
 		if (!global_variable.success())
 		{
 			error_message = tr("Cannot create symbol.");
 			return;
 		}
 
-		(*global_variable)->set_type(std::move(type));
+		(*global_variable)->set_type(std::move(m_type));
 	});
 
 	if (!error_message.isEmpty())
@@ -348,39 +426,34 @@ NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* par
 	setWindowTitle("New Local Variable");
 }
 
-void NewLocalVariableDialog::createSymbol()
+bool NewLocalVariableDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		// Parse the user input.
-		ccc::FunctionHandle function_handle = m_functions.at(m_ui.functionComboBox->currentIndex());
-		ccc::Function* function = database.functions.symbol_from_handle(function_handle);
-		if (!function)
-		{
-			error_message = tr("Invalid function.");
-			return;
-		}
-
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
 		std::string name = m_ui.nameLineEdit->text().toStdString();
 		if (name.empty())
 		{
-			error_message = tr("No name provided.");
+			error_message = tr("Name is empty.");
 			return;
 		}
 
-		std::variant<ccc::GlobalStorage, ccc::RegisterStorage, ccc::StackStorage> storage;
-		ccc::Address address;
 		switch (storageType())
 		{
 			case GLOBAL_STORAGE:
 			{
-				storage.emplace<ccc::GlobalStorage>();
+				m_storage.emplace<ccc::GlobalStorage>();
 
 				bool ok;
-				address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+				m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
 				if (!ok)
 				{
-					error_message = tr("Invalid address.");
+					error_message = tr("Address is not valid.");
+					return;
+				}
+
+				if (m_address % 4 != 0)
+				{
+					error_message = tr("Address not aligned.");
 					return;
 				}
 
@@ -388,24 +461,52 @@ void NewLocalVariableDialog::createSymbol()
 			}
 			case REGISTER_STORAGE:
 			{
-				ccc::RegisterStorage& register_storage = storage.emplace<ccc::RegisterStorage>();
+				ccc::RegisterStorage& register_storage = m_storage.emplace<ccc::RegisterStorage>();
 				register_storage.dbx_register_number = m_ui.registerComboBox->currentIndex();
 				break;
 			}
 			case STACK_STORAGE:
 			{
-				ccc::StackStorage& stack_storage = storage.emplace<ccc::StackStorage>();
+				ccc::StackStorage& stack_storage = m_storage.emplace<ccc::StackStorage>();
 				stack_storage.stack_pointer_offset = m_ui.stackPointerOffsetSpinBox->value();
 				break;
 			}
 		}
 
 		std::string typeString = m_ui.typeLineEdit->text().toStdString();
-		std::unique_ptr<ccc::ast::Node> type = stringToType(typeString, database, error_message);
-		if (!type)
+		m_type = stringToType(typeString, database, error_message);
+		if (!error_message.isEmpty())
 			return;
 
-		// Create the symbol.
+		m_function = m_functions.at(m_ui.functionComboBox->currentIndex());
+		if (!m_function.valid())
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+	});
+
+	updateErrorMessage(error_message);
+	return error_message.isEmpty();
+}
+
+void NewLocalVariableDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		if (!parseUserInput())
+		{
+			error_message = tr("Cannot parse user input.");
+			return;
+		}
+
+		ccc::Function* function = database.functions.symbol_from_handle(m_function);
+		if (!function)
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -414,17 +515,16 @@ void NewLocalVariableDialog::createSymbol()
 		}
 
 		ccc::Result<ccc::LocalVariable*> local_variable =
-			database.local_variables.create_symbol(std::move(name), address, *source, nullptr);
+			database.local_variables.create_symbol(std::move(m_name), m_address, *source, nullptr);
 		if (!local_variable.success())
 		{
 			error_message = tr("Cannot create symbol.");
 			return;
 		}
 
-		(*local_variable)->set_type(std::move(type));
-		(*local_variable)->storage = storage;
+		(*local_variable)->set_type(std::move(m_type));
+		(*local_variable)->storage = m_storage;
 
-		// Add the local variable to the chosen function.
 		std::vector<ccc::LocalVariableHandle> local_variables;
 		if (function->local_variables().has_value())
 			local_variables = *function->local_variables();
@@ -444,23 +544,14 @@ NewParameterVariableDialog::NewParameterVariableDialog(DebugInterface& cpu, QWid
 	setWindowTitle("New Parameter Variable");
 }
 
-void NewParameterVariableDialog::createSymbol()
+bool NewParameterVariableDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		// Parse the user input.
-		ccc::FunctionHandle function_handle = m_functions.at(m_ui.functionComboBox->currentIndex());
-		ccc::Function* function = database.functions.symbol_from_handle(function_handle);
-		if (!function)
-		{
-			error_message = tr("Invalid function.");
-			return;
-		}
-
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
 		std::string name = m_ui.nameLineEdit->text().toStdString();
 		if (name.empty())
 		{
-			error_message = tr("No name provided.");
+			error_message = tr("Name is empty.");
 			return;
 		}
 
@@ -469,6 +560,7 @@ void NewParameterVariableDialog::createSymbol()
 		{
 			case GLOBAL_STORAGE:
 			{
+				error_message = tr("Invalid storage type.");
 				return;
 			}
 			case REGISTER_STORAGE:
@@ -486,11 +578,39 @@ void NewParameterVariableDialog::createSymbol()
 		}
 
 		std::string typeString = m_ui.typeLineEdit->text().toStdString();
-		std::unique_ptr<ccc::ast::Node> type = stringToType(typeString, database, error_message);
-		if (!type)
+		m_type = stringToType(typeString, database, error_message);
+		if (!error_message.isEmpty())
 			return;
 
-		// Create the symbol.
+		m_function = m_functions.at(m_ui.functionComboBox->currentIndex());
+		if (!m_function.valid())
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+	});
+
+	updateErrorMessage(error_message);
+	return error_message.isEmpty();
+}
+
+void NewParameterVariableDialog::createSymbol()
+{
+	QString error_message;
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		if (!parseUserInput())
+		{
+			error_message = tr("Cannot parse user input.");
+			return;
+		}
+
+		ccc::Function* function = database.functions.symbol_from_handle(m_function);
+		if (!function)
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -499,17 +619,16 @@ void NewParameterVariableDialog::createSymbol()
 		}
 
 		ccc::Result<ccc::ParameterVariable*> parameter_variable =
-			database.parameter_variables.create_symbol(std::move(name), *source, nullptr);
+			database.parameter_variables.create_symbol(std::move(m_name), *source, nullptr);
 		if (!parameter_variable.success())
 		{
 			error_message = tr("Cannot create symbol.");
 			return;
 		}
 
-		(*parameter_variable)->set_type(std::move(type));
-		(*parameter_variable)->storage = storage;
+		(*parameter_variable)->set_type(std::move(m_type));
+		(*parameter_variable)->storage = m_storage;
 
-		// Add the parameter variable to the chosen function.
 		std::vector<ccc::ParameterVariableHandle> parameter_variables;
 		if (function->parameter_variables().has_value())
 			parameter_variables = *function->parameter_variables();
