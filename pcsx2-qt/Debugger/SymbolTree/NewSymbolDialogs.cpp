@@ -211,6 +211,28 @@ void NewSymbolDialog::onStorageTabChanged(int index)
 	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
 }
 
+std::string NewSymbolDialog::parseName(QString& error_message)
+{
+	std::string name = m_ui.nameLineEdit->text().toStdString();
+	if (name.empty())
+		error_message = tr("Name is empty.");
+
+	return name;
+}
+
+u32 NewSymbolDialog::parseAddress(QString& error_message)
+{
+	bool ok;
+	u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
+	if (!ok)
+		error_message = tr("Address is not valid.");
+
+	if (address % 4 != 0)
+		error_message = tr("Address is not aligned.");
+
+	return address;
+}
+
 // *****************************************************************************
 
 NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
@@ -223,26 +245,13 @@ bool NewFunctionDialog::parseUserInput()
 {
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
-		m_name = m_ui.nameLineEdit->text().toStdString();
-		if (m_name.empty())
-		{
-			error_message = tr("Name is empty.");
+		m_name = parseName(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
 
-		bool ok;
-		m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-		if (!ok)
-		{
-			error_message = tr("Address is not valid.");
+		m_address = parseAddress(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
-
-		if (m_address % 4 != 0)
-		{
-			error_message = tr("Address not aligned.");
-			return;
-		}
 
 		m_size = 0;
 		switch (functionSizeType())
@@ -362,26 +371,13 @@ bool NewGlobalVariableDialog::parseUserInput()
 {
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
-		m_name = m_ui.nameLineEdit->text().toStdString();
-		if (m_name.empty())
-		{
-			error_message = tr("Name is empty.");
+		m_name = parseName(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
 
-		bool ok;
-		m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-		if (!ok)
-		{
-			error_message = tr("Address is not valid.");
+		m_address = parseAddress(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
-
-		if (m_address % 4 != 0)
-		{
-			error_message = tr("Address not aligned.");
-			return;
-		}
 
 		m_type = stringToType(m_ui.typeLineEdit->text().toStdString(), database, error_message);
 		if (!error_message.isEmpty())
@@ -435,12 +431,9 @@ bool NewLocalVariableDialog::parseUserInput()
 {
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
-		std::string name = m_ui.nameLineEdit->text().toStdString();
-		if (name.empty())
-		{
-			error_message = tr("Name is empty.");
+		m_name = parseName(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
 
 		switch (storageType())
 		{
@@ -448,19 +441,9 @@ bool NewLocalVariableDialog::parseUserInput()
 			{
 				m_storage.emplace<ccc::GlobalStorage>();
 
-				bool ok;
-				m_address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
-				if (!ok)
-				{
-					error_message = tr("Address is not valid.");
+				m_address = parseAddress(error_message);
+				if (!error_message.isEmpty())
 					return;
-				}
-
-				if (m_address % 4 != 0)
-				{
-					error_message = tr("Address not aligned.");
-					return;
-				}
 
 				break;
 			}
@@ -553,12 +536,9 @@ bool NewParameterVariableDialog::parseUserInput()
 {
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
-		std::string name = m_ui.nameLineEdit->text().toStdString();
-		if (name.empty())
-		{
-			error_message = tr("Name is empty.");
+		m_name = parseName(error_message);
+		if (!error_message.isEmpty())
 			return;
-		}
 
 		std::variant<ccc::RegisterStorage, ccc::StackStorage> storage;
 		switch (storageType())

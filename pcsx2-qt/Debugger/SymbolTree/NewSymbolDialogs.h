@@ -73,6 +73,9 @@ protected:
 
 	u32 storageType() const;
 	void onStorageTabChanged(int index);
+	
+	std::string parseName(QString& error_message);
+	u32 parseAddress(QString& error_message);
 
 	DebugInterface& m_cpu;
 	Ui::NewSymbolDialog m_ui;
