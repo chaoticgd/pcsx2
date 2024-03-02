@@ -117,7 +117,7 @@ QString SymbolTreeNode::toString(
 				case ccc::ast::BuiltInClass::UNQUALIFIED_128:
 				case ccc::ast::BuiltInClass::FLOAT_128:
 				{
-					if (depth > 1)
+					if (depth > 0)
 						return "(128-bit value)";
 
 					QString result;
