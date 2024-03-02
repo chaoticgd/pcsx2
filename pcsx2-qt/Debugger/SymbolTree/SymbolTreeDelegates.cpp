@@ -13,9 +13,11 @@
 
 SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
 	SymbolGuardian& guardian,
+	u32 alignment,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
 	, m_guardian(guardian)
+	, m_alignment(alignment)
 {
 }
 
@@ -74,6 +76,8 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	u32 address = line_edit->text().toUInt(&ok, 16);
 	if (!ok)
 		return;
+
+	address -= address % m_alignment;
 
 	bool success = false;
 	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {

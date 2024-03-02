@@ -14,6 +14,7 @@ class SymbolTreeLocationDelegate : public QStyledItemDelegate
 public:
 	SymbolTreeLocationDelegate(
 		SymbolGuardian& guardian,
+		u32 alignment,
 		QObject* parent = nullptr);
 
 	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -22,6 +23,7 @@ public:
 
 protected:
 	SymbolGuardian& m_guardian;
+	u32 m_alignment;
 };
 
 class SymbolTreeTypeDelegate : public QStyledItemDelegate

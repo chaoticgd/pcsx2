@@ -28,7 +28,7 @@ signals:
 	void locationColumnClicked(u32 address);
 
 protected:
-	explicit SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent = nullptr);
+	explicit SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent = nullptr);
 
 	void setupTree();
 	void setupMenu();
@@ -89,6 +89,7 @@ protected:
 	};
 
 	u32 m_flags;
+	u32 m_symbol_address_alignment;
 };
 
 class FunctionTreeWidget : public SymbolTreeWidget

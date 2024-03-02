@@ -8,14 +8,14 @@
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
 
-#include "common/Assertions.h"
 #include "NewSymbolDialogs.h"
 #include "SymbolTreeDelegates.h"
 
-SymbolTreeWidget::SymbolTreeWidget(u32 flags, DebugInterface& cpu, QWidget* parent)
+SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent)
 	: QWidget(parent)
 	, m_cpu(cpu)
 	, m_flags(flags)
+	, m_symbol_address_alignment(symbol_address_alignment)
 {
 	m_ui.setupUi(this);
 
@@ -66,7 +66,7 @@ void SymbolTreeWidget::setupTree()
 	m_model = new SymbolTreeModel(m_cpu, this);
 	m_ui.treeView->setModel(m_model);
 
-	auto location_delegate = new SymbolTreeLocationDelegate(m_cpu.GetSymbolGuardian(), this);
+	auto location_delegate = new SymbolTreeLocationDelegate(m_cpu.GetSymbolGuardian(), m_symbol_address_alignment, this);
 	m_ui.treeView->setItemDelegateForColumn(SymbolTreeModel::LOCATION, location_delegate);
 
 	auto type_delegate = new SymbolTreeTypeDelegate(m_cpu.GetSymbolGuardian(), this);
@@ -448,7 +448,7 @@ SymbolTreeNode* SymbolTreeWidget::currentNode()
 }
 
 FunctionTreeWidget::FunctionTreeWidget(DebugInterface& cpu, QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING, cpu, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING, 4, cpu, parent)
 {
 }
 
@@ -535,7 +535,7 @@ void FunctionTreeWidget::onDeleteButtonPressed()
 }
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
-	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, cpu, parent)
+	: SymbolTreeWidget(ALLOW_GROUPING | ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN | ALLOW_TYPE_ACTIONS, 1, cpu, parent)
 {
 }
 
@@ -649,7 +649,7 @@ void GlobalVariableTreeWidget::onDeleteButtonPressed()
 }
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
-	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, cpu, parent)
+	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, 1, cpu, parent)
 {
 }
 
@@ -747,7 +747,7 @@ void LocalVariableTreeWidget::onDeleteButtonPressed()
 }
 
 ParameterVariableTreeWidget::ParameterVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
-	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, cpu, parent)
+	: SymbolTreeWidget(ALLOW_TYPE_ACTIONS, 1, cpu, parent)
 {
 }
 
