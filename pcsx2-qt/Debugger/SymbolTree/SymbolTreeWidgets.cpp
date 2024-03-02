@@ -97,6 +97,12 @@ void SymbolTreeWidget::setupMenu()
 
 	m_context_menu->addSeparator();
 
+	QAction* rename_symbol = new QAction(tr("Rename Symbol"), this);
+	connect(rename_symbol, &QAction::triggered, this, &SymbolTreeWidget::onRenameSymbol);
+	m_context_menu->addAction(rename_symbol);
+
+	m_context_menu->addSeparator();
+
 	QAction* go_to_in_disassembly = new QAction(tr("Go to in Disassembly"), this);
 	connect(go_to_in_disassembly, &QAction::triggered, this, &SymbolTreeWidget::onGoToInDisassembly);
 	m_context_menu->addAction(go_to_in_disassembly);
@@ -316,6 +322,41 @@ void SymbolTreeWidget::onCopyLocation()
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	QApplication::clipboard()->setText(node->location.toString(m_cpu));
+}
+
+void SymbolTreeWidget::onRenameSymbol()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QString title = tr("Rename Symbol");
+	QString label = tr("Name:");
+
+	QString text;
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol || !symbol->address().valid())
+			return;
+
+		text = QString::fromStdString(symbol->name());
+	});
+
+	bool ok;
+	std::string name = QInputDialog::getText(this, title, label, QLineEdit::Normal, text, &ok).toStdString();
+	if (!ok)
+		return;
+
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		node->symbol.rename_symbol(name, database);
+	});
 }
 
 void SymbolTreeWidget::onGoToInDisassembly()

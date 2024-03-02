@@ -59,6 +59,7 @@ protected:
 
 	void onCopyName();
 	void onCopyLocation();
+	void onRenameSymbol();
 	void onGoToInDisassembly();
 	void onGoToInMemoryView();
 	void onResetChildren();
