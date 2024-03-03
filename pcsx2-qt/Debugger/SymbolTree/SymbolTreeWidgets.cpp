@@ -183,7 +183,7 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySourceFile(
 	else
 	{
 		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-		group_node->name = "(unknown source file)";
+		group_node->name = tr("(unknown source file)");
 	}
 
 	group_node->emplaceChild(std::move(child));
@@ -213,7 +213,7 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
 	else
 	{
 		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-		group_node->name = "(unknown section)";
+		group_node->name = tr("(unknown section)");
 	}
 	group_node->emplaceChild(std::move(child));
 	child = std::move(group_node);
@@ -250,7 +250,7 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
 	else
 	{
 		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-		group_node->name = "(unknown module)";
+		group_node->name = tr("(unknown module)");
 	}
 
 	group_node->emplaceChild(std::move(child));
@@ -636,15 +636,15 @@ std::vector<SymbolTreeWidget::SymbolWork> GlobalVariableTreeWidget::getSymbols(
 		ccc::FunctionHandle function_handle = local_variable.function();
 		const ccc::Function* function = database.functions.symbol_from_handle(function_handle);
 
-		QString name;
+		QString function_name;
 		if (function)
-			name = QString("%1 (%2)")
-					   .arg(QString::fromStdString(local_variable.name()))
-					   .arg(QString::fromStdString(function->name()));
+			function_name = QString::fromStdString(function->name());
 		else
-			name = QString("%1 (unknown function)")
-					   .arg(QString::fromStdString(local_variable.name()));
+			function_name = tr("unknown function");
 
+		QString name = QString("%1 (%2)")
+						   .arg(QString::fromStdString(local_variable.name()))
+						   .arg(function_name);
 		if (!testName(name, filter))
 			continue;
 
