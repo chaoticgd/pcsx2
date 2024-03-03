@@ -31,26 +31,25 @@ protected:
 	explicit SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent = nullptr);
 
 	void setupTree();
+	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);
+	
 	void setupMenu();
 
-	// Builds up the tree for when symbols are grouped by the module that
-	// contains them, otherwise it just passes through to populateSections.
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateModules(
-		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
+	struct SymbolWork
+	{
+		QString name;
+		ccc::SymbolDescriptor descriptor;
+		const ccc::Symbol* symbol = nullptr;
+		const ccc::Module* module_symbol = nullptr;
+		const ccc::Section* section = nullptr;
+		const ccc::SourceFile* source_file = nullptr;
+	};
 
-	// Builds up the tree for when symbols are grouped by the ELF section that
-	// contains them, otherwise it just passes through to populateSourceFiles.
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSections(
-		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
+	virtual std::vector<SymbolWork> getSymbols(
+		const QString& filter, const ccc::SymbolDatabase& database) = 0;
 
-	// Builds up the tree for when symbols are grouped by the source file that
-	// contains them, otherwise it just passes through to populateSymbols.
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSourceFiles(
-		SymbolFilters& filters, const ccc::SymbolDatabase& database) const;
-
-	// Generates a filtered list of symbols.
-	virtual std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
-		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const = 0;
+	virtual std::unique_ptr<SymbolTreeNode> buildNode(
+		SymbolWork& work, const ccc::SymbolDatabase& database) const = 0;
 
 	virtual void configureColumns() = 0;
 
@@ -100,8 +99,11 @@ public:
 	virtual ~FunctionTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
-		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+	std::vector<SymbolWork> getSymbols(
+		const QString& filter, const ccc::SymbolDatabase& database) override;
+
+	std::unique_ptr<SymbolTreeNode> buildNode(
+		SymbolWork& work, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
 
@@ -117,8 +119,11 @@ public:
 	virtual ~GlobalVariableTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
-		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+	std::vector<SymbolWork> getSymbols(
+		const QString& filter, const ccc::SymbolDatabase& database) override;
+
+	std::unique_ptr<SymbolTreeNode> buildNode(
+		SymbolWork& work, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
 
@@ -134,13 +139,18 @@ public:
 	virtual ~LocalVariableTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
-		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+	std::vector<SymbolWork> getSymbols(
+		const QString& filter, const ccc::SymbolDatabase& database) override;
+
+	std::unique_ptr<SymbolTreeNode> buildNode(
+		SymbolWork& work, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
 	void onDeleteButtonPressed() override;
+	
+	u32 m_stack_pointer = 0;
 };
 
 class ParameterVariableTreeWidget : public SymbolTreeWidget
@@ -151,13 +161,18 @@ public:
 	virtual ~ParameterVariableTreeWidget();
 
 protected:
-	std::vector<std::unique_ptr<SymbolTreeNode>> populateSymbols(
-		const SymbolFilters& filters, const ccc::SymbolDatabase& database) const override;
+	std::vector<SymbolWork> getSymbols(
+		const QString& filter, const ccc::SymbolDatabase& database) override;
+
+	std::unique_ptr<SymbolTreeNode> buildNode(
+		SymbolWork& work, const ccc::SymbolDatabase& database) const override;
 
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
 	void onDeleteButtonPressed() override;
+	
+	u32 m_stack_pointer = 0;
 };
 
 struct SymbolFilters
@@ -166,15 +181,4 @@ struct SymbolFilters
 	bool group_by_section = false;
 	bool group_by_source_file = false;
 	QString string;
-
-	ccc::ModuleHandle module_handle;
-	ccc::SectionHandle section;
-	const ccc::SourceFile* source_file = nullptr;
-
-	bool testGroups(
-		const ccc::Symbol& test_symbol,
-		ccc::SourceFileHandle test_source_file,
-		const ccc::SymbolDatabase& database) const;
-	
-	bool testName(const QString& test_name) const;
 };

@@ -146,7 +146,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case VALUE:
 		{
-			if (node->tag != SymbolTreeTag::OBJECT)
+			if (node->tag != SymbolTreeNode::OBJECT)
 				return QVariant();
 
 			QVariant result;
@@ -321,7 +321,7 @@ std::optional<QString> SymbolTreeModel::typeFromModelIndexToString(QModelIndex i
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (node->tag == SymbolTreeTag::GROUP)
+	if (node->tag != SymbolTreeNode::OBJECT)
 		return std::nullopt;
 
 	QString result;

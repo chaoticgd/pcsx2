@@ -10,17 +10,18 @@
 
 class DebugInterface;
 
-enum class SymbolTreeTag
-{
-	GROUP,
-	OBJECT
-};
-
 // A node in a symbol tree model.
 struct SymbolTreeNode
 {
 public:
-	SymbolTreeTag tag = SymbolTreeTag::OBJECT;
+	enum Tag
+	{
+		UNKNOWN_GROUP,
+		GROUP,
+		OBJECT
+	};
+
+	Tag tag = OBJECT;
 	QString name;
 	ccc::NodeHandle type;
 	SymbolTreeLocation location;
