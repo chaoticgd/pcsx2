@@ -28,13 +28,6 @@ signals:
 	void locationColumnClicked(u32 address);
 
 protected:
-	explicit SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent = nullptr);
-
-	void setupTree();
-	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);
-	
-	void setupMenu();
-
 	struct SymbolWork
 	{
 		QString name;
@@ -44,6 +37,20 @@ protected:
 		const ccc::Section* section = nullptr;
 		const ccc::SourceFile* source_file = nullptr;
 	};
+
+	explicit SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent = nullptr);
+
+	void setupTree();
+	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);
+
+	std::unique_ptr<SymbolTreeNode> groupBySourceFile(
+		std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work);
+	std::unique_ptr<SymbolTreeNode> groupBySection(
+		std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work);
+	std::unique_ptr<SymbolTreeNode> groupByModule(
+		std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work);
+
+	void setupMenu();
 
 	virtual std::vector<SymbolWork> getSymbols(
 		const QString& filter, const ccc::SymbolDatabase& database) = 0;
@@ -149,7 +156,7 @@ protected:
 
 	void onNewButtonPressed() override;
 	void onDeleteButtonPressed() override;
-	
+
 	u32 m_stack_pointer = 0;
 };
 
@@ -171,7 +178,7 @@ protected:
 
 	void onNewButtonPressed() override;
 	void onDeleteButtonPressed() override;
-	
+
 	u32 m_stack_pointer = 0;
 };
 

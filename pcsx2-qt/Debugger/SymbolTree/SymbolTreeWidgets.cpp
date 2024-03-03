@@ -127,9 +127,9 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 	SymbolTreeNode* section_node = nullptr;
 	SymbolTreeNode* module_node = nullptr;
 
-	SymbolWork* source_file_work = nullptr;
-	SymbolWork* section_work = nullptr;
-	SymbolWork* module_work = nullptr;
+	const SymbolWork* source_file_work = nullptr;
+	const SymbolWork* section_work = nullptr;
+	const SymbolWork* module_work = nullptr;
 
 	for (SymbolWork& work : symbols)
 	{
@@ -137,99 +137,129 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 
 		if (filters.group_by_source_file)
 		{
-			if (source_file_node && work.source_file == source_file_work->source_file)
-			{
-				source_file_node->emplaceChild(std::move(node));
+			node = groupBySourceFile(std::move(node), work, source_file_node, source_file_work);
+			if (!node)
 				continue;
-			}
-
-			std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
-			if (work.source_file)
-			{
-				group_node->tag = SymbolTreeNode::GROUP;
-				if (!work.source_file->command_line_path.empty())
-					group_node->name = QString::fromStdString(work.source_file->command_line_path);
-				else
-					node->name = QString::fromStdString(work.source_file->name());
-			}
-			else
-			{
-				group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-				group_node->name = "(unknown source file)";
-			}
-
-			group_node->emplaceChild(std::move(node));
-			node = std::move(group_node);
-
-			source_file_node = node.get();
-			source_file_work = &work;
 		}
 
 		if (filters.group_by_section)
 		{
-			if (section_node && work.section == section_work->section)
-			{
-				section_node->emplaceChild(std::move(node));
+			node = groupBySection(std::move(node), work, section_node, section_work);
+			if (!node)
 				continue;
-			}
-
-			std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
-			if (work.section)
-			{
-				group_node->tag = SymbolTreeNode::GROUP;
-				group_node->name = QString::fromStdString(work.section->name());
-			}
-			else
-			{
-				group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-				group_node->name = "(unknown section)";
-			}
-			group_node->emplaceChild(std::move(node));
-			node = std::move(group_node);
-
-			section_node = node.get();
-			section_work = &work;
 		}
 
 		if (filters.group_by_module)
 		{
-			if (module_node && work.module_symbol == module_work->module_symbol)
-			{
-				module_node->emplaceChild(std::move(node));
+			node = groupByModule(std::move(node), work, module_node, module_work);
+			if (!node)
 				continue;
-			}
-
-			std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
-			if (work.module_symbol)
-			{
-
-				group_node->tag = SymbolTreeNode::GROUP;
-				if (work.module_symbol->is_irx)
-				{
-					s32 major = work.module_symbol->version_major;
-					s32 minor = work.module_symbol->version_minor;
-					group_node->name += QString(" v%1.%2").arg(major).arg(minor);
-				}
-				else
-					group_node->name = QString::fromStdString(work.module_symbol->name());
-			}
-			else
-			{
-				group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
-				group_node->name = "(unknown module)";
-			}
-
-			group_node->emplaceChild(std::move(node));
-			node = std::move(group_node);
-
-			module_node = node.get();
-			module_work = &work;
 		}
 
 		root->emplaceChild(std::move(node));
 	}
 
 	return root;
+}
+
+std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySourceFile(
+	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+{
+	if (prev_group && child_work.source_file == prev_work->source_file)
+	{
+		prev_group->emplaceChild(std::move(child));
+		return nullptr;
+	}
+
+	std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
+	if (child_work.source_file)
+	{
+		group_node->tag = SymbolTreeNode::GROUP;
+		if (!child_work.source_file->command_line_path.empty())
+			group_node->name = QString::fromStdString(child_work.source_file->command_line_path);
+		else
+			group_node->name = QString::fromStdString(child_work.source_file->name());
+	}
+	else
+	{
+		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
+		group_node->name = "(unknown source file)";
+	}
+
+	group_node->emplaceChild(std::move(child));
+	child = std::move(group_node);
+
+	prev_group = child.get();
+	prev_work = &child_work;
+
+	return child;
+}
+
+std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
+	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+{
+	if (prev_group && child_work.section == prev_work->section)
+	{
+		prev_group->emplaceChild(std::move(child));
+		return nullptr;
+	}
+
+	std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
+	if (child_work.section)
+	{
+		group_node->tag = SymbolTreeNode::GROUP;
+		group_node->name = QString::fromStdString(child_work.section->name());
+	}
+	else
+	{
+		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
+		group_node->name = "(unknown section)";
+	}
+	group_node->emplaceChild(std::move(child));
+	child = std::move(group_node);
+
+	prev_group = child.get();
+	prev_work = &child_work;
+
+	return child;
+}
+
+std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
+	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+{
+	if (prev_group && child_work.module_symbol == prev_work->module_symbol)
+	{
+		prev_group->emplaceChild(std::move(child));
+		return nullptr;
+	}
+
+	std::unique_ptr<SymbolTreeNode> group_node = std::make_unique<SymbolTreeNode>();
+	if (child_work.module_symbol)
+	{
+
+		group_node->tag = SymbolTreeNode::GROUP;
+		if (child_work.module_symbol->is_irx)
+		{
+			s32 major = child_work.module_symbol->version_major;
+			s32 minor = child_work.module_symbol->version_minor;
+			group_node->name += QString(" v%1.%2").arg(major).arg(minor);
+		}
+		else
+			group_node->name = QString::fromStdString(child_work.module_symbol->name());
+	}
+	else
+	{
+		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
+		group_node->name = "(unknown module)";
+	}
+
+	group_node->emplaceChild(std::move(child));
+	child = std::move(group_node);
+
+	prev_group = child.get();
+	prev_work = &child_work;
+
+	return child;
 }
 
 void SymbolTreeWidget::setupMenu()

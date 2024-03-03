@@ -407,6 +407,8 @@ void SymbolTreeNode::clearChildren()
 void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 {
 	auto comparator = [&](const std::unique_ptr<SymbolTreeNode>& lhs, const std::unique_ptr<SymbolTreeNode>& rhs) -> bool {
+		if (lhs->tag != rhs->tag)
+			return lhs->tag < rhs->tag;
 		if (sort_by_if_type_is_known && lhs->type.valid() != rhs->type.valid())
 			return lhs->type.valid() > rhs->type.valid();
 
