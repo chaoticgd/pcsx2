@@ -21,7 +21,7 @@ public:
 	void setCustomSize(u32 size);
 
 protected:
-	explicit NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent = nullptr);
+	explicit NewSymbolDialog(u32 flags, u32 alignment, DebugInterface& cpu, QWidget* parent = nullptr);
 
 	enum Flags
 	{
@@ -81,6 +81,7 @@ protected:
 	DebugInterface& m_cpu;
 	Ui::NewSymbolDialog m_ui;
 
+u32 m_alignment;
 	std::vector<ccc::FunctionHandle> m_functions;
 };
 

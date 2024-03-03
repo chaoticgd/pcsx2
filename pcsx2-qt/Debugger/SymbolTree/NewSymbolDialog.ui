@@ -136,6 +136,9 @@
          </item>
          <item>
           <widget class="QSpinBox" name="customSizeSpinBox">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
            <property name="readOnly">
             <bool>false</bool>
            </property>

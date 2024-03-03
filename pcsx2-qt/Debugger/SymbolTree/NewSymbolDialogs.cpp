@@ -10,9 +10,10 @@
 
 #include "TypeString.h"
 
-NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent)
+NewSymbolDialog::NewSymbolDialog(u32 flags, u32 alignment, DebugInterface& cpu, QWidget* parent)
 	: QDialog(parent)
 	, m_cpu(cpu)
+	, m_alignment(alignment)
 {
 	m_ui.setupUi(this);
 
@@ -40,14 +41,16 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, DebugInterface& cpu, QWidget* parent
 	m_ui.form->setRowVisible(Row::FUNCTION, flags & FUNCTION_FIELD);
 
 	if (flags & SIZE_FIELD)
+	{
 		setupSizeField();
+		updateSizeField();
+	}
 
 	if (flags & FUNCTION_FIELD)
 		setupFunctionField();
 
 	connectInputWidgets();
 
-	updateSizeField();
 	adjustSize();
 
 	QTimer::singleShot(0, this, [&]() {
@@ -229,7 +232,7 @@ u32 NewSymbolDialog::parseAddress(QString& error_message)
 	if (!ok)
 		error_message = tr("Address is not valid.");
 
-	if (address % 4 != 0)
+	if (address % m_alignment != 0)
 		error_message = tr("Address is not aligned.");
 
 	return address;
@@ -238,7 +241,7 @@ u32 NewSymbolDialog::parseAddress(QString& error_message)
 // *****************************************************************************
 
 NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
-	: NewSymbolDialog(GLOBAL_STORAGE | SIZE_FIELD | EXISTING_FUNCTIONS_FIELD, cpu, parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | SIZE_FIELD | EXISTING_FUNCTIONS_FIELD, 4, cpu, parent)
 {
 	setWindowTitle("New Function");
 }
@@ -328,14 +331,11 @@ bool NewFunctionDialog::parseUserInput()
 
 void NewFunctionDialog::createSymbol()
 {
+	if (!parseUserInput())
+		return;
+
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		if (!parseUserInput())
-		{
-			error_message = tr("Cannot parse user input.");
-			return;
-		}
-
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -364,7 +364,7 @@ void NewFunctionDialog::createSymbol()
 // *****************************************************************************
 
 NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* parent)
-	: NewSymbolDialog(GLOBAL_STORAGE | TYPE_FIELD, cpu, parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | TYPE_FIELD, 1, cpu, parent)
 {
 	setWindowTitle("New Global Variable");
 }
@@ -392,14 +392,11 @@ bool NewGlobalVariableDialog::parseUserInput()
 
 void NewGlobalVariableDialog::createSymbol()
 {
+	if (!parseUserInput())
+		return;
+
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		if (!parseUserInput())
-		{
-			error_message = tr("Cannot parse user input.");
-			return;
-		}
-
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -424,7 +421,7 @@ void NewGlobalVariableDialog::createSymbol()
 // *****************************************************************************
 
 NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* parent)
-	: NewSymbolDialog(GLOBAL_STORAGE | REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, cpu, parent)
+	: NewSymbolDialog(GLOBAL_STORAGE | REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, 1, cpu, parent)
 {
 	setWindowTitle("New Local Variable");
 }
@@ -482,14 +479,11 @@ bool NewLocalVariableDialog::parseUserInput()
 
 void NewLocalVariableDialog::createSymbol()
 {
+	if (!parseUserInput())
+		return;
+
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		if (!parseUserInput())
-		{
-			error_message = tr("Cannot parse user input.");
-			return;
-		}
-
 		ccc::Function* function = database.functions.symbol_from_handle(m_function);
 		if (!function)
 		{
@@ -529,7 +523,7 @@ void NewLocalVariableDialog::createSymbol()
 // *****************************************************************************
 
 NewParameterVariableDialog::NewParameterVariableDialog(DebugInterface& cpu, QWidget* parent)
-	: NewSymbolDialog(REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, cpu, parent)
+	: NewSymbolDialog(REGISTER_STORAGE | STACK_STORAGE | TYPE_FIELD | FUNCTION_FIELD, 1, cpu, parent)
 {
 	setWindowTitle("New Parameter Variable");
 }
@@ -583,14 +577,11 @@ bool NewParameterVariableDialog::parseUserInput()
 
 void NewParameterVariableDialog::createSymbol()
 {
+	if (!parseUserInput())
+		return;
+
 	QString error_message;
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		if (!parseUserInput())
-		{
-			error_message = tr("Cannot parse user input.");
-			return;
-		}
-
 		ccc::Function* function = database.functions.symbol_from_handle(m_function);
 		if (!function)
 		{
