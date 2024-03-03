@@ -3,6 +3,8 @@
 
 #include "NewSymbolDialogs.h"
 
+#include <QtCore/QTimer>
+#include <QtCore/QMetaMethod>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QPushButton>
 

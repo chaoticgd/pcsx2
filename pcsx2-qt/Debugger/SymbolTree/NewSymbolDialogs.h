@@ -6,6 +6,7 @@
 #include <QtWidgets/QDialog>
 
 #include "DebugTools/DebugInterface.h"
+#include "DebugTools/ccc/ast.h"
 #include "ui_NewSymbolDialog.h"
 
 // Base class for symbol creation dialogs.
