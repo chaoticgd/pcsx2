@@ -51,6 +51,7 @@ protected:
 		std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work);
 
 	void setupMenu();
+	void openMenu(QPoint pos);
 
 	virtual std::vector<SymbolWork> getSymbols(
 		const QString& filter, const ccc::SymbolDatabase& database) = 0;
@@ -71,6 +72,9 @@ protected:
 	void onResetChildren();
 	void onChangeTypeTemporarily();
 
+	bool currentNodeIsObject();
+	bool currentNodeIsSymbol();
+
 	void onTreeViewClicked(const QModelIndex& index);
 
 	SymbolTreeNode* currentNode();
@@ -81,10 +85,13 @@ protected:
 	SymbolTreeModel* m_model = nullptr;
 
 	QMenu* m_context_menu = nullptr;
+	QAction* m_rename_symbol = nullptr;
 	QAction* m_group_by_module = nullptr;
 	QAction* m_group_by_section = nullptr;
 	QAction* m_group_by_source_file = nullptr;
 	QAction* m_sort_by_if_type_is_known = nullptr;
+	QAction* m_reset_children = nullptr;
+	QAction* m_change_type_temporarily = nullptr;
 
 	enum Flags
 	{

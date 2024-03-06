@@ -30,9 +30,7 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, Debu
 	connect(m_ui.deleteButton, &QPushButton::clicked, this, &SymbolTreeWidget::onDeleteButtonPressed);
 
 	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, [this](QPoint pos) {
-		m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
-	});
+	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, this, &SymbolTreeWidget::openMenu);
 }
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
@@ -276,9 +274,9 @@ void SymbolTreeWidget::setupMenu()
 
 	m_context_menu->addSeparator();
 
-	QAction* rename_symbol = new QAction(tr("Rename Symbol"), this);
-	connect(rename_symbol, &QAction::triggered, this, &SymbolTreeWidget::onRenameSymbol);
-	m_context_menu->addAction(rename_symbol);
+	m_rename_symbol = new QAction(tr("Rename Symbol"), this);
+	connect(m_rename_symbol, &QAction::triggered, this, &SymbolTreeWidget::onRenameSymbol);
+	m_context_menu->addAction(m_rename_symbol);
 
 	m_context_menu->addSeparator();
 
@@ -328,15 +326,31 @@ void SymbolTreeWidget::setupMenu()
 	{
 		m_context_menu->addSeparator();
 
-		QAction* reset_children = new QAction(tr("Reset children"), this);
-		m_context_menu->addAction(reset_children);
+		m_reset_children = new QAction(tr("Reset children"), this);
+		m_context_menu->addAction(m_reset_children);
 
-		QAction* change_type_temporarily = new QAction(tr("Change type temporarily"), this);
-		m_context_menu->addAction(change_type_temporarily);
+		m_change_type_temporarily = new QAction(tr("Change type temporarily"), this);
+		m_context_menu->addAction(m_change_type_temporarily);
 
-		connect(reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
-		connect(change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
+		connect(m_reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
+		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
 	}
+}
+
+void SymbolTreeWidget::openMenu(QPoint pos)
+{
+	bool node_is_object = currentNodeIsObject();
+	bool node_is_symbol = currentNodeIsSymbol();
+
+	m_rename_symbol->setEnabled(node_is_symbol);
+
+	if (m_reset_children)
+		m_reset_children->setEnabled(node_is_object);
+
+	if (m_change_type_temporarily)
+		m_change_type_temporarily->setEnabled(node_is_object);
+
+	m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
 }
 
 void SymbolTreeWidget::onCopyName()
@@ -456,6 +470,32 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 	QString error_message = m_model->changeTypeTemporarily(index, type_string.toStdString());
 	if (!error_message.isEmpty())
 		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
+}
+
+bool SymbolTreeWidget::currentNodeIsObject()
+{
+	if (!m_model)
+		return false;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return false;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	return node->tag == SymbolTreeNode::OBJECT;
+}
+
+bool SymbolTreeWidget::currentNodeIsSymbol()
+{
+	if (!m_model)
+		return false;
+
+	QModelIndex index = m_ui.treeView->currentIndex();
+	if (!index.isValid())
+		return false;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	return node->symbol.valid();
 }
 
 void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)

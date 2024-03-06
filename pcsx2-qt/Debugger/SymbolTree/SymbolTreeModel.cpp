@@ -289,6 +289,8 @@ void SymbolTreeModel::resetChildren(QModelIndex index)
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
 	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (node->tag != SymbolTreeNode::OBJECT)
+		return;
 
 	bool remove_rows = !node->children().empty();
 	if (remove_rows)
