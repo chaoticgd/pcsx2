@@ -21,10 +21,10 @@ public:
 	enum Column
 	{
 		NAME = 0,
-		LOCATION = 1,
-		TYPE = 2,
-		LIVENESS = 3,
-		VALUE = 4,
+		VALUE = 1,
+		LOCATION = 2,
+		TYPE = 3,
+		LIVENESS = 4,
 		COLUMN_COUNT = 5
 	};
 

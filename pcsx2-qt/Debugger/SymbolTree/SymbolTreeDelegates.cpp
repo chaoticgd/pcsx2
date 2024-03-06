@@ -11,173 +11,6 @@
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
 #include "Debugger/SymbolTree/TypeString.h"
 
-SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
-	SymbolGuardian& guardian,
-	u32 alignment,
-	QObject* parent)
-	: QStyledItemDelegate(parent)
-	, m_guardian(guardian)
-	, m_alignment(alignment)
-{
-}
-
-QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return nullptr;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
-		return nullptr;
-
-	if (m_guardian.IsBusy())
-		return nullptr;
-
-	return new QLineEdit(parent);
-}
-
-void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
-		return;
-
-	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(line_edit);
-
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
-		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
-		if (!symbol || !symbol->address().valid())
-			return;
-
-		line_edit->setText(QString::number(symbol->address().value, 16));
-	});
-}
-
-void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
-		return;
-
-	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(line_edit);
-
-	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
-	Q_ASSERT(symbol_tree_model);
-
-	bool ok;
-	u32 address = line_edit->text().toUInt(&ok, 16);
-	if (!ok)
-		return;
-
-	address -= address % m_alignment;
-
-	bool success = false;
-	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		if (node->symbol.move_symbol(address, database))
-			success = true;
-	});
-
-	if (success)
-	{
-		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
-		symbol_tree_model->resetChildren(index);
-	}
-}
-
-// *****************************************************************************
-
-SymbolTreeTypeDelegate::SymbolTreeTypeDelegate(
-	SymbolGuardian& guardian,
-	QObject* parent)
-	: QStyledItemDelegate(parent)
-	, m_guardian(guardian)
-{
-}
-
-QWidget* SymbolTreeTypeDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return nullptr;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
-		return nullptr;
-
-	if (m_guardian.IsBusy())
-		return nullptr;
-
-	return new QLineEdit(parent);
-}
-
-void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
-		return;
-
-	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(line_edit);
-
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
-		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
-		if (!symbol || !symbol->type())
-			return;
-
-		line_edit->setText(typeToString(symbol->type(), database));
-	});
-}
-
-void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
-{
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
-		return;
-
-	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-	Q_ASSERT(line_edit);
-
-	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
-	Q_ASSERT(symbol_tree_model);
-
-	QString error_message;
-	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
-		if (!symbol)
-		{
-			error_message = tr("Symbol no longer exists.");
-			return;
-		}
-
-		std::unique_ptr<ccc::ast::Node> type = stringToType(line_edit->text().toStdString(), database, error_message);
-		if (!error_message.isEmpty())
-			return;
-
-		symbol->set_type(std::move(type));
-		node->type = ccc::NodeHandle(node->symbol.descriptor(), *symbol, symbol->type());
-	});
-
-	if (error_message.isEmpty())
-		symbol_tree_model->resetChildren(index);
-	else
-		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
-}
-
-// *****************************************************************************
-
 SymbolTreeValueDelegate::SymbolTreeValueDelegate(
 	SymbolGuardian& guardian,
 	QObject* parent)
@@ -499,4 +332,171 @@ void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)
 	QComboBox* combo_box = qobject_cast<QComboBox*>(sender());
 	if (combo_box)
 		commitData(combo_box);
+}
+
+// *****************************************************************************
+
+SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
+	SymbolGuardian& guardian,
+	u32 alignment,
+	QObject* parent)
+	: QStyledItemDelegate(parent)
+	, m_guardian(guardian)
+	, m_alignment(alignment)
+{
+}
+
+QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return nullptr;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+		return nullptr;
+
+	if (m_guardian.IsBusy())
+		return nullptr;
+
+	return new QLineEdit(parent);
+}
+
+void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
+
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol || !symbol->address().valid())
+			return;
+
+		line_edit->setText(QString::number(symbol->address().value, 16));
+	});
+}
+
+void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+		return;
+
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
+
+	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbol_tree_model);
+
+	bool ok;
+	u32 address = line_edit->text().toUInt(&ok, 16);
+	if (!ok)
+		return;
+
+	address -= address % m_alignment;
+
+	bool success = false;
+	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		if (node->symbol.move_symbol(address, database))
+			success = true;
+	});
+
+	if (success)
+	{
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
+		symbol_tree_model->resetChildren(index);
+	}
+}
+
+// *****************************************************************************
+
+SymbolTreeTypeDelegate::SymbolTreeTypeDelegate(
+	SymbolGuardian& guardian,
+	QObject* parent)
+	: QStyledItemDelegate(parent)
+	, m_guardian(guardian)
+{
+}
+
+QWidget* SymbolTreeTypeDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return nullptr;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return nullptr;
+
+	if (m_guardian.IsBusy())
+		return nullptr;
+
+	return new QLineEdit(parent);
+}
+
+void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
+
+	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol || !symbol->type())
+			return;
+
+		line_edit->setText(typeToString(symbol->type(), database));
+	});
+}
+
+void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return;
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node->symbol.valid())
+		return;
+
+	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
+	Q_ASSERT(line_edit);
+
+	SymbolTreeModel* symbol_tree_model = qobject_cast<SymbolTreeModel*>(model);
+	Q_ASSERT(symbol_tree_model);
+
+	QString error_message;
+	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
+		if (!symbol)
+		{
+			error_message = tr("Symbol no longer exists.");
+			return;
+		}
+
+		std::unique_ptr<ccc::ast::Node> type = stringToType(line_edit->text().toStdString(), database, error_message);
+		if (!error_message.isEmpty())
+			return;
+
+		symbol->set_type(std::move(type));
+		node->type = ccc::NodeHandle(node->symbol.descriptor(), *symbol, symbol->type());
+	});
+
+	if (error_message.isEmpty())
+		symbol_tree_model->resetChildren(index);
+	else
+		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
 }

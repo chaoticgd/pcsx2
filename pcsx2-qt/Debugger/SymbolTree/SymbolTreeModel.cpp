@@ -117,6 +117,26 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		{
 			return node->name;
 		}
+		case VALUE:
+		{
+			if (node->tag != SymbolTreeNode::OBJECT)
+				return QVariant();
+
+			QVariant result;
+			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+				switch (role)
+				{
+					case Qt::DisplayRole:
+						result = node->toString(m_cpu, database);
+						break;
+					case Qt::UserRole:
+						result = node->toVariant(m_cpu, database);
+						break;
+				}
+			});
+
+			return result;
+		}
 		case LOCATION:
 		{
 			return node->location.toString(m_cpu).rightJustified(8);
@@ -143,26 +163,6 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				return alive ? "Alive" : "Dead";
 			}
 			return QVariant();
-		}
-		case VALUE:
-		{
-			if (node->tag != SymbolTreeNode::OBJECT)
-				return QVariant();
-
-			QVariant result;
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
-				switch (role)
-				{
-					case Qt::DisplayRole:
-						result = node->toString(m_cpu, database);
-						break;
-					case Qt::UserRole:
-						result = node->toVariant(m_cpu, database);
-						break;
-				}
-			});
-
-			return result;
 		}
 	}
 
@@ -264,14 +264,14 @@ QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, i
 	{
 		case NAME:
 			return tr("Name");
+		case VALUE:
+			return tr("Value");
 		case LOCATION:
 			return tr("Location");
 		case TYPE:
 			return tr("Type");
 		case LIVENESS:
 			return tr("Liveness");
-		case VALUE:
-			return tr("Value");
 	}
 
 	return QVariant();
