@@ -311,12 +311,15 @@ namespace MIPSAnalyst
 			if (!symbol) {
 				std::string name;
 				
-				// The SNDLL importer will create labels for symbols since
-				// it can't distinguish between functions and globals.
-				ccc::LabelHandle label_handle = database.labels.first_handle_from_starting_address(function.start);
-				ccc::Label* label = database.labels.symbol_from_handle(label_handle);
-				if(label && !label->is_junk) {
-					name = label->name();
+				// The SNDLL importer may create label symbols for functions if
+				// they're not in a section named ".text" since it can't
+				// otherwise distinguish between functions and globals.
+				for (auto [address, handle] : database.labels.handles_from_starting_address(function.start)) {
+					ccc::Label* label = database.labels.symbol_from_handle(handle);
+					if (label && !label->is_junk) {
+						name = label->name();
+						break;
+					}
 				}
 				
 				if (name.empty()) {
