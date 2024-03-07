@@ -23,11 +23,9 @@ QModelIndex SymbolTreeModel::index(int row, int column, const QModelIndex& paren
 	if (!hasIndex(row, column, parent))
 		return QModelIndex();
 
-	SymbolTreeNode* parent_node;
-	if (parent.isValid())
-		parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
-	else
-		parent_node = m_root.get();
+	SymbolTreeNode* parent_node = nodeFromIndex(parent);
+	if (!parent_node)
+		return QModelIndex();
 
 	const SymbolTreeNode* child_node = parent_node->children().at(row).get();
 	if (!child_node)
@@ -41,9 +39,12 @@ QModelIndex SymbolTreeModel::parent(const QModelIndex& index) const
 	if (!index.isValid())
 		return QModelIndex();
 
-	SymbolTreeNode* child_node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	SymbolTreeNode* child_node = nodeFromIndex(index);
+	if (!child_node)
+		return QModelIndex();
+
 	const SymbolTreeNode* parent_node = child_node->parent();
-	if (!parent_node)
+	if (!parent_node || parent_node == m_root.get())
 		return QModelIndex();
 
 	return indexFromNode(*parent_node);
@@ -54,12 +55,8 @@ int SymbolTreeModel::rowCount(const QModelIndex& parent) const
 	if (parent.column() > 0)
 		return 0;
 
-	SymbolTreeNode* node;
-	if (parent.isValid())
-		node = static_cast<SymbolTreeNode*>(parent.internalPointer());
-	else if (m_root.get())
-		node = m_root.get();
-	else
+	SymbolTreeNode* node = nodeFromIndex(parent);
+	if (!node)
 		return 0;
 
 	return (int)node->children().size();
@@ -75,9 +72,12 @@ bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 	if (!parent.isValid())
 		return true;
 
+	SymbolTreeNode* parent_node = nodeFromIndex(parent);
+	if (!parent_node)
+		return true;
+
 	// If a node doesn't have a type, it can't generate any children, so all the
 	// children that will exist must already be there.
-	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
 	if (!parent_node->type.valid())
 		return !parent_node->children().empty();
 
@@ -98,7 +98,9 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 	if (!index.isValid())
 		return QVariant();
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	SymbolTreeNode* node = nodeFromIndex(index);
+	if (!node)
+		return QVariant();
 
 	// Gray out symbols that have been overwritten in memory.
 	if (role == Qt::ForegroundRole && index.column() == NAME && node->symbol.valid())
@@ -171,15 +173,14 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 
 bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-	bool result = false;
-
 	if (!index.isValid() || role != Qt::UserRole)
-		return result;
+		return false;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->type.valid())
-		return result;
+	SymbolTreeNode* node = nodeFromIndex(index);
+	if (!node || !node->type.valid())
+		return false;
 
+	bool result = false;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
@@ -200,8 +201,8 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 	if (!parent.isValid())
 		return;
 
-	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
-	if (!parent_node->type.valid())
+	SymbolTreeNode* parent_node = nodeFromIndex(parent);
+	if (!parent_node || !parent_node->type.valid())
 		return;
 
 	std::vector<std::unique_ptr<SymbolTreeNode>> children;
@@ -223,15 +224,14 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 
 bool SymbolTreeModel::canFetchMore(const QModelIndex& parent) const
 {
-	bool result = false;
-
 	if (!parent.isValid())
-		return result;
+		return false;
 
-	SymbolTreeNode* parent_node = static_cast<SymbolTreeNode*>(parent.internalPointer());
-	if (!parent_node->type.valid())
-		return result;
+	SymbolTreeNode* parent_node = nodeFromIndex(parent);
+	if (!parent_node || !parent_node->type.valid())
+		return false;
 
+	bool result = false;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* parent_type = parent_node->type.lookup_node(database);
 		if (!parent_type)
@@ -278,6 +278,33 @@ QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, i
 	return QVariant();
 }
 
+QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
+{
+	int row = 0;
+	if (node.parent())
+	{
+		for (int i = 0; i < (int)node.parent()->children().size(); i++)
+			if (node.parent()->children()[i].get() == &node)
+				row = i;
+	}
+	else
+		row = 0;
+
+	return createIndex(row, 0, &node);
+}
+
+SymbolTreeNode* SymbolTreeModel::nodeFromIndex(const QModelIndex& index) const
+{
+	if (!index.isValid())
+		return m_root.get();
+
+	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	if (!node)
+		return m_root.get();
+
+	return node;
+}
+
 void SymbolTreeModel::reset(std::unique_ptr<SymbolTreeNode> new_root)
 {
 	beginResetModel();
@@ -289,8 +316,8 @@ void SymbolTreeModel::resetChildren(QModelIndex index)
 {
 	pxAssertRel(index.isValid(), "Invalid model index.");
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (node->tag != SymbolTreeNode::OBJECT)
+	SymbolTreeNode* node = nodeFromIndex(index);
+	if (!node || node->tag != SymbolTreeNode::OBJECT)
 		return;
 
 	bool remove_rows = !node->children().empty();
@@ -301,8 +328,12 @@ void SymbolTreeModel::resetChildren(QModelIndex index)
 		endRemoveRows();
 }
 
-QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
+std::optional<QString> SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
 {
+	SymbolTreeNode* node = nodeFromIndex(index);
+	if (!node)
+		return std::nullopt;
+
 	resetChildren(index);
 
 	QString error_message;
@@ -311,7 +342,6 @@ QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_vi
 		if (!error_message.isEmpty())
 			return;
 
-		SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 		node->temporary_type = std::move(type);
 		node->type = ccc::NodeHandle(node->temporary_type.get());
 	});
@@ -321,10 +351,8 @@ QString SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_vi
 
 std::optional<QString> SymbolTreeModel::typeFromModelIndexToString(QModelIndex index)
 {
-	pxAssertRel(index.isValid(), "Invalid model index.");
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (node->tag != SymbolTreeNode::OBJECT)
+	SymbolTreeNode* node = nodeFromIndex(index);
+	if (!node || node->tag != SymbolTreeNode::OBJECT)
 		return std::nullopt;
 
 	QString result;
@@ -450,21 +478,6 @@ bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& logical_type, const 
 	}
 
 	return result;
-}
-
-QModelIndex SymbolTreeModel::indexFromNode(const SymbolTreeNode& node) const
-{
-	int row = 0;
-	if (node.parent())
-	{
-		for (int i = 0; i < (int)node.parent()->children().size(); i++)
-			if (node.parent()->children()[i].get() == &node)
-				row = i;
-	}
-	else
-		row = 0;
-
-	return createIndex(row, 0, &node);
 }
 
 bool SymbolTreeModel::symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const

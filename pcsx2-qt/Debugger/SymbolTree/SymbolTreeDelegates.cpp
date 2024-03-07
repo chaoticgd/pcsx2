@@ -24,8 +24,12 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 	if (!index.isValid())
 		return nullptr;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->type.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return nullptr;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->type.valid())
 		return nullptr;
 
 	QWidget* result = nullptr;
@@ -96,8 +100,12 @@ void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& 
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->type.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->type.valid())
 		return;
 
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
@@ -209,8 +217,12 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->type.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!model)
+		return;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->type.valid())
 		return;
 
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
@@ -351,8 +363,12 @@ QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleO
 	if (!index.isValid())
 		return nullptr;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+	const SymbolTreeModel* model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!model)
+		return nullptr;
+
+	SymbolTreeNode* node = model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
 		return nullptr;
 
 	if (m_guardian.IsBusy())
@@ -366,8 +382,12 @@ void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelInde
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
+	const SymbolTreeModel* model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!model)
+		return;
+
+	SymbolTreeNode* node = model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid())
 		return;
 
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
@@ -387,8 +407,12 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
 		return;
 
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
@@ -432,8 +456,12 @@ QWidget* SymbolTreeTypeDelegate::createEditor(QWidget* parent, const QStyleOptio
 	if (!index.isValid())
 		return nullptr;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return nullptr;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid())
 		return nullptr;
 
 	if (m_guardian.IsBusy())
@@ -447,8 +475,12 @@ void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& i
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid())
 		return;
 
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
@@ -468,8 +500,12 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
+	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
+	if (!tree_model)
+		return;
+
+	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
+	if (!node || !node->symbol.valid())
 		return;
 
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);

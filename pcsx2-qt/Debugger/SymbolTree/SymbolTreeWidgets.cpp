@@ -355,41 +355,26 @@ void SymbolTreeWidget::openMenu(QPoint pos)
 
 void SymbolTreeWidget::onCopyName()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	QApplication::clipboard()->setText(node->name);
 }
 
 void SymbolTreeWidget::onCopyLocation()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	QApplication::clipboard()->setText(node->location.toString(m_cpu));
 }
 
 void SymbolTreeWidget::onRenameSymbol()
 {
-	if (!m_model)
-		return;
-
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
-	if (!node->symbol.valid())
+	SymbolTreeNode* node = currentNode();
+	if (!node || !node->symbol.valid())
 		return;
 
 	QString title = tr("Rename Symbol");
@@ -467,34 +452,26 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 	if (!ok)
 		return;
 
-	QString error_message = m_model->changeTypeTemporarily(index, type_string.toStdString());
-	if (!error_message.isEmpty())
-		QMessageBox::warning(this, tr("Cannot Change Type"), error_message);
+	std::optional<QString> error_message = m_model->changeTypeTemporarily(index, type_string.toStdString());
+	if (error_message.has_value() && !error_message->isEmpty())
+		QMessageBox::warning(this, tr("Cannot Change Type"), *error_message);
 }
 
 bool SymbolTreeWidget::currentNodeIsObject()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return false;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return false;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	return node->tag == SymbolTreeNode::OBJECT;
 }
 
 bool SymbolTreeWidget::currentNodeIsSymbol()
 {
-	if (!m_model)
+	SymbolTreeNode* node = currentNode();
+	if (!node)
 		return false;
 
-	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return false;
-
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
 	return node->symbol.valid();
 }
 
@@ -503,7 +480,9 @@ void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
 	if (!index.isValid())
 		return;
 
-	SymbolTreeNode* node = static_cast<SymbolTreeNode*>(index.internalPointer());
+	SymbolTreeNode* node = m_model->nodeFromIndex(index);
+	if (!node)
+		return;
 
 	switch (index.column())
 	{
@@ -522,10 +501,7 @@ SymbolTreeNode* SymbolTreeWidget::currentNode()
 		return nullptr;
 
 	QModelIndex index = m_ui.treeView->currentIndex();
-	if (!index.isValid())
-		return nullptr;
-
-	return static_cast<SymbolTreeNode*>(index.internalPointer());
+	return m_model->nodeFromIndex(index);
 }
 
 // *****************************************************************************

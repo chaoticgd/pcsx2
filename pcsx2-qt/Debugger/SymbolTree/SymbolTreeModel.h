@@ -42,13 +42,16 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const override;
 	QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
+	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
+	SymbolTreeNode* nodeFromIndex(const QModelIndex& index) const;
+
 	// Reset the whole model.
 	void reset(std::unique_ptr<SymbolTreeNode> new_root);
 
 	// Remove all the children of a given node, and allow fetching again.
 	void resetChildren(QModelIndex index);
 
-	QString changeTypeTemporarily(QModelIndex index, std::string_view type_string);
+	std::optional<QString> changeTypeTemporarily(QModelIndex index, std::string_view type_string);
 	std::optional<QString> typeFromModelIndexToString(QModelIndex index);
 
 protected:
@@ -61,7 +64,6 @@ protected:
 		const ccc::SymbolDatabase& database);
 
 	static bool nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database);
-	QModelIndex indexFromNode(const SymbolTreeNode& node) const;
 
 	bool symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const;
 
