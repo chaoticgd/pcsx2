@@ -208,6 +208,7 @@ static void CreateBuiltInDataType(
 		return;
 
 	std::unique_ptr<ccc::ast::BuiltIn> type = std::make_unique<ccc::ast::BuiltIn>();
+	type->name = name;
 	type->size_bytes = ccc::ast::builtin_class_size(bclass);
 	type->bclass = bclass;
 	(*symbol)->set_type(std::move(type));
