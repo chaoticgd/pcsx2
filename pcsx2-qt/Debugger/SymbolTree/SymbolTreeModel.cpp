@@ -127,10 +127,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				switch (role)
 				{
 					case Qt::DisplayRole:
-						result = node->toString(m_cpu, database);
+						result = node->valueToString(m_cpu, database);
 						break;
 					case Qt::UserRole:
-						result = node->toVariant(m_cpu, database);
+						result = node->valueToVariant(m_cpu, database);
 						break;
 				}
 			});
