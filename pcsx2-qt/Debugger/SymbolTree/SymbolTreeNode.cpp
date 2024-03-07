@@ -89,7 +89,7 @@ QString SymbolTreeNode::valueToString(
 				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 					return QString::number(location.read8(cpu));
 				case ccc::ast::BuiltInClass::BOOL_8:
-					return QString::number(location.read8(cpu));
+					return location.read8(cpu) ? "true" : "false";
 				case ccc::ast::BuiltInClass::UNSIGNED_16:
 					return QString::number(location.read16(cpu));
 				case ccc::ast::BuiltInClass::SIGNED_16:
