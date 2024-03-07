@@ -160,7 +160,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 			{
 				u32 pc = m_cpu.getPC();
 				bool alive = pc >= node->live_range.low && pc < node->live_range.high;
-				return alive ? "Alive" : "Dead";
+				return alive ? tr("Alive") : tr("Dead");
 			}
 			return QVariant();
 		}
