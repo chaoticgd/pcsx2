@@ -29,6 +29,15 @@ public:
 	ccc::MultiSymbolHandle symbol;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 
+	SymbolTreeNode() {}
+	~SymbolTreeNode() {}
+
+	SymbolTreeNode(const SymbolTreeNode& rhs) = delete;
+	SymbolTreeNode& operator=(const SymbolTreeNode& rhs) = delete;
+
+	SymbolTreeNode(SymbolTreeNode&& rhs) = delete;
+	SymbolTreeNode& operator=(SymbolTreeNode&& rhs) = delete;
+
 	QString valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
 	QString valueToString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const;
 	QVariant valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
