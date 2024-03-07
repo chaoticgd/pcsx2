@@ -53,6 +53,7 @@ public:
 
 protected:
 	static std::vector<std::unique_ptr<SymbolTreeNode>> populateChildren(
+		const QString& name,
 		SymbolTreeLocation location,
 		const ccc::ast::Node& logical_type,
 		ccc::NodeHandle parent_handle,

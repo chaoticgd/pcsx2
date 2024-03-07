@@ -210,7 +210,8 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 		if (!logical_parent_type)
 			return;
 
-		children = populateChildren(parent_node->location, *logical_parent_type, parent_node->type, m_cpu, database);
+		children = populateChildren(
+			parent_node->name, parent_node->location, *logical_parent_type, parent_node->type, m_cpu, database);
 	});
 
 	if (!children.empty())
@@ -339,6 +340,7 @@ std::optional<QString> SymbolTreeModel::typeFromModelIndexToString(QModelIndex i
 }
 
 std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
+	const QString& name,
 	SymbolTreeLocation location,
 	const ccc::ast::Node& logical_type,
 	ccc::NodeHandle parent_handle,
@@ -377,7 +379,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 			{
 				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
 				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
-				element->name = QString("*%1").arg(QString::number(address, 16));
+				element->name = QString("*%1").arg(name);
 				element->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
 				element->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
 				children.emplace_back(std::move(element));
@@ -393,7 +395,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 				if (base_class_location.type != SymbolTreeLocation::NONE)
 				{
 					std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
-						base_class_location, *base_class.get(), parent_handle, cpu, database);
+						name, base_class_location, *base_class.get(), parent_handle, cpu, database);
 					children.insert(children.end(),
 						std::make_move_iterator(fields.begin()),
 						std::make_move_iterator(fields.end()));
