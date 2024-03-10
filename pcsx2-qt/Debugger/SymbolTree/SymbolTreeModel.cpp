@@ -205,6 +205,9 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 	if (!parent_node || !parent_node->type.valid())
 		return;
 
+	if (!parent_node->children().empty())
+		return;
+
 	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_parent_type = parent_node->type.lookup_node(database);
@@ -215,10 +218,11 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 			parent_node->name, parent_node->location, *logical_parent_type, parent_node->type, m_cpu, database);
 	});
 
-	if (!children.empty())
+	bool insert_children = !children.empty();
+	if (insert_children)
 		beginInsertRows(parent, 0, children.size() - 1);
 	parent_node->setChildren(std::move(children));
-	if (!children.empty())
+	if (insert_children)
 		endInsertRows();
 }
 
