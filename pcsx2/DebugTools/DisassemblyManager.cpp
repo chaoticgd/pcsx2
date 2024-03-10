@@ -544,7 +544,7 @@ void DisassemblyFunction::load()
 	u32 opcodeSequenceStart = funcPos;
 	while (funcPos < funcEnd)
 	{
-		if (funcPos == nextData.address.value)
+		if (funcPos == nextData.address.value && nextData.size > 0)
 		{
 			if (opcodeSequenceStart != funcPos)
 				addOpcodeSequence(opcodeSequenceStart,funcPos);
