@@ -43,7 +43,7 @@ enum SymbolDatabaseAccessMode
 struct SymbolGuardian
 {
 public:
-	SymbolGuardian();
+	SymbolGuardian(const char* thread_name);
 	SymbolGuardian(const SymbolGuardian& rhs) = delete;
 	SymbolGuardian(SymbolGuardian&& rhs) = delete;
 	~SymbolGuardian();

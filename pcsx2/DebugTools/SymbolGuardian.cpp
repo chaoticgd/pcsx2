@@ -7,6 +7,7 @@
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
+#include "common/Threading.h"
 
 #include "demangle.h"
 #include "ccc/ast.h"
@@ -15,8 +16,8 @@
 #include "ccc/symbol_file.h"
 #include "DebugInterface.h"
 
-SymbolGuardian R5900SymbolGuardian;
-SymbolGuardian R3000SymbolGuardian;
+SymbolGuardian R5900SymbolGuardian("EE Symbol Worker");
+SymbolGuardian R3000SymbolGuardian("IOP Symbol Worker");
 
 static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database);
 static void CreateBuiltInDataType(
@@ -37,11 +38,13 @@ static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 	}
 }
 
-SymbolGuardian::SymbolGuardian()
+SymbolGuardian::SymbolGuardian(const char* thread_name)
 {
 	ccc::set_custom_error_callback(error_callback);
 
-	m_import_thread = std::thread([this]() {
+	m_import_thread = std::thread([this, thread_name]() {
+		Threading::SetNameOfCurrentThread(thread_name);
+
 		while (!m_shutdown_import_thread)
 		{
 			ReadWriteCallback callback;
