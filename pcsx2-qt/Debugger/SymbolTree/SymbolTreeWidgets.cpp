@@ -236,14 +236,13 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
 	{
 
 		group_node->tag = SymbolTreeNode::GROUP;
+		group_node->name = QString::fromStdString(child_work.module_symbol->name());
 		if (child_work.module_symbol->is_irx)
 		{
 			s32 major = child_work.module_symbol->version_major;
 			s32 minor = child_work.module_symbol->version_minor;
 			group_node->name += QString(" v%1.%2").arg(major).arg(minor);
 		}
-		else
-			group_node->name = QString::fromStdString(child_work.module_symbol->name());
 	}
 	else
 	{
