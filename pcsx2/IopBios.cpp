@@ -1063,25 +1063,30 @@ namespace R3000A
 				if (!source.success())
 					return;
 
-				// Destroy the old entry for this module if it exists.
+				// Enumerate the module symbols that already exist for this IRX
+				// module. Really there should only be one.
+				std::vector<ccc::ModuleHandle> existing_modules;
 				for (const auto& pair : database.modules.handles_from_name(modname))
 				{
 					const ccc::Module* existing_module = database.modules.symbol_from_handle(pair.second);
 					if (!existing_module || !existing_module->is_irx)
 						continue;
 
-					// Different major versions, we treat this one as a different module
+					// Different major versions, we treat this one as a different module.
 					if (existing_module->version_major != version_major)
 						continue;
 
 					// RegisterLibraryEntries will fail if the new minor ver is <= the old minor ver
-					// and the major version is the same
+					// and the major version is the same.
 					if (existing_module->version_minor >= version_minor)
 						return;
 
-					// Remove the old module and its export table
-					database.destroy_symbols_from_modules(existing_module->handle());
+					existing_modules.emplace_back(existing_module->handle());
 				}
+
+				// Destroy the old symbols for this IRX module if any exist.
+				for (ccc::ModuleHandle existing_module : existing_modules)
+					database.destroy_symbols_from_modules(existing_module);
 
 				ccc::Result<ccc::Module*> module_symbol = database.modules.create_symbol(modname, *source, nullptr);
 				if (!module_symbol.success())
@@ -1097,7 +1102,7 @@ namespace R3000A
 				while (funcptr != 0)
 				{
 					const char* unqualified_name = irxImportFuncname(modname, index);
-					
+
 					std::string qualified_name;
 					if (unqualified_name && unqualified_name[0] != '\0')
 						qualified_name = fmt::format("{}[{:02}]::{}", modname, index, unqualified_name);
