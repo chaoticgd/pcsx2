@@ -27,7 +27,10 @@ QModelIndex SymbolTreeModel::index(int row, int column, const QModelIndex& paren
 	if (!parent_node)
 		return QModelIndex();
 
-	const SymbolTreeNode* child_node = parent_node->children().at(row).get();
+	if (row < 0 || row >= (int)parent_node->children().size())
+		return QModelIndex();
+
+	const SymbolTreeNode* child_node = parent_node->children()[row].get();
 	if (!child_node)
 		return QModelIndex();
 
