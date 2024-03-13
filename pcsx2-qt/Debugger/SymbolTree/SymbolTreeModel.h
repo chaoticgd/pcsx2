@@ -50,6 +50,7 @@ public:
 
 	// Remove all the children of a given node, and allow fetching again.
 	void resetChildren(QModelIndex index);
+	void resetChildrenRecursive(SymbolTreeNode& node);
 
 	std::optional<QString> changeTypeTemporarily(QModelIndex index, std::string_view type_string);
 	std::optional<QString> typeFromModelIndexToString(QModelIndex index);

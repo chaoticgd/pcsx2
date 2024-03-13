@@ -20,17 +20,11 @@ SymbolTreeModel::SymbolTreeModel(DebugInterface& cpu, QObject* parent)
 
 QModelIndex SymbolTreeModel::index(int row, int column, const QModelIndex& parent) const
 {
-	if (!hasIndex(row, column, parent))
-		return QModelIndex();
-
 	SymbolTreeNode* parent_node = nodeFromIndex(parent);
 	if (!parent_node)
 		return QModelIndex();
 
-	if (row < 0 || row >= (int)parent_node->children().size())
-		return QModelIndex();
-
-	const SymbolTreeNode* child_node = parent_node->children()[row].get();
+	const SymbolTreeNode* child_node = parent_node->children().at(row).get();
 	if (!child_node)
 		return QModelIndex();
 
@@ -327,10 +321,18 @@ void SymbolTreeModel::resetChildren(QModelIndex index)
 	if (!node || node->tag != SymbolTreeNode::OBJECT)
 		return;
 
-	bool remove_rows = !node->children().empty();
+	resetChildrenRecursive(*node);
+}
+
+void SymbolTreeModel::resetChildrenRecursive(SymbolTreeNode& node)
+{
+	for (const std::unique_ptr<SymbolTreeNode>& child : node.children())
+		resetChildrenRecursive(*child);
+
+	bool remove_rows = !node.children().empty();
 	if (remove_rows)
-		beginRemoveRows(index, 0, node->children().size() - 1);
-	node->clearChildren();
+		beginRemoveRows(indexFromNode(node), 0, node.children().size() - 1);
+	node.clearChildren();
 	if (remove_rows)
 		endRemoveRows();
 }
