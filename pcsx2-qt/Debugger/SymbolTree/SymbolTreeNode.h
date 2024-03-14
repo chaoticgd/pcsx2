@@ -48,7 +48,7 @@ public:
 	bool readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& database);
 
 	// Write the value back to the VM memory. Returns true on success.
-	bool writeToVM(QVariant value, DebugInterface& cpu, const ccc::SymbolDatabase& database);
+	bool writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& database);
 
 	QVariant valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
 	QVariant valueToVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;

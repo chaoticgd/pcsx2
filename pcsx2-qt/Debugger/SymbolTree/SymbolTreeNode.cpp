@@ -36,7 +36,7 @@ bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& 
 	return data_changed;
 }
 
-bool SymbolTreeNode::writeToVM(QVariant value, DebugInterface& cpu, const ccc::SymbolDatabase& database)
+bool SymbolTreeNode::writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
 	const ccc::ast::Node* logical_type = type.lookup_node(database);
 	if (!logical_type)

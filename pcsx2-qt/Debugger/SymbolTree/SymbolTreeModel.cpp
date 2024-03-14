@@ -176,16 +176,14 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 
 	bool data_changed = false;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
-		switch (role)
+		if (role == Qt::EditRole)
 		{
-			case Qt::EditRole:
-				data_changed = node->value != value;
-				node->value = value;
-				break;
-			case Qt::UserRole:
-				data_changed = node->readFromVM(m_cpu, database);
-				break;
+			node->value = value;
+			node->writeToVM(m_cpu, database);
+			data_changed = true;
 		}
+
+		data_changed |= node->readFromVM(m_cpu, database);
 	});
 
 	if (data_changed)
