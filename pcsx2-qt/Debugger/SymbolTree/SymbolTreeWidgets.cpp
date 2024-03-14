@@ -60,7 +60,9 @@ void SymbolTreeWidget::reset()
 	{
 		root->sortChildrenRecursively(m_sort_by_if_type_is_known && m_sort_by_if_type_is_known->isChecked());
 		m_model->reset(std::move(root));
-		updateVisibleNodes();
+
+		// Read the initial values for all the nodes.
+		updateChildren(QModelIndex());
 	}
 }
 
@@ -80,6 +82,21 @@ void SymbolTreeWidget::updateVisibleNodes()
 		m_model->setData(index, QVariant(), Qt::UserRole);
 
 	m_ui.treeView->update();
+}
+
+void SymbolTreeWidget::updateChildren(QModelIndex index)
+{
+	if (!m_model)
+		return;
+
+	m_model->setData(index, QVariant(), Qt::UserRole);
+
+	int child_count = m_model->rowCount(index);
+	for (int i = 0; i < child_count; i++)
+	{
+		QModelIndex child = m_model->index(i, 0, index);
+		updateChildren(child);
+	}
 }
 
 void SymbolTreeWidget::setupTree()

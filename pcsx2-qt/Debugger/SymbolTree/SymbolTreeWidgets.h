@@ -21,6 +21,7 @@ public:
 
 	void reset();
 	void updateVisibleNodes();
+	void updateChildren(QModelIndex index);
 
 signals:
 	void goToInDisassembly(u32 address);
