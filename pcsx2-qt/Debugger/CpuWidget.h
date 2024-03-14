@@ -82,7 +82,7 @@ public slots:
 		m_ui.registerWidget->update();
 		m_ui.disassemblyWidget->update();
 		m_ui.memoryviewWidget->update();
-		
+
 		m_local_variable_tree->reset();
 		m_parameter_variable_tree->reset();
 	}
@@ -109,9 +109,6 @@ private:
 	QSortFilterProxyModel m_threadProxyModel;
 	StackModel m_stackModel;
 	SavedAddressesModel m_savedAddressesModel;
-
-	bool m_demangleFunctions = true;
-	bool m_moduleView = true;
 
 	FunctionTreeWidget* m_function_tree = nullptr;
 	GlobalVariableTreeWidget* m_global_variable_tree = nullptr;
