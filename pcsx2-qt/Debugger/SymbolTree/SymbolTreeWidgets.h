@@ -19,7 +19,8 @@ class SymbolTreeWidget : public QWidget
 public:
 	virtual ~SymbolTreeWidget();
 
-	void update();
+	void reset();
+	void updateVisibleNodes();
 
 signals:
 	void goToInDisassembly(u32 address);
@@ -42,7 +43,7 @@ protected:
 
 	void setupTree();
 	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);
-
+	
 	std::unique_ptr<SymbolTreeNode> groupBySourceFile(
 		std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work);
 	std::unique_ptr<SymbolTreeNode> groupBySection(

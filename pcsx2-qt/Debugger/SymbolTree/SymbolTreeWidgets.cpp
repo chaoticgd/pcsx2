@@ -7,6 +7,7 @@
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QScrollBar>
 
 #include "NewSymbolDialogs.h"
 #include "SymbolTreeDelegates.h"
@@ -23,11 +24,13 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, Debu
 
 	setupMenu();
 
-	connect(m_ui.refreshButton, &QPushButton::clicked, this, &SymbolTreeWidget::update);
-	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::update);
+	connect(m_ui.refreshButton, &QPushButton::clicked, this, &SymbolTreeWidget::reset);
+	connect(m_ui.filterBox, &QLineEdit::textEdited, this, &SymbolTreeWidget::reset);
 
 	connect(m_ui.newButton, &QPushButton::clicked, this, &SymbolTreeWidget::onNewButtonPressed);
 	connect(m_ui.deleteButton, &QPushButton::clicked, this, &SymbolTreeWidget::onDeleteButtonPressed);
+
+	connect(m_ui.treeView->verticalScrollBar(), &QScrollBar::valueChanged, this, &SymbolTreeWidget::updateVisibleNodes);
 
 	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, this, &SymbolTreeWidget::openMenu);
@@ -35,7 +38,7 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, Debu
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
 
-void SymbolTreeWidget::update()
+void SymbolTreeWidget::reset()
 {
 	if (!m_model)
 		setupTree();
@@ -57,7 +60,26 @@ void SymbolTreeWidget::update()
 	{
 		root->sortChildrenRecursively(m_sort_by_if_type_is_known && m_sort_by_if_type_is_known->isChecked());
 		m_model->reset(std::move(root));
+		updateVisibleNodes();
 	}
+}
+
+void SymbolTreeWidget::updateVisibleNodes()
+{
+	if (!m_model)
+		return;
+
+	QModelIndex first_visible = m_ui.treeView->indexAt(m_ui.treeView->rect().topLeft());
+	QModelIndex last_visible = m_ui.treeView->indexAt(m_ui.treeView->rect().bottomLeft());
+
+	if (!first_visible.isValid() || !last_visible.isValid())
+		return;
+
+	// Update all the visible nodes with the current contents of memory.
+	for (QModelIndex index = first_visible; index.isValid() && index != last_visible; index = m_ui.treeView->indexBelow(index))
+		m_model->setData(index, QVariant(), Qt::UserRole);
+
+	m_ui.treeView->update();
 }
 
 void SymbolTreeWidget::setupTree()
@@ -213,6 +235,7 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
 		group_node->tag = SymbolTreeNode::UNKNOWN_GROUP;
 		group_node->name = tr("(unknown section)");
 	}
+
 	group_node->emplaceChild(std::move(child));
 	child = std::move(group_node);
 
@@ -305,9 +328,9 @@ void SymbolTreeWidget::setupMenu()
 		m_group_by_source_file->setCheckable(true);
 		m_context_menu->addAction(m_group_by_source_file);
 
-		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::update);
-		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::update);
-		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::reset);
 	}
 
 	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
@@ -318,7 +341,7 @@ void SymbolTreeWidget::setupMenu()
 		m_sort_by_if_type_is_known->setCheckable(true);
 		m_context_menu->addAction(m_sort_by_if_type_is_known);
 
-		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::update);
+		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::reset);
 	}
 
 	if (m_flags & ALLOW_TYPE_ACTIONS)

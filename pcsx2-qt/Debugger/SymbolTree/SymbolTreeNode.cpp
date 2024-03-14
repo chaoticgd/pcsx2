@@ -5,214 +5,45 @@
 
 #include "DebugTools/ccc/ast.h"
 
-QString SymbolTreeNode::valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
-	QString result;
+	bool data_changed = false;
 
-	const ccc::ast::Node* logical_type = type.lookup_node(database);
-	if (logical_type)
+	QVariant new_value = valueToVariant(cpu, database);
+	if (!new_value.isNull())
 	{
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		result = valueToString(type, cpu, database, 0);
+		data_changed |= new_value != value;
+		value = std::move(new_value);
 	}
 
-	if (result.isEmpty())
+	QString new_display_value = valueToString(cpu, database);
+	if (!new_display_value.isNull())
 	{
-		// We don't know how to display objects of this type, so just show the
-		// first 4 bytes of it as a hex dump.
-		u32 value = location.read32(cpu);
-		result = QString("%1 %2 %3 %4")
-					 .arg(value & 0xff, 2, 16, QChar('0'))
-					 .arg((value >> 8) & 0xff, 2, 16, QChar('0'))
-					 .arg((value >> 16) & 0xff, 2, 16, QChar('0'))
-					 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
+		data_changed |= new_display_value != display_value;
+		display_value = std::move(new_display_value);
 	}
 
-	return result;
+	std::optional<bool> new_liveness;
+	if (live_range.low.valid() && live_range.high.valid())
+	{
+		u32 pc = cpu.getPC();
+		new_liveness = pc >= live_range.low && pc < live_range.high;
+	}
+
+	data_changed |= new_liveness != liveness;
+	liveness = new_liveness;
+
+	return data_changed;
 }
 
-QString SymbolTreeNode::valueToString(
-	const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const
+bool SymbolTreeNode::writeToVM(QVariant value, DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
-	s32 max_elements_to_display = 0;
-	switch (depth)
-	{
-		case 0:
-			max_elements_to_display = 8;
-			break;
-		case 1:
-			max_elements_to_display = 2;
-			break;
-	}
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (!logical_type)
+		return false;
 
-	switch (type.descriptor)
-	{
-		case ccc::ast::ARRAY:
-		{
-			const ccc::ast::Array& array = type.as<ccc::ast::Array>();
-
-			QString result;
-			result += "{";
-
-			s32 elements_to_display = std::min(array.element_count, max_elements_to_display);
-			for (s32 i = 0; i < elements_to_display; i++)
-			{
-				SymbolTreeNode node;
-				node.location = location.addOffset(i * array.element_type->size_bytes);
-
-				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
-
-				QString element = node.valueToString(element_type, cpu, database, depth + 1);
-				if (element.isEmpty())
-					element = QString("(%1)").arg(ccc::ast::node_type_to_string(element_type));
-				result += element;
-
-				if (i + 1 != array.element_count)
-					result += ",";
-			}
-
-			if (elements_to_display != array.element_count)
-				result += "...";
-
-			result += "}";
-			return result;
-		}
-		case ccc::ast::BUILTIN:
-		{
-			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
-			switch (builtIn.bclass)
-			{
-				case ccc::ast::BuiltInClass::UNSIGNED_8:
-					return QString::number(location.read8(cpu));
-				case ccc::ast::BuiltInClass::SIGNED_8:
-					return QString::number((s8)location.read8(cpu));
-				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					return QString::number(location.read8(cpu));
-				case ccc::ast::BuiltInClass::BOOL_8:
-					return location.read8(cpu) ? "true" : "false";
-				case ccc::ast::BuiltInClass::UNSIGNED_16:
-					return QString::number(location.read16(cpu));
-				case ccc::ast::BuiltInClass::SIGNED_16:
-					return QString::number((s16)location.read16(cpu));
-				case ccc::ast::BuiltInClass::UNSIGNED_32:
-					return QString::number(location.read32(cpu));
-				case ccc::ast::BuiltInClass::SIGNED_32:
-					return QString::number((s32)location.read32(cpu));
-				case ccc::ast::BuiltInClass::FLOAT_32:
-				{
-					u32 value = location.read32(cpu);
-					return QString::number(*reinterpret_cast<float*>(&value));
-				}
-				case ccc::ast::BuiltInClass::UNSIGNED_64:
-					return QString::number(location.read64(cpu));
-				case ccc::ast::BuiltInClass::SIGNED_64:
-					return QString::number((s64)location.read64(cpu));
-				case ccc::ast::BuiltInClass::FLOAT_64:
-				{
-					u64 value = location.read64(cpu);
-					return QString::number(*reinterpret_cast<double*>(&value));
-				}
-				case ccc::ast::BuiltInClass::UNSIGNED_128:
-				case ccc::ast::BuiltInClass::SIGNED_128:
-				case ccc::ast::BuiltInClass::UNQUALIFIED_128:
-				case ccc::ast::BuiltInClass::FLOAT_128:
-				{
-					if (depth > 0)
-						return "(128-bit value)";
-
-					QString result;
-					for (s32 i = 0; i < 16; i++)
-					{
-						u8 value = location.addOffset(i).read8(cpu);
-						result += QString("%1 ").arg(value, 2, 16, QChar('0'));
-						if ((i + 1) % 4 == 0)
-							result += " ";
-					}
-
-					return result;
-				}
-				default:
-				{
-				}
-			}
-			break;
-		}
-		case ccc::ast::ENUM:
-		{
-			s32 value = (s32)location.read32(cpu);
-			const auto& enum_type = type.as<ccc::ast::Enum>();
-			for (auto [test_value, name] : enum_type.constants)
-			{
-				if (test_value == value)
-					return QString::fromStdString(name);
-			}
-
-			break;
-		}
-		case ccc::ast::POINTER_OR_REFERENCE:
-		{
-			const auto& pointer_or_reference = type.as<ccc::ast::PointerOrReference>();
-
-			QString result = QString::number(location.read32(cpu), 16);
-
-			// For char* nodes add the value of the string to the output.
-			if (pointer_or_reference.is_pointer)
-			{
-				const ccc::ast::Node* value_type =
-					resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
-				if (value_type->name == "char")
-				{
-					u32 pointer = location.read32(cpu);
-					const char* string = cpu.stringFromPointer(pointer);
-					if (string)
-						result += QString(" \"%1\"").arg(string);
-				}
-			}
-
-			return result;
-		}
-		case ccc::ast::POINTER_TO_DATA_MEMBER:
-		{
-			return QString::number(location.read32(cpu), 16);
-		}
-		case ccc::ast::STRUCT_OR_UNION:
-		{
-			const ccc::ast::StructOrUnion& struct_or_union = type.as<ccc::ast::StructOrUnion>();
-
-			QString result;
-			result += "{";
-
-			s32 fields_to_display = std::min((s32)struct_or_union.fields.size(), max_elements_to_display);
-			for (s32 i = 0; i < fields_to_display; i++)
-			{
-				QString field_name = QString::fromStdString(struct_or_union.fields[i]->name);
-
-				SymbolTreeNode node;
-				node.location = location.addOffset(struct_or_union.fields[i]->offset_bytes);
-
-				const ccc::ast::Node& field_type = *resolvePhysicalType(struct_or_union.fields[i].get(), database).first;
-
-				QString field_value = node.valueToString(field_type, cpu, database, depth + 1);
-				if (field_value.isEmpty())
-					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
-				result += QString(".%1=%2").arg(field_name).arg(field_value);
-
-				if (i + 1 != (s32)struct_or_union.fields.size())
-					result += ",";
-			}
-
-			if (fields_to_display != (s32)struct_or_union.fields.size())
-				result += "...";
-
-			result += "}";
-			return result;
-		}
-		default:
-		{
-		}
-	}
-
-	return QString();
+	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+	return fromVariant(value, physical_type, cpu);
 }
 
 QVariant SymbolTreeNode::valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
@@ -221,17 +52,17 @@ QVariant SymbolTreeNode::valueToVariant(DebugInterface& cpu, const ccc::SymbolDa
 	if (!logical_type)
 		return QVariant();
 
-	const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-	return valueToVariant(type, cpu, database);
+	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+	return valueToVariant(physical_type, cpu, database);
 }
 
-QVariant SymbolTreeNode::valueToVariant(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+QVariant SymbolTreeNode::valueToVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
-	switch (type.descriptor)
+	switch (physical_type.descriptor)
 	{
 		case ccc::ast::BUILTIN:
 		{
-			const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
+			const ccc::ast::BuiltIn& builtIn = physical_type.as<ccc::ast::BuiltIn>();
 			switch (builtIn.bclass)
 			{
 				case ccc::ast::BuiltInClass::UNSIGNED_8:
@@ -283,13 +114,13 @@ QVariant SymbolTreeNode::valueToVariant(const ccc::ast::Node& type, DebugInterfa
 	return QVariant();
 }
 
-bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu) const
+bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const
 {
-	switch (type.descriptor)
+	switch (physical_type.descriptor)
 	{
 		case ccc::ast::BUILTIN:
 		{
-			const ccc::ast::BuiltIn& built_in = type.as<ccc::ast::BuiltIn>();
+			const ccc::ast::BuiltIn& built_in = physical_type.as<ccc::ast::BuiltIn>();
 
 			switch (built_in.bclass)
 			{
@@ -356,6 +187,216 @@ bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& type, Deb
 	}
 
 	return true;
+}
+
+QString SymbolTreeNode::valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+{
+	QString result;
+
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (logical_type)
+	{
+		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		result = valueToString(physical_type, cpu, database, 0);
+	}
+
+	if (result.isEmpty())
+	{
+		// We don't know how to display objects of this type, so just show the
+		// first 4 bytes of it as a hex dump.
+		u32 value = location.read32(cpu);
+		result = QString("%1 %2 %3 %4")
+					 .arg(value & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 8) & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 16) & 0xff, 2, 16, QChar('0'))
+					 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
+	}
+
+	return result;
+}
+
+QString SymbolTreeNode::valueToString(
+	const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const
+{
+	s32 max_elements_to_display = 0;
+	switch (depth)
+	{
+		case 0:
+			max_elements_to_display = 8;
+			break;
+		case 1:
+			max_elements_to_display = 2;
+			break;
+	}
+
+	switch (physical_type.descriptor)
+	{
+		case ccc::ast::ARRAY:
+		{
+			const ccc::ast::Array& array = physical_type.as<ccc::ast::Array>();
+
+			QString result;
+			result += "{";
+
+			s32 elements_to_display = std::min(array.element_count, max_elements_to_display);
+			for (s32 i = 0; i < elements_to_display; i++)
+			{
+				SymbolTreeNode node;
+				node.location = location.addOffset(i * array.element_type->size_bytes);
+
+				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
+
+				QString element = node.valueToString(element_type, cpu, database, depth + 1);
+				if (element.isEmpty())
+					element = QString("(%1)").arg(ccc::ast::node_type_to_string(element_type));
+				result += element;
+
+				if (i + 1 != array.element_count)
+					result += ",";
+			}
+
+			if (elements_to_display != array.element_count)
+				result += "...";
+
+			result += "}";
+			return result;
+		}
+		case ccc::ast::BUILTIN:
+		{
+			const ccc::ast::BuiltIn& builtIn = physical_type.as<ccc::ast::BuiltIn>();
+			switch (builtIn.bclass)
+			{
+				case ccc::ast::BuiltInClass::UNSIGNED_8:
+					return QString::number(location.read8(cpu));
+				case ccc::ast::BuiltInClass::SIGNED_8:
+					return QString::number((s8)location.read8(cpu));
+				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
+					return QString::number(location.read8(cpu));
+				case ccc::ast::BuiltInClass::BOOL_8:
+					return location.read8(cpu) ? "true" : "false";
+				case ccc::ast::BuiltInClass::UNSIGNED_16:
+					return QString::number(location.read16(cpu));
+				case ccc::ast::BuiltInClass::SIGNED_16:
+					return QString::number((s16)location.read16(cpu));
+				case ccc::ast::BuiltInClass::UNSIGNED_32:
+					return QString::number(location.read32(cpu));
+				case ccc::ast::BuiltInClass::SIGNED_32:
+					return QString::number((s32)location.read32(cpu));
+				case ccc::ast::BuiltInClass::FLOAT_32:
+				{
+					u32 value = location.read32(cpu);
+					return QString::number(*reinterpret_cast<float*>(&value));
+				}
+				case ccc::ast::BuiltInClass::UNSIGNED_64:
+					return QString::number(location.read64(cpu));
+				case ccc::ast::BuiltInClass::SIGNED_64:
+					return QString::number((s64)location.read64(cpu));
+				case ccc::ast::BuiltInClass::FLOAT_64:
+				{
+					u64 value = location.read64(cpu);
+					return QString::number(*reinterpret_cast<double*>(&value));
+				}
+				case ccc::ast::BuiltInClass::UNSIGNED_128:
+				case ccc::ast::BuiltInClass::SIGNED_128:
+				case ccc::ast::BuiltInClass::UNQUALIFIED_128:
+				case ccc::ast::BuiltInClass::FLOAT_128:
+				{
+					if (depth > 0)
+						return "(128-bit value)";
+
+					QString result;
+					for (s32 i = 0; i < 16; i++)
+					{
+						u8 value = location.addOffset(i).read8(cpu);
+						result += QString("%1 ").arg(value, 2, 16, QChar('0'));
+						if ((i + 1) % 4 == 0)
+							result += " ";
+					}
+
+					return result;
+				}
+				default:
+				{
+				}
+			}
+			break;
+		}
+		case ccc::ast::ENUM:
+		{
+			s32 value = (s32)location.read32(cpu);
+			const auto& enum_type = physical_type.as<ccc::ast::Enum>();
+			for (auto [test_value, name] : enum_type.constants)
+			{
+				if (test_value == value)
+					return QString::fromStdString(name);
+			}
+
+			break;
+		}
+		case ccc::ast::POINTER_OR_REFERENCE:
+		{
+			const auto& pointer_or_reference = physical_type.as<ccc::ast::PointerOrReference>();
+
+			QString result = QString::number(location.read32(cpu), 16);
+
+			// For char* nodes add the value of the string to the output.
+			if (pointer_or_reference.is_pointer)
+			{
+				const ccc::ast::Node* value_type =
+					resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
+				if (value_type->name == "char")
+				{
+					u32 pointer = location.read32(cpu);
+					const char* string = cpu.stringFromPointer(pointer);
+					if (string)
+						result += QString(" \"%1\"").arg(string);
+				}
+			}
+
+			return result;
+		}
+		case ccc::ast::POINTER_TO_DATA_MEMBER:
+		{
+			return QString::number(location.read32(cpu), 16);
+		}
+		case ccc::ast::STRUCT_OR_UNION:
+		{
+			const ccc::ast::StructOrUnion& struct_or_union = physical_type.as<ccc::ast::StructOrUnion>();
+
+			QString result;
+			result += "{";
+
+			s32 fields_to_display = std::min((s32)struct_or_union.fields.size(), max_elements_to_display);
+			for (s32 i = 0; i < fields_to_display; i++)
+			{
+				QString field_name = QString::fromStdString(struct_or_union.fields[i]->name);
+
+				SymbolTreeNode node;
+				node.location = location.addOffset(struct_or_union.fields[i]->offset_bytes);
+
+				const ccc::ast::Node& field_type = *resolvePhysicalType(struct_or_union.fields[i].get(), database).first;
+
+				QString field_value = node.valueToString(field_type, cpu, database, depth + 1);
+				if (field_value.isEmpty())
+					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
+				result += QString(".%1=%2").arg(field_name).arg(field_value);
+
+				if (i + 1 != (s32)struct_or_union.fields.size())
+					result += ",";
+			}
+
+			if (fields_to_display != (s32)struct_or_union.fields.size())
+				result += "...";
+
+			result += "}";
+			return result;
+		}
+		default:
+		{
+		}
+	}
+
+	return QString();
 }
 
 const SymbolTreeNode* SymbolTreeNode::parent() const

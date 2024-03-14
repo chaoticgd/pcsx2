@@ -251,7 +251,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						bool ok;
 						qulonglong value = line_edit->text().toULongLong(&ok);
 						if (ok)
-							model->setData(index, value, Qt::UserRole);
+							model->setData(index, value, Qt::EditRole);
 
 						break;
 					}
@@ -266,14 +266,14 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						bool ok;
 						qlonglong value = line_edit->text().toLongLong(&ok);
 						if (ok)
-							model->setData(index, value, Qt::UserRole);
+							model->setData(index, value, Qt::EditRole);
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* check_box = qobject_cast<QCheckBox*>(editor);
-						model->setData(index, check_box->isChecked(), Qt::UserRole);
+						model->setData(index, check_box->isChecked(), Qt::EditRole);
 
 						break;
 					}
@@ -285,7 +285,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						bool ok;
 						float value = line_edit->text().toFloat(&ok);
 						if (ok)
-							model->setData(index, value, Qt::UserRole);
+							model->setData(index, value, Qt::EditRole);
 
 						break;
 					}
@@ -297,7 +297,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						bool ok;
 						double value = line_edit->text().toDouble(&ok);
 						if (ok)
-							model->setData(index, value, Qt::UserRole);
+							model->setData(index, value, Qt::EditRole);
 
 						break;
 					}
@@ -315,7 +315,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				if (comboIndex < (s32)enumeration.constants.size())
 				{
 					s32 value = enumeration.constants[comboIndex].first;
-					model->setData(index, QVariant(value), Qt::UserRole);
+					model->setData(index, QVariant(value), Qt::EditRole);
 				}
 				break;
 			}
@@ -328,7 +328,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				bool ok;
 				qulonglong address = line_edit->text().toUInt(&ok, 16);
 				if (ok)
-					model->setData(index, address, Qt::UserRole);
+					model->setData(index, address, Qt::EditRole);
 
 				break;
 			}

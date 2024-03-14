@@ -22,12 +22,17 @@ public:
 	};
 
 	Tag tag = OBJECT;
-	QString name;
-	ccc::NodeHandle type;
-	SymbolTreeLocation location;
-	ccc::AddressRange live_range;
 	ccc::MultiSymbolHandle symbol;
+	QString name;
+	SymbolTreeLocation location;
+	ccc::NodeHandle type;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
+	ccc::AddressRange live_range;
+
+	// Generated from VM state, to be updated regularly.
+	QVariant value;
+	QString display_value;
+	std::optional<bool> liveness;
 
 	SymbolTreeNode() {}
 	~SymbolTreeNode() {}
@@ -38,11 +43,19 @@ public:
 	SymbolTreeNode(SymbolTreeNode&& rhs) = delete;
 	SymbolTreeNode& operator=(SymbolTreeNode&& rhs) = delete;
 
-	QString valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	QString valueToString(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const;
+	// Read the value from the VM memory, update liveness information, and
+	// generate a display string. Returns true if the data changed.
+	bool readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& database);
+
+	// Write the value back to the VM memory. Returns true on success.
+	bool writeToVM(QVariant value, DebugInterface& cpu, const ccc::SymbolDatabase& database);
+
 	QVariant valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	QVariant valueToVariant(const ccc::ast::Node& type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	bool fromVariant(QVariant value, const ccc::ast::Node& type, DebugInterface& cpu) const;
+	QVariant valueToVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	bool fromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const;
+	
+	QString valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	QString valueToString(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const;
 
 	const SymbolTreeNode* parent() const;
 

@@ -82,8 +82,9 @@ public slots:
 		m_ui.registerWidget->update();
 		m_ui.disassemblyWidget->update();
 		m_ui.memoryviewWidget->update();
-		m_ui.tabLocalVariables->update();
-		m_ui.tabParameterVariables->update();
+		
+		m_local_variable_tree->reset();
+		m_parameter_variable_tree->reset();
 	}
 
 	void saveBreakpointsToDebuggerSettings();

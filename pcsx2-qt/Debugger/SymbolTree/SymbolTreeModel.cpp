@@ -126,10 +126,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				switch (role)
 				{
 					case Qt::DisplayRole:
-						result = node->valueToString(m_cpu, database);
+						result = node->display_value;
 						break;
 					case Qt::UserRole:
-						result = node->valueToVariant(m_cpu, database);
+						result = node->value;
 						break;
 				}
 			});
@@ -155,13 +155,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LIVENESS:
 		{
-			if (node->live_range.low.valid() && node->live_range.high.valid())
-			{
-				u32 pc = m_cpu.getPC();
-				bool alive = pc >= node->live_range.low && pc < node->live_range.high;
-				return alive ? tr("Alive") : tr("Dead");
-			}
-			return QVariant();
+			if (!node->liveness.has_value())
+				return QVariant();
+
+			return *node->liveness ? tr("Alive") : tr("Dead");
 		}
 	}
 
@@ -170,27 +167,31 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 
 bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-	if (!index.isValid() || role != Qt::UserRole)
+	if (!index.isValid())
 		return false;
 
 	SymbolTreeNode* node = nodeFromIndex(index);
-	if (!node || !node->type.valid())
+	if (!node)
 		return false;
 
-	bool result = false;
+	bool data_changed = false;
 	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
-		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
-		if (!logical_type)
-			return;
-
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		result = node->fromVariant(value, type, m_cpu);
+		switch (role)
+		{
+			case Qt::EditRole:
+				data_changed = node->value != value;
+				node->value = value;
+				break;
+			case Qt::UserRole:
+				data_changed = node->readFromVM(m_cpu, database);
+				break;
+		}
 	});
 
-	if (result)
-		emit dataChanged(index, index);
+	if (data_changed)
+		emit dataChanged(index.siblingAtColumn(0), index.siblingAtColumn(COLUMN_COUNT - 1));
 
-	return result;
+	return data_changed;
 }
 
 void SymbolTreeModel::fetchMore(const QModelIndex& parent)
@@ -453,6 +454,9 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		{
 		}
 	}
+
+	for (std::unique_ptr<SymbolTreeNode>& child : children)
+		child->readFromVM(cpu, database);
 
 	return children;
 }
