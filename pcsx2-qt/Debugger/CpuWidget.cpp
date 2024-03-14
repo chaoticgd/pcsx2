@@ -185,7 +185,7 @@ void CpuWidget::refreshDebugger()
 		m_ui.disassemblyWidget->update();
 		m_ui.memoryviewWidget->update();
 		m_ui.memorySearchWidget->update();
-		
+
 		m_global_variable_tree->updateVisibleNodes();
 		m_local_variable_tree->updateVisibleNodes();
 		m_parameter_variable_tree->updateVisibleNodes();

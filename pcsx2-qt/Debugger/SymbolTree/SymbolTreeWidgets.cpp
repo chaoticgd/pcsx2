@@ -45,9 +45,9 @@ void SymbolTreeWidget::reset()
 
 	m_cpu.GetSymbolGuardian().UpdateFunctionHashes(m_cpu);
 
+	SymbolFilters filters;
 	std::unique_ptr<SymbolTreeNode> root;
 	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
-		SymbolFilters filters;
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
 		filters.group_by_source_file = m_group_by_source_file && m_group_by_source_file->isChecked();
@@ -63,6 +63,9 @@ void SymbolTreeWidget::reset()
 
 		// Read the initial values for all the nodes.
 		updateChildren(QModelIndex());
+
+		if (!filters.string.isEmpty())
+			expandGroups(QModelIndex());
 	}
 }
 
@@ -96,6 +99,25 @@ void SymbolTreeWidget::updateChildren(QModelIndex index)
 	{
 		QModelIndex child = m_model->index(i, 0, index);
 		updateChildren(child);
+	}
+}
+
+void SymbolTreeWidget::expandGroups(QModelIndex index)
+{
+	if (!m_model)
+		return;
+
+	SymbolTreeNode* node = m_model->nodeFromIndex(index);
+	if (node->tag == SymbolTreeNode::OBJECT)
+		return;
+
+	m_ui.treeView->expand(index);
+
+	int child_count = m_model->rowCount(index);
+	for (int i = 0; i < child_count; i++)
+	{
+		QModelIndex child = m_model->index(i, 0, index);
+		expandGroups(child);
 	}
 }
 
@@ -159,6 +181,7 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 		std::stable_sort(symbols.begin(), symbols.end(), module_comparator);
 
 	std::unique_ptr<SymbolTreeNode> root = std::make_unique<SymbolTreeNode>();
+	root->tag = SymbolTreeNode::ROOT;
 
 	SymbolTreeNode* source_file_node = nullptr;
 	SymbolTreeNode* section_node = nullptr;

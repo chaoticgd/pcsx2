@@ -16,6 +16,7 @@ struct SymbolTreeNode
 public:
 	enum Tag
 	{
+		ROOT,
 		UNKNOWN_GROUP,
 		GROUP,
 		OBJECT
