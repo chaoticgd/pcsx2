@@ -49,21 +49,52 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				switch (builtIn.bclass)
 				{
 					case ccc::ast::BuiltInClass::UNSIGNED_8:
-					case ccc::ast::BuiltInClass::SIGNED_8:
 					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
 					case ccc::ast::BuiltInClass::UNSIGNED_16:
-					case ccc::ast::BuiltInClass::SIGNED_16:
 					case ccc::ast::BuiltInClass::UNSIGNED_32:
-					case ccc::ast::BuiltInClass::SIGNED_32:
-					case ccc::ast::BuiltInClass::FLOAT_32:
 					case ccc::ast::BuiltInClass::UNSIGNED_64:
+					{
+						QLineEdit* editor = new QLineEdit(parent);
+						editor->setText(QString::number(index.data(Qt::UserRole).toULongLong()));
+						result = editor;
+
+						break;
+					}
+					case ccc::ast::BuiltInClass::SIGNED_8:
+					case ccc::ast::BuiltInClass::SIGNED_16:
+					case ccc::ast::BuiltInClass::SIGNED_32:
 					case ccc::ast::BuiltInClass::SIGNED_64:
-					case ccc::ast::BuiltInClass::FLOAT_64:
-						result = new QLineEdit(parent);
+					{
+						QLineEdit* editor = new QLineEdit(parent);
+						editor->setText(QString::number(index.data(Qt::UserRole).toLongLong()));
+						result = editor;
+
 						break;
+					}
 					case ccc::ast::BuiltInClass::BOOL_8:
-						result = new QCheckBox(parent);
+					{
+						QCheckBox* editor = new QCheckBox(parent);
+						editor->setChecked(index.data(Qt::UserRole).toBool());
+						result = editor;
+
 						break;
+					}
+					case ccc::ast::BuiltInClass::FLOAT_32:
+					{
+						QLineEdit* editor = new QLineEdit(parent);
+						editor->setText(QString::number(index.data(Qt::UserRole).toFloat()));
+						result = editor;
+
+						break;
+					}
+					case ccc::ast::BuiltInClass::FLOAT_64:
+					{
+						QLineEdit* editor = new QLineEdit(parent);
+						editor->setText(QString::number(index.data(Qt::UserRole).toDouble()));
+						result = editor;
+
+						break;
+					}
 					default:
 					{
 					}
@@ -73,17 +104,27 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
+				QVariant data = index.data(Qt::UserRole);
+
 				QComboBox* combo_box = new QComboBox(parent);
-				for (auto [value, string] : enumeration.constants)
-					combo_box->addItem(QString::fromStdString(string));
+				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
+				{
+					combo_box->addItem(QString::fromStdString(enumeration.constants[i].second));
+					if (enumeration.constants[i].first == data.toInt())
+						combo_box->setCurrentIndex(i);
+				}
 				connect(combo_box, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
 				result = combo_box;
+
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
 			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
-				result = new QLineEdit(parent);
+				QLineEdit* editor = new QLineEdit(parent);
+				editor->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
+				result = editor;
+
 				break;
 			}
 			default:
@@ -97,119 +138,8 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 
 void SymbolTreeValueDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
-	if (!index.isValid())
-		return;
-
-	const SymbolTreeModel* tree_model = qobject_cast<const SymbolTreeModel*>(index.model());
-	if (!tree_model)
-		return;
-
-	SymbolTreeNode* node = tree_model->nodeFromIndex(index);
-	if (!node || !node->type.valid())
-		return;
-
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
-		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
-		if (!logical_type)
-			return;
-
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
-		switch (type.descriptor)
-		{
-			case ccc::ast::BUILTIN:
-			{
-				const ccc::ast::BuiltIn& builtIn = type.as<ccc::ast::BuiltIn>();
-
-				switch (builtIn.bclass)
-				{
-					case ccc::ast::BuiltInClass::UNSIGNED_8:
-					case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					case ccc::ast::BuiltInClass::UNSIGNED_16:
-					case ccc::ast::BuiltInClass::UNSIGNED_32:
-					case ccc::ast::BuiltInClass::UNSIGNED_64:
-					{
-						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(line_edit);
-
-						line_edit->setText(QString::number(index.data(Qt::UserRole).toULongLong()));
-
-						break;
-					}
-					case ccc::ast::BuiltInClass::SIGNED_8:
-					case ccc::ast::BuiltInClass::SIGNED_16:
-					case ccc::ast::BuiltInClass::SIGNED_32:
-					case ccc::ast::BuiltInClass::SIGNED_64:
-					{
-						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(line_edit);
-
-						line_edit->setText(QString::number(index.data(Qt::UserRole).toLongLong()));
-
-						break;
-					}
-					case ccc::ast::BuiltInClass::BOOL_8:
-					{
-						QCheckBox* check_box = qobject_cast<QCheckBox*>(editor);
-						Q_ASSERT(check_box);
-
-						check_box->setChecked(index.data(Qt::UserRole).toBool());
-
-						break;
-					}
-					case ccc::ast::BuiltInClass::FLOAT_32:
-					{
-						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(line_edit);
-
-						line_edit->setText(QString::number(index.data(Qt::UserRole).toFloat()));
-
-						break;
-					}
-					case ccc::ast::BuiltInClass::FLOAT_64:
-					{
-						QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-						Q_ASSERT(line_edit);
-
-						line_edit->setText(QString::number(index.data(Qt::UserRole).toDouble()));
-
-						break;
-					}
-					default:
-					{
-					}
-				}
-				break;
-			}
-			case ccc::ast::ENUM:
-			{
-				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QComboBox* combo_box = static_cast<QComboBox*>(editor);
-				QVariant data = index.data(Qt::UserRole);
-				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
-				{
-					if (enumeration.constants[i].first == data.toInt())
-					{
-						combo_box->setCurrentIndex(i);
-						break;
-					}
-				}
-				break;
-			}
-			case ccc::ast::POINTER_OR_REFERENCE:
-			case ccc::ast::POINTER_TO_DATA_MEMBER:
-			{
-				QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
-				Q_ASSERT(line_edit);
-
-				line_edit->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
-
-				break;
-			}
-			default:
-			{
-			}
-		}
-	});
+	// This function is intentionally left blank to prevent the values of
+	// editors from constantly being reset every time the model is updated.
 }
 
 void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
