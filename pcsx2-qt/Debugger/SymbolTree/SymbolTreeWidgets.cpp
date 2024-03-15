@@ -844,6 +844,8 @@ std::vector<SymbolTreeWidget::SymbolWork> LocalVariableTreeWidget::getSymbols(
 	for (const ccc::LocalVariableHandle local_variable_handle : *function->local_variables())
 	{
 		const ccc::LocalVariable* local_variable = database.local_variables.symbol_from_handle(local_variable_handle);
+		if (!local_variable)
+			continue;
 
 		if (std::holds_alternative<ccc::GlobalStorage>(local_variable->storage) && !local_variable->address().valid())
 			continue;
@@ -953,6 +955,8 @@ std::vector<SymbolTreeWidget::SymbolWork> ParameterVariableTreeWidget::getSymbol
 	for (const ccc::ParameterVariableHandle parameter_variable_handle : *function->parameter_variables())
 	{
 		const ccc::ParameterVariable* parameter_variable = database.parameter_variables.symbol_from_handle(parameter_variable_handle);
+		if (!parameter_variable)
+			continue;
 
 		QString name = QString::fromStdString(parameter_variable->name());
 		if (!testName(name, filter))
@@ -969,7 +973,7 @@ std::vector<SymbolTreeWidget::SymbolWork> ParameterVariableTreeWidget::getSymbol
 
 		work.module_symbol = database.modules.symbol_from_handle(parameter_variable->module_handle());
 		work.section = database.sections.symbol_overlapping_address(parameter_variable->address());
-		work.source_file = database.source_files.symbol_from_handle(function->source_file());
+		work.source_file = function ? database.source_files.symbol_from_handle(function->source_file()) : nullptr;
 	}
 
 	return symbols;
