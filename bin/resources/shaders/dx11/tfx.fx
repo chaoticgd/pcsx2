@@ -60,6 +60,7 @@
 #define PS_FIXED_ONE_A 0
 #define PS_PABE 0
 #define PS_DITHER 0
+#define PS_DITHER_ADJUST 0
 #define PS_ZCLAMP 0
 #define PS_SCANMSK 0
 #define PS_AUTOMATIC_LOD 0
@@ -783,7 +784,7 @@ void ps_fbmask(inout float4 C, float2 pos_xy)
 	}
 }
 
-void ps_dither(inout float3 C, float2 pos_xy)
+void ps_dither(inout float3 C, float As, float2 pos_xy)
 {
 	if (PS_DITHER)
 	{
@@ -795,6 +796,15 @@ void ps_dither(inout float3 C, float2 pos_xy)
 			fpos = int2(pos_xy * RcpScaleFactor);
 
 		float value = DitherMatrix[fpos.x & 3][fpos.y & 3];
+		
+		// The idea here is we add on the dither amount adjusted by the alpha before it goes to the hw blend
+		// so after the alpha blend the resulting value should be the same as (Cs - Cd) * As + Cd + Dither.
+		if (PS_DITHER_ADJUST)
+		{
+			float Alpha = PS_BLEND_C == 2 ? Af : As;
+			value *= Alpha > 0.0f ? min(1.0f / Alpha, 1.0f) : 1.0f;
+		}
+		
 		if (PS_ROUND_INV)
 			C -= value;
 		else
@@ -816,7 +826,7 @@ void ps_color_clamp_wrap(inout float3 C)
 			C = clamp(C, (float3)0.0f, (float3)255.0f);
 
 		// In 16 bits format, only 5 bits of color are used. It impacts shadows computation of Castlevania
-		if (PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0)
+		if (PS_DST_FMT == FMT_16 && (PS_BLEND_MIX == 0 || PS_DITHER))
 			C = (float3)((int3)C & (int3)0xF8);
 		else if (PS_COLCLIP == 1 || PS_HDR == 1)
 			C = (float3)((int3)C & (int3)0xFF);
@@ -852,7 +862,7 @@ void ps_blend(inout float4 Color, inout float4 As_rgba, float2 pos_xy)
 		// As/Af clamp alpha for Blend mix
 		// We shouldn't clamp blend mix with blend hw 1 as we want alpha higher
 		float C_clamped = C;
-		if (PS_BLEND_MIX > 0 && PS_BLEND_HW != 1)
+		if (PS_BLEND_MIX > 0 && PS_BLEND_HW != 1 && PS_BLEND_HW != 2)
 			C_clamped = min(C_clamped, 1.0f);
 
 		if (PS_BLEND_A == PS_BLEND_B)
@@ -885,13 +895,12 @@ void ps_blend(inout float4 Color, inout float4 As_rgba, float2 pos_xy)
 		}
 		else if (PS_BLEND_HW == 2)
 		{
-			// Compensate slightly for Cd*(As + 1) - Cs*As.
-			// The initial factor we chose is 1 (0.00392)
-			// as that is the minimum color Cd can be,
-			// then we multiply by alpha to get the minimum
-			// blended value it can be.
-			float color_compensate = 1.0f * (C + 1.0f);
-			Color.rgb -= (float3)color_compensate;
+			// Since we can't do Cd*(Alpha + 1) - Cs*Alpha in hw blend
+			// what we can do is adjust the Cs value that will be
+			// subtracted, this way we can get a better result in hw blend.
+			// Result is still wrong but less wrong than before.
+			float division_alpha = 1.0f + C;
+			Color.rgb /= (float3)division_alpha;
 		}
 		else if (PS_BLEND_HW == 3)
 		{
@@ -1061,7 +1070,7 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		}
 	}
 
-	ps_dither(C.rgb, input.p.xy);
+	ps_dither(C.rgb, alpha_blend.a, input.p.xy);
 
 	// Color clamp/wrap needs to be done after sw blending and dithering
 	ps_color_clamp_wrap(C.rgb);

@@ -1925,8 +1925,6 @@ void GSRendererHW::Draw()
 		// Depth test will always pass
 		(m_cached_ctx.TEST.ZTST == ZTST_GEQUAL && m_vt.m_eq.z && std::min(m_vertex.buff[0].XYZ.Z, max_z) == max_z);
 	bool no_ds = (zm != 0 && all_depth_tests_pass) ||
-				 // Depth will be written through the RT
-				 (!no_rt && m_cached_ctx.FRAME.FBP == m_cached_ctx.ZBUF.ZBP && !PRIM->TME && zm == 0 && (fm & fm_mask) == 0 && m_cached_ctx.TEST.ZTE) ||
 				 // No color or Z being written.
 				 (no_rt && zm != 0);
 
@@ -1986,7 +1984,8 @@ void GSRendererHW::Draw()
 	if (!GSConfig.UserHacks_DisableSafeFeatures && is_possible_mem_clear)
 	{
 		if (!DetectStripedDoubleClear(no_rt, no_ds))
-			DetectDoubleHalfClear(no_rt, no_ds);
+			if (!DetectDoubleHalfClear(no_rt, no_ds))
+				DetectRedundantBufferClear(no_rt, no_ds, fm_mask);
 	}
 
 	m_process_texture = PRIM->TME && !(PRIM->ABE && m_context->ALPHA.IsBlack() && !m_cached_ctx.TEX0.TCC) && !(no_rt && (!m_cached_ctx.TEST.ATE || m_cached_ctx.TEST.ATST <= ATST_ALWAYS));
@@ -3732,9 +3731,6 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	GL_INS("Draw AlphaMinMax: %d-%d, RT AlphaMinMax: %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max, rt_alpha_min, rt_alpha_max);
 #endif
 
-	bool blend_ad_improved = false;
-	const bool alpha_mask = (m_cached_ctx.FRAME.FBMSK & 0xFF000000) == 0xFF000000;
-
 	// When AA1 is enabled and Alpha Blending is disabled, alpha blending done with coverage instead of alpha.
 	// We use a COV value of 128 (full coverage) in triangles (except the edge geometry, which we can't do easily).
 	if (IsCoverageAlpha())
@@ -3756,13 +3752,6 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 			AFIX = 128;
 			m_conf.ps.blend_c = 2;
 		}
-		// Check whenever we can use rt alpha min as the new alpha value, will be more accurate.
-		else if (!alpha_mask && (rt_alpha_min >= (rt_alpha_max / 2)))
-		{
-			AFIX = rt_alpha_min;
-			m_conf.ps.blend_c = 2;
-			blend_ad_improved = true;
-		}
 	}
 
 	// Get alpha value
@@ -3770,10 +3759,13 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	const bool alpha_c0_one = (m_conf.ps.blend_c == 0 && (GetAlphaMinMax().min == 128) && (GetAlphaMinMax().max == 128));
 	const bool alpha_c0_high_min_one = (m_conf.ps.blend_c == 0 && GetAlphaMinMax().min > 128);
 	const bool alpha_c0_high_max_one = (m_conf.ps.blend_c == 0 && GetAlphaMinMax().max > 128);
+	const bool alpha_c0_less_max_one = (m_conf.ps.blend_c == 0 && GetAlphaMinMax().max <= 128);
 	const bool alpha_c2_zero = (m_conf.ps.blend_c == 2 && AFIX == 0u);
 	const bool alpha_c2_one = (m_conf.ps.blend_c == 2 && AFIX == 128u);
+	const bool alpha_c2_less_one = (m_conf.ps.blend_c == 2 && AFIX <= 128u);
 	const bool alpha_c2_high_one = (m_conf.ps.blend_c == 2 && AFIX > 128u);
 	const bool alpha_one = alpha_c0_one || alpha_c2_one;
+	const bool alpha_less_one = alpha_c0_less_max_one || alpha_c2_less_one;
 
 	// Optimize blending equations, must be done before index calculation
 	if ((m_conf.ps.blend_a == m_conf.ps.blend_b) || ((m_conf.ps.blend_b == m_conf.ps.blend_d) && alpha_one))
@@ -3819,6 +3811,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	// Replace Ad with As, blend flags will be used from As since we are chaging the blend_index value.
 	// Must be done before index calculation, after blending equation optimizations
 	const bool blend_ad = m_conf.ps.blend_c == 1;
+	const bool alpha_mask = (m_cached_ctx.FRAME.FBMSK & 0xFF000000) == 0xFF000000;
 	bool blend_ad_alpha_masked = blend_ad && alpha_mask;
 	if (((GSConfig.AccurateBlendingUnit >= AccBlendLevel::Basic) || (COLCLAMP.CLAMP == 0))
 		&& g_gs_device->Features().texture_barrier && blend_ad_alpha_masked)
@@ -3866,7 +3859,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	// BLEND_HW_CLR1 with Ad, BLEND_HW_CLR3  Cs > 0.5f will require sw blend.
 	// BLEND_HW_CLR1 with As/F and BLEND_HW_CLR2 can be done in hw.
 	const bool clr_blend = !!(blend_flag & (BLEND_HW_CLR1 | BLEND_HW_CLR2 | BLEND_HW_CLR3));
-	bool clr_blend1_2 = (blend_flag & (BLEND_HW_CLR1 | BLEND_HW_CLR2)) && (m_conf.ps.blend_c != 1) && !blend_ad_improved // Make sure it isn't an Ad case
+	bool clr_blend1_2 = (blend_flag & (BLEND_HW_CLR1 | BLEND_HW_CLR2)) && (m_conf.ps.blend_c != 1) // Make sure it isn't an Ad case
 						&& !(m_draw_env->PABE.PABE && GetAlphaMinMax().min < 128) // No PABE as it will require sw blending.
 						&& (COLCLAMP.CLAMP) // Let's add a colclamp check too, hw blend will clamp to 0-1.
 						&& !(one_barrier || m_conf.require_full_barrier); // Also don't run if there are barriers present.
@@ -3889,7 +3882,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 			|| (one_barrier && (no_prim_overlap || features.framebuffer_fetch))
 			|| ((alpha_c2_high_one || alpha_c0_high_max_one) && no_prim_overlap)
 			// Ad blends are completely wrong without sw blend (Ad is 0.5 not 1 for 128). We can spare a barrier for it.
-			|| ((blend_ad || blend_ad_improved) && no_prim_overlap);
+			|| (blend_ad && no_prim_overlap);
 
 		switch (GSConfig.AccurateBlendingUnit)
 		{
@@ -3920,19 +3913,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 				sw_blending |= blend_requires_barrier;
 				// Try to do hw blend for clr2 case.
 				sw_blending &= !clr_blend1_2;
-				// blend_ad_improved should only run if no other barrier blend is enabled, otherwise restore bit values.
-				if (blend_ad_improved && (sw_blending || prefer_sw_blend))
-				{
-					AFIX = 0;
-					m_conf.ps.blend_c = 1;
-				}
 				// Enable sw blending for free blending, should be done after blend_ad_improved check.
 				sw_blending |= free_blend;
 				// Do not run BLEND MIX if sw blending is already present, it's less accurate.
 				blend_mix &= !sw_blending;
 				sw_blending |= blend_mix;
-				// Disable dithering on blend mix.
-				m_conf.ps.dither &= !blend_mix;
 				[[fallthrough]];
 			case AccBlendLevel::Minimum:
 				break;
@@ -3974,19 +3959,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 				sw_blending |= fbmask_no_overlap;
 				// Try to do hw blend for clr2 case.
 				sw_blending &= !clr_blend1_2;
-				// blend_ad_improved should only run if no other barrier blend is enabled, otherwise restore bit values.
-				if (blend_ad_improved && (sw_blending || fbmask_no_overlap))
-				{
-					AFIX = 0;
-					m_conf.ps.blend_c = 1;
-				}
 				// Enable sw blending for free blending, should be done after blend_ad_improved check.
 				sw_blending |= accumulation_blend || blend_non_recursive;
 				// Do not run BLEND MIX if sw blending is already present, it's less accurate.
 				blend_mix &= !sw_blending;
 				sw_blending |= blend_mix;
-				// Disable dithering on blend mix.
-				m_conf.ps.dither &= !blend_mix;
 				[[fallthrough]];
 			case AccBlendLevel::Minimum:
 				break;
@@ -4192,6 +4169,14 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 		}
 		else if (blend_mix)
 		{
+			// Disable dithering on blend mix if needed.
+			if (m_conf.ps.dither)
+			{
+				const bool can_dither = (m_conf.ps.blend_a == 0 && m_conf.ps.blend_b == 1 && alpha_less_one);
+				m_conf.ps.dither = can_dither;
+				m_conf.ps.dither_adjust = can_dither;
+			}
+
 			// For mixed blend, the source blend is done in the shader (so we use CONST_ONE as a factor).
 			m_conf.blend = {true, GSDevice::CONST_ONE, blend.dst, blend.op, m_conf.ps.blend_c == 2, AFIX};
 			m_conf.ps.blend_mix = (blend.op == GSDevice::OP_REV_SUBTRACT) ? 2 : 1;
@@ -5047,15 +5032,50 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 
 	const GSDevice::FeatureSupport features = g_gs_device->Features();
 
+	if (DATE)
+	{
+		// Should always be true, but sanity check...
+		if (rt)
+		{
+			const bool is_overlap_alpha = m_prim_overlap != PRIM_OVERLAP_NO && !(m_cached_ctx.FRAME.FBMSK & 0x80000000);
+
+			if (m_cached_ctx.TEST.DATM == 0)
+			{
+				// Some pixles are >= 1 so some fail, or some pixels get written but the written alpha matches or exceeds 1 (so overlap doesn't always pass).
+				DATE = rt->m_alpha_max >= 128 || (is_overlap_alpha && rt->m_alpha_min < 128 && (GetAlphaMinMax().max >= 128 || (m_context->FBA.FBA || IsCoverageAlpha())));
+
+				// All pixels fail.
+				if (DATE && rt->m_alpha_min >= 128)
+					return;
+			}
+			else
+			{
+				// Some pixles are < 1 so some fail, or some pixels get written but the written alpha goes below 1 (so overlap doesn't always pass).
+				DATE = rt->m_alpha_min < 128 || (is_overlap_alpha && rt->m_alpha_max >= 128 && (GetAlphaMinMax().min < 128 && !(m_context->FBA.FBA || IsCoverageAlpha())));
+
+				// All pixels fail.
+				if (DATE && rt->m_alpha_max < 128)
+					return;
+			}
+		}
+	}
+
+	const int fail_type = m_cached_ctx.TEST.GetAFAIL(m_cached_ctx.FRAME.PSM);
+	const int aref = static_cast<int>(m_cached_ctx.TEST.AREF);
+	if (m_cached_ctx.TEST.ATE && ((fail_type != AFAIL_FB_ONLY && fail_type != AFAIL_RGB_ONLY) || !PRIM->ABE || !IsUsingAsInBlend()))
+		CorrectATEAlphaMinMax(m_cached_ctx.TEST.ATST, aref);
+
 	// Blend
 	int blend_alpha_min = 0, blend_alpha_max = 255;
 	if (rt)
 	{
+
 		blend_alpha_min = rt->m_alpha_min;
 		blend_alpha_max = rt->m_alpha_max;
 
 		const bool is_24_bit = (GSLocalMemory::m_psm[rt->m_TEX0.PSM].trbpp == 24);
 		const u32 alpha_mask = GSLocalMemory::m_psm[rt->m_TEX0.PSM].fmsk & 0xFF000000;
+		const int fba_value = m_draw_env->CTXT[m_draw_env->PRIM.CTXT].FBA.FBA * 128;
 
 		if (is_24_bit)
 		{
@@ -5066,25 +5086,27 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 
 		if (GSUtil::GetChannelMask(m_cached_ctx.FRAME.PSM) & 0x8 && !m_channel_shuffle && !m_texture_shuffle)
 		{
-			const int fba_value = m_prev_env.CTXT[m_prev_env.PRIM.CTXT].FBA.FBA * 128;
-
+			const int s_alpha_max = GetAlphaMinMax().max | fba_value;
+			const int s_alpha_min = GetAlphaMinMax().min | fba_value;
 			if ((m_cached_ctx.FRAME.FBMSK & alpha_mask) == 0)
 			{
-				if (rt->m_valid.rintersect(m_r).eq(rt->m_valid) && PrimitiveCoversWithoutGaps() && !(m_cached_ctx.TEST.DATE || m_cached_ctx.TEST.ATE || m_cached_ctx.TEST.ZTST != ZTST_ALWAYS))
+				const bool afail_always_fb_alpha = m_cached_ctx.TEST.AFAIL == AFAIL_FB_ONLY || (m_cached_ctx.TEST.AFAIL == AFAIL_RGB_ONLY && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].trbpp != 32);
+				const bool always_passing_alpha = !m_cached_ctx.TEST.ATE || afail_always_fb_alpha || (m_cached_ctx.TEST.ATE && m_cached_ctx.TEST.ATST == ATST_ALWAYS);
+				if (rt->m_valid.rintersect(m_r).eq(rt->m_valid) && PrimitiveCoversWithoutGaps() && !(DATE || !always_passing_alpha || (m_cached_ctx.TEST.ZTE && m_cached_ctx.TEST.ZTST != ZTST_ALWAYS)))
 				{
-					rt->m_alpha_max = GetAlphaMinMax().max | fba_value;
-					rt->m_alpha_min = GetAlphaMinMax().min | fba_value;
+					rt->m_alpha_max = s_alpha_max;
+					rt->m_alpha_min = s_alpha_min;
 				}
 				else
 				{
-					rt->m_alpha_max = std::max(GetAlphaMinMax().max | fba_value, rt->m_alpha_max);
-					rt->m_alpha_min = std::min(GetAlphaMinMax().min | fba_value, rt->m_alpha_min);
+					rt->m_alpha_max = std::max(s_alpha_max, rt->m_alpha_max);
+					rt->m_alpha_min = std::min(s_alpha_min, rt->m_alpha_min);
 				}
 			}
 			else if ((m_cached_ctx.FRAME.FBMSK & alpha_mask) != alpha_mask) // We can't be sure of the alpha if it's partially masked.
 			{
-				rt->m_alpha_max |= std::max(GetAlphaMinMax().max | fba_value, rt->m_alpha_max);
-				rt->m_alpha_min = std::min(GetAlphaMinMax().min | fba_value, rt->m_alpha_min);
+				rt->m_alpha_max |= std::max(s_alpha_max, rt->m_alpha_max);
+				rt->m_alpha_min = std::min(s_alpha_min, rt->m_alpha_min);
 			}
 		}
 		else if ((m_texture_shuffle && m_conf.colormask.wa) || (m_channel_shuffle && (m_cached_ctx.FRAME.FBMSK & alpha_mask) != alpha_mask))
@@ -5115,125 +5137,96 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	{
 		if (m_cached_ctx.TEST.DATM)
 		{
-			if (rt)
-			{
-				// Destination and incoming pixels are all 1 or higher, no need for DATE.
-				if ((rt->m_alpha_min >= 128 || (m_cached_ctx.FRAME.FBMSK & 0x80000000)) && blend_alpha_min >= 128)
-				{
-					DATE = false;
-					m_cached_ctx.TEST.DATE = false;
-				}
-				else if (blend_alpha_max < 128) // All dest pixels are less than 1, everything fails.
-				{
-					rt->m_alpha_max = blend_alpha_max;
-					rt->m_alpha_min = blend_alpha_min;
-					return;
-				}
-			}
+			blend_alpha_min = std::max(blend_alpha_min, 128);
+			blend_alpha_max = std::max(blend_alpha_max, 128);
 		}
 		else
 		{
-			if (rt)
-			{
-				// Destination and incoming pixels are all less than 1, no need for DATE.
-				if ((rt->m_alpha_max < 128 || (m_cached_ctx.FRAME.FBMSK & 0x80000000)) && blend_alpha_max < 128)
-				{
-					DATE = false;
-					m_cached_ctx.TEST.DATE = false;
-				}
-				else if (blend_alpha_min >= 128) // All dest pixels are 1 or higher, everything fails.
-				{
-					rt->m_alpha_max = blend_alpha_max;
-					rt->m_alpha_min = blend_alpha_min;
-					return;
-				}
-			}
+			blend_alpha_min = std::min(blend_alpha_min, 127);
+			blend_alpha_max = std::min(blend_alpha_max, 127);
 		}
 
-		if (DATE)
+		// It is way too complex to emulate texture shuffle with DATE, so use accurate path.
+		// No overlap should be triggered on gl/vk only as they support DATE_BARRIER.
+		if (features.framebuffer_fetch)
 		{
-			// It is way too complex to emulate texture shuffle with DATE, so use accurate path.
-			// No overlap should be triggered on gl/vk only as they support DATE_BARRIER.
-			if (features.framebuffer_fetch)
-			{
-				// Full DATE is "free" with framebuffer fetch. The barrier gets cleared below.
-				DATE_BARRIER = true;
-				m_conf.require_full_barrier = true;
-			}
-			else if ((features.texture_barrier && m_prim_overlap == PRIM_OVERLAP_NO) || m_texture_shuffle)
-			{
-				GL_PERF("DATE: Accurate with %s", (features.texture_barrier && m_prim_overlap == PRIM_OVERLAP_NO) ? "no overlap" : "texture shuffle");
-				if (features.texture_barrier)
-				{
-					m_conf.require_full_barrier = true;
-					DATE_BARRIER = true;
-				}
-			}
-			// When Blending is disabled and Edge Anti Aliasing is enabled,
-			// the output alpha is Coverage (which we force to 128) so DATE will fail/pass guaranteed on second pass.
-			else if (m_conf.colormask.wa && (m_context->FBA.FBA || IsCoverageAlpha()) && features.stencil_buffer)
-			{
-				GL_PERF("DATE: Fast with FBA, all pixels will be >= 128");
-				DATE_one = !m_cached_ctx.TEST.DATM;
-			}
-			else if (m_conf.colormask.wa && !m_cached_ctx.TEST.ATE && !(m_cached_ctx.FRAME.FBMSK & 0x80000000))
-			{
-				// Performance note: check alpha range with GetAlphaMinMax()
-				// Note: all my dump are already above 120fps, but it seems to reduce GPU load
-				// with big upscaling
-				if (m_cached_ctx.TEST.DATM && GetAlphaMinMax().max < 128 && features.stencil_buffer)
-				{
-					// Only first pixel (write 0) will pass (alpha is 1)
-					GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					DATE_one = true;
-				}
-				else if (!m_cached_ctx.TEST.DATM && GetAlphaMinMax().min >= 128 && features.stencil_buffer)
-				{
-					// Only first pixel (write 1) will pass (alpha is 0)
-					GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					DATE_one = true;
-				}
-				else if (features.texture_barrier && ((m_vt.m_primclass == GS_SPRITE_CLASS && m_drawlist.size() < 10) || (m_index.tail < 30)))
-				{
-					// texture barrier will split the draw call into n draw call. It is very efficient for
-					// few primitive draws. Otherwise it sucks.
-					GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					m_conf.require_full_barrier = true;
-					DATE_BARRIER = true;
-				}
-				else if (features.primitive_id)
-				{
-					GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					DATE_PRIMID = true;
-				}
-				else if (features.texture_barrier)
-				{
-					GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					m_conf.require_full_barrier = true;
-					DATE_BARRIER = true;
-				}
-				else if (features.stencil_buffer)
-				{
-					// Might be inaccurate in some cases but we shouldn't hit this path.
-					GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
-					DATE_one = true;
-				}
-			}
-			else if (!m_conf.colormask.wa && !m_cached_ctx.TEST.ATE)
-			{
-				GL_PERF("DATE: Accurate with no alpha write");
-				if (g_gs_device->Features().texture_barrier)
-				{
-					m_conf.require_one_barrier = true;
-					DATE_BARRIER = true;
-				}
-			}
-
-			// Will save my life !
-			pxAssert(!(DATE_BARRIER && DATE_one));
-			pxAssert(!(DATE_PRIMID && DATE_one));
-			pxAssert(!(DATE_PRIMID && DATE_BARRIER));
+			// Full DATE is "free" with framebuffer fetch. The barrier gets cleared below.
+			DATE_BARRIER = true;
+			m_conf.require_full_barrier = true;
 		}
+		else if ((features.texture_barrier && m_prim_overlap == PRIM_OVERLAP_NO) || m_texture_shuffle)
+		{
+			GL_PERF("DATE: Accurate with %s", (features.texture_barrier && m_prim_overlap == PRIM_OVERLAP_NO) ? "no overlap" : "texture shuffle");
+			if (features.texture_barrier)
+			{
+				m_conf.require_full_barrier = true;
+				DATE_BARRIER = true;
+			}
+		}
+		// When Blending is disabled and Edge Anti Aliasing is enabled,
+		// the output alpha is Coverage (which we force to 128) so DATE will fail/pass guaranteed on second pass.
+		else if (m_conf.colormask.wa && (m_context->FBA.FBA || IsCoverageAlpha()) && features.stencil_buffer)
+		{
+			GL_PERF("DATE: Fast with FBA, all pixels will be >= 128");
+			DATE_one = !m_cached_ctx.TEST.DATM;
+		}
+		else if (m_conf.colormask.wa && !m_cached_ctx.TEST.ATE && !(m_cached_ctx.FRAME.FBMSK & 0x80000000))
+		{
+			// Performance note: check alpha range with GetAlphaMinMax()
+			// Note: all my dump are already above 120fps, but it seems to reduce GPU load
+			// with big upscaling
+			if (m_cached_ctx.TEST.DATM && GetAlphaMinMax().max < 128 && features.stencil_buffer)
+			{
+				// Only first pixel (write 0) will pass (alpha is 1)
+				GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				DATE_one = true;
+			}
+			else if (!m_cached_ctx.TEST.DATM && GetAlphaMinMax().min >= 128 && features.stencil_buffer)
+			{
+				// Only first pixel (write 1) will pass (alpha is 0)
+				GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				DATE_one = true;
+			}
+			else if (features.texture_barrier && ((m_vt.m_primclass == GS_SPRITE_CLASS && m_drawlist.size() < 10) || (m_index.tail < 30)))
+			{
+				// texture barrier will split the draw call into n draw call. It is very efficient for
+				// few primitive draws. Otherwise it sucks.
+				GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				m_conf.require_full_barrier = true;
+				DATE_BARRIER = true;
+			}
+			else if (features.primitive_id)
+			{
+				GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				DATE_PRIMID = true;
+			}
+			else if (features.texture_barrier)
+			{
+				GL_PERF("DATE: Accurate with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				m_conf.require_full_barrier = true;
+				DATE_BARRIER = true;
+			}
+			else if (features.stencil_buffer)
+			{
+				// Might be inaccurate in some cases but we shouldn't hit this path.
+				GL_PERF("DATE: Fast with alpha %d-%d", GetAlphaMinMax().min, GetAlphaMinMax().max);
+				DATE_one = true;
+			}
+		}
+		else if (!m_conf.colormask.wa && !m_cached_ctx.TEST.ATE)
+		{
+			GL_PERF("DATE: Accurate with no alpha write");
+			if (g_gs_device->Features().texture_barrier)
+			{
+				m_conf.require_one_barrier = true;
+				DATE_BARRIER = true;
+			}
+		}
+
+		// Will save my life !
+		pxAssert(!(DATE_BARRIER && DATE_one));
+		pxAssert(!(DATE_PRIMID && DATE_one));
+		pxAssert(!(DATE_PRIMID && DATE_BARRIER));
 	}
 
 	// Before emulateblending, dither will be used
@@ -6121,6 +6114,49 @@ bool GSRendererHW::DetectDoubleHalfClear(bool& no_rt, bool& no_ds)
 	// Remove any targets at the half-buffer point, they're getting overwritten.
 	g_texture_cache->InvalidateVideoMemType(GSTextureCache::RenderTarget, half * BLOCKS_PER_PAGE);
 	g_texture_cache->InvalidateVideoMemType(GSTextureCache::DepthStencil, half * BLOCKS_PER_PAGE);
+	return true;
+}
+
+bool GSRendererHW::DetectRedundantBufferClear(bool& no_rt, bool& no_ds, u32 fm_mask)
+{
+	// This function handles the case where the game points FRAME and ZBP at the same page, and both FRAME and Z
+	// write the same bits. A few games do this, including Flatout 2, DMC3, Ratchet & Clank, Gundam, and Superman.
+	if (m_cached_ctx.FRAME.FBP != m_cached_ctx.ZBUF.ZBP || m_cached_ctx.ZBUF.ZMSK)
+		return false;
+
+	// Frame and Z aren't writing any overlapping bits.
+	// We can't check for exactly the same bitmask, because some games do C32 FRAME with Z24, and no FBMSK.
+	if (((~m_cached_ctx.FRAME.FBMSK & fm_mask) & GSLocalMemory::m_psm[m_cached_ctx.ZBUF.PSM].fmsk) == 0)
+		return false;
+
+	// Make sure the width is page aligned, so we don't break powerdrome-style clears where Z writes the right side of the page.
+	// We can't check page alignment on the size entirely, because Ratchet does 256x127 clears...
+	// Test cases: Devil May Cry 3, Tom & Jerry.
+	if ((m_r.x & 63) != 0 || (m_r.z & 63) != 0)
+		return false;
+
+	// Compute how many bits are actually written through FRAME. Normally we'd use popcnt, but we still have to
+	// support SSE4.1. If we somehow don't have a contiguous FBMSK, we're in trouble anyway...
+	const u32 frame_bits_written = 32 - std::countl_zero(~m_cached_ctx.FRAME.FBMSK & fm_mask);
+
+	// Keep Z if we have a target at this location already, or if Z is writing more bits than FRAME.
+	const u32 z_bits_written = GSLocalMemory::m_psm[m_cached_ctx.ZBUF.PSM].trbpp;
+	const GSTextureCache::Target* ztgt = g_texture_cache->GetTargetWithSharedBits(m_cached_ctx.ZBUF.Block(), m_cached_ctx.ZBUF.PSM);
+	const bool keep_z = (ztgt && ztgt->m_valid_rgb && z_bits_written >= frame_bits_written) || (z_bits_written > frame_bits_written);
+	GL_INS("FRAME and ZBUF writing page-aligned same data, discarding %s", keep_z ? "FRAME" : "ZBUF");
+	if (keep_z)
+	{
+		m_cached_ctx.FRAME.FBMSK = 0xFFFFFFFFu;
+		no_rt = true;
+		no_ds = false;
+	}
+	else
+	{
+		m_cached_ctx.ZBUF.ZMSK = true;
+		no_ds = true;
+		no_rt = false;
+	}
+
 	return true;
 }
 
