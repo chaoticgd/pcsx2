@@ -460,12 +460,17 @@ bool NewLocalVariableDialog::parseUserInput()
 			}
 		}
 
-		std::string typeString = m_ui.typeLineEdit->text().toStdString();
-		m_type = stringToType(typeString, database, error_message);
+		std::string type_string = m_ui.typeLineEdit->text().toStdString();
+		m_type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty())
 			return;
 
-		m_function = m_functions.at(m_ui.functionComboBox->currentIndex());
+		int function_index = m_ui.functionComboBox->currentIndex();
+		if (function_index > 0 && function_index < (int)m_functions.size())
+			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
+		else
+			m_function = ccc::FunctionHandle();
+
 		if (!m_function.valid())
 		{
 			error_message = tr("Invalid function.");
@@ -558,12 +563,17 @@ bool NewParameterVariableDialog::parseUserInput()
 			}
 		}
 
-		std::string typeString = m_ui.typeLineEdit->text().toStdString();
-		m_type = stringToType(typeString, database, error_message);
+		std::string type_string = m_ui.typeLineEdit->text().toStdString();
+		m_type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty())
 			return;
 
-		m_function = m_functions.at(m_ui.functionComboBox->currentIndex());
+		int function_index = m_ui.functionComboBox->currentIndex();
+		if (function_index > 0 && function_index < (int)m_functions.size())
+			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
+		else
+			m_function = ccc::FunctionHandle();
+
 		if (!m_function.valid())
 		{
 			error_message = tr("Invalid function.");
