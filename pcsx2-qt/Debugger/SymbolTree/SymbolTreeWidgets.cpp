@@ -645,7 +645,7 @@ void FunctionTreeWidget::onNewButtonPressed()
 {
 	NewFunctionDialog* dialog = new NewFunctionDialog(m_cpu, this);
 	if (dialog->exec() == QDialog::Accepted)
-		update();
+		reset();
 }
 
 void FunctionTreeWidget::onDeleteButtonPressed()
@@ -664,7 +664,7 @@ void FunctionTreeWidget::onDeleteButtonPressed()
 		database.destroy_function(node->symbol.handle());
 	});
 
-	update();
+	reset();
 }
 
 // *****************************************************************************
@@ -798,7 +798,7 @@ void GlobalVariableTreeWidget::onNewButtonPressed()
 {
 	NewGlobalVariableDialog* dialog = new NewGlobalVariableDialog(m_cpu, this);
 	if (dialog->exec() == QDialog::Accepted)
-		update();
+		reset();
 }
 
 void GlobalVariableTreeWidget::onDeleteButtonPressed()
@@ -817,7 +817,7 @@ void GlobalVariableTreeWidget::onDeleteButtonPressed()
 		database.global_variables.destroy_symbol(node->symbol.handle());
 	});
 
-	update();
+	reset();
 }
 
 // *****************************************************************************
@@ -909,7 +909,7 @@ void LocalVariableTreeWidget::onNewButtonPressed()
 {
 	NewLocalVariableDialog* dialog = new NewLocalVariableDialog(m_cpu, this);
 	if (dialog->exec() == QDialog::Accepted)
-		update();
+		reset();
 }
 
 void LocalVariableTreeWidget::onDeleteButtonPressed()
@@ -928,7 +928,7 @@ void LocalVariableTreeWidget::onDeleteButtonPressed()
 		database.local_variables.destroy_symbol(node->symbol.handle());
 	});
 
-	update();
+	reset();
 }
 
 // *****************************************************************************
@@ -1018,7 +1018,7 @@ void ParameterVariableTreeWidget::onNewButtonPressed()
 {
 	NewParameterVariableDialog* dialog = new NewParameterVariableDialog(m_cpu, this);
 	if (dialog->exec() == QDialog::Accepted)
-		update();
+		reset();
 }
 
 void ParameterVariableTreeWidget::onDeleteButtonPressed()
@@ -1037,7 +1037,7 @@ void ParameterVariableTreeWidget::onDeleteButtonPressed()
 		database.parameter_variables.destroy_symbol(node->symbol.handle());
 	});
 
-	update();
+	reset();
 }
 
 static bool testName(const QString& name, const QString& filter)
