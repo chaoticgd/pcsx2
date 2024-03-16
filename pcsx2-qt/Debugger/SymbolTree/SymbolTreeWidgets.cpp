@@ -486,7 +486,7 @@ void SymbolTreeWidget::onGoToInDisassembly()
 	if (!node)
 		return;
 
-	goToInDisassembly(node->location.address);
+	emit goToInDisassembly(node->location.address);
 }
 
 void SymbolTreeWidget::onGoToInMemoryView()
@@ -495,7 +495,7 @@ void SymbolTreeWidget::onGoToInMemoryView()
 	if (!node)
 		return;
 
-	goToInMemoryView(node->location.address);
+	emit goToInMemoryView(node->location.address);
 }
 
 void SymbolTreeWidget::onResetChildren()
@@ -568,10 +568,10 @@ void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
 	switch (index.column())
 	{
 		case SymbolTreeModel::NAME:
-			nameColumnClicked(node->location.address);
+			emit nameColumnClicked(node->location.address);
 			break;
 		case SymbolTreeModel::LOCATION:
-			locationColumnClicked(node->location.address);
+			emit locationColumnClicked(node->location.address);
 			break;
 	}
 }
@@ -630,7 +630,6 @@ std::unique_ptr<SymbolTreeNode> FunctionTreeWidget::buildNode(
 	std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 	node->name = std::move(work.name);
 	node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, function.address().value);
-	node->is_location_editable = true;
 	node->symbol = ccc::MultiSymbolHandle(function);
 
 	for (auto address_handle : database.labels.handles_from_address_range(function.address_range()))

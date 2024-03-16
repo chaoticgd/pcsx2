@@ -165,16 +165,12 @@ void CpuWidget::setupSymbolTrees()
 	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 
 	connect(m_function_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_global_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_local_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 
 	connect(m_function_tree, &SymbolTreeWidget::nameColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_function_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
-
-	connect(m_global_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_local_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_parameter_variable_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
 }
 
 void CpuWidget::refreshDebugger()
