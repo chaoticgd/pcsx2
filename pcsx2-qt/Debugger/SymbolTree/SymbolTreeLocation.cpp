@@ -8,7 +8,10 @@
 SymbolTreeLocation::SymbolTreeLocation() = default;
 
 SymbolTreeLocation::SymbolTreeLocation(Type type_arg, u32 address_arg)
-	: type(type_arg), address(address_arg) {}
+	: type(type_arg)
+	, address(address_arg)
+{
+}
 
 QString SymbolTreeLocation::toString(DebugInterface& cpu) const
 {
@@ -17,6 +20,8 @@ QString SymbolTreeLocation::toString(DebugInterface& cpu) const
 		case REGISTER:
 			if (address < 32)
 				return cpu.getRegisterName(0, address);
+			else
+				return QString("Reg %1").arg(address);
 		case MEMORY:
 			return QString::number(address, 16);
 		default:
