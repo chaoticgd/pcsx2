@@ -65,7 +65,7 @@ protected:
 	virtual void configureColumns() = 0;
 
 	virtual void onNewButtonPressed() = 0;
-	virtual void onDeleteButtonPressed() = 0;
+	void onDeleteButtonPressed();
 
 	void onCopyName();
 	void onCopyLocation();
@@ -125,7 +125,6 @@ protected:
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
-	void onDeleteButtonPressed() override;
 };
 
 class GlobalVariableTreeWidget : public SymbolTreeWidget
@@ -145,7 +144,6 @@ protected:
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
-	void onDeleteButtonPressed() override;
 };
 
 class LocalVariableTreeWidget : public SymbolTreeWidget
@@ -165,7 +163,6 @@ protected:
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
-	void onDeleteButtonPressed() override;
 
 	u32 m_stack_pointer = 0;
 };
@@ -187,7 +184,6 @@ protected:
 	void configureColumns() override;
 
 	void onNewButtonPressed() override;
-	void onDeleteButtonPressed() override;
 
 	u32 m_stack_pointer = 0;
 };

@@ -415,6 +415,25 @@ void SymbolTreeWidget::openMenu(QPoint pos)
 	m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
 }
 
+void SymbolTreeWidget::onDeleteButtonPressed()
+{
+	SymbolTreeNode* node = currentNode();
+	if (!node)
+		return;
+
+	if (!node->symbol.valid())
+		return;
+
+	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
+		return;
+
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+		node->symbol.destroy_symbol(database, true);
+	});
+
+	reset();
+}
+
 void SymbolTreeWidget::onCopyName()
 {
 	SymbolTreeNode* node = currentNode();
@@ -648,25 +667,6 @@ void FunctionTreeWidget::onNewButtonPressed()
 		reset();
 }
 
-void FunctionTreeWidget::onDeleteButtonPressed()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::FUNCTION)
-		return;
-
-	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
-		return;
-
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.functions.destroy_symbol(node->symbol.handle(), &database);
-	});
-
-	reset();
-}
-
 // *****************************************************************************
 
 GlobalVariableTreeWidget::GlobalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
@@ -801,25 +801,6 @@ void GlobalVariableTreeWidget::onNewButtonPressed()
 		reset();
 }
 
-void GlobalVariableTreeWidget::onDeleteButtonPressed()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::GLOBAL_VARIABLE)
-		return;
-
-	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
-		return;
-
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.global_variables.destroy_symbol(node->symbol.handle(), &database);
-	});
-
-	reset();
-}
-
 // *****************************************************************************
 
 LocalVariableTreeWidget::LocalVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
@@ -912,25 +893,6 @@ void LocalVariableTreeWidget::onNewButtonPressed()
 		reset();
 }
 
-void LocalVariableTreeWidget::onDeleteButtonPressed()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::LOCAL_VARIABLE)
-		return;
-
-	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
-		return;
-
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.local_variables.destroy_symbol(node->symbol.handle(), &database);
-	});
-
-	reset();
-}
-
 // *****************************************************************************
 
 ParameterVariableTreeWidget::ParameterVariableTreeWidget(DebugInterface& cpu, QWidget* parent)
@@ -1019,25 +981,6 @@ void ParameterVariableTreeWidget::onNewButtonPressed()
 	NewParameterVariableDialog* dialog = new NewParameterVariableDialog(m_cpu, this);
 	if (dialog->exec() == QDialog::Accepted)
 		reset();
-}
-
-void ParameterVariableTreeWidget::onDeleteButtonPressed()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	if (!node->symbol.valid() || node->symbol.descriptor() != ccc::SymbolDescriptor::PARAMETER_VARIABLE)
-		return;
-
-	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
-		return;
-
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.parameter_variables.destroy_symbol(node->symbol.handle(), &database);
-	});
-
-	reset();
 }
 
 static bool testName(const QString& name, const QString& filter)
