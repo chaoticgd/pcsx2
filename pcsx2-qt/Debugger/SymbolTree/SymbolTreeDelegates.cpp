@@ -301,6 +301,9 @@ QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleO
 	if (!node || !node->symbol.valid() || !node->symbol.is_flag_set(ccc::WITH_ADDRESS_MAP))
 		return nullptr;
 
+	if (!node->is_location_editable)
+		return nullptr;
+
 	if (m_guardian.IsBusy())
 		return nullptr;
 

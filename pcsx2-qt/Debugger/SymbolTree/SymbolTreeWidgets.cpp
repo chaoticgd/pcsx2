@@ -630,6 +630,7 @@ std::unique_ptr<SymbolTreeNode> FunctionTreeWidget::buildNode(
 	std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 	node->name = std::move(work.name);
 	node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, function.address().value);
+	node->is_location_editable = true;
 	node->symbol = ccc::MultiSymbolHandle(function);
 
 	for (auto address_handle : database.labels.handles_from_address_range(function.address_range()))
@@ -756,6 +757,7 @@ std::unique_ptr<SymbolTreeNode> GlobalVariableTreeWidget::buildNode(
 			if (global_variable.type())
 				node->type = ccc::NodeHandle(global_variable, global_variable.type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, global_variable.address().value);
+			node->is_location_editable = true;
 			node->symbol = ccc::MultiSymbolHandle(global_variable);
 
 			break;
@@ -767,6 +769,7 @@ std::unique_ptr<SymbolTreeNode> GlobalVariableTreeWidget::buildNode(
 			if (local_variable.type())
 				node->type = ccc::NodeHandle(local_variable, local_variable.type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable.address().value);
+			node->is_location_editable = true;
 			node->symbol = ccc::MultiSymbolHandle(local_variable);
 
 			break;

@@ -26,6 +26,7 @@ public:
 	ccc::MultiSymbolHandle symbol;
 	QString name;
 	SymbolTreeLocation location;
+	bool is_location_editable = false;
 	ccc::NodeHandle type;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 	ccc::AddressRange live_range;
