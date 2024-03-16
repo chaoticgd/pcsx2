@@ -205,7 +205,7 @@ void DisassemblyWidget::contextRemoveFunction()
 		if (previousFunc)
 			previousFunc->set_size(curFunc->size() + previousFunc->size());
 
-		database.functions.destroy_symbol(curFunc->handle());
+		database.functions.destroy_symbol(curFunc->handle(), &database);
 	});
 }
 

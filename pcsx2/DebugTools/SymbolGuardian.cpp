@@ -450,7 +450,7 @@ void SymbolGuardian::ClearIrxModules()
 				irx_modules.emplace_back(module.handle());
 
 		for (ccc::ModuleHandle module : irx_modules)
-			m_database.destroy_symbols_from_modules(module);
+			m_database.destroy_symbols_from_module(module, nullptr);
 	});
 }
 

@@ -661,7 +661,7 @@ void FunctionTreeWidget::onDeleteButtonPressed()
 		return;
 
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.destroy_function(node->symbol.handle());
+		database.functions.destroy_symbol(node->symbol.handle(), &database);
 	});
 
 	reset();
@@ -814,7 +814,7 @@ void GlobalVariableTreeWidget::onDeleteButtonPressed()
 		return;
 
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.global_variables.destroy_symbol(node->symbol.handle());
+		database.global_variables.destroy_symbol(node->symbol.handle(), &database);
 	});
 
 	reset();
@@ -925,7 +925,7 @@ void LocalVariableTreeWidget::onDeleteButtonPressed()
 		return;
 
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.local_variables.destroy_symbol(node->symbol.handle());
+		database.local_variables.destroy_symbol(node->symbol.handle(), &database);
 	});
 
 	reset();
@@ -1034,7 +1034,7 @@ void ParameterVariableTreeWidget::onDeleteButtonPressed()
 		return;
 
 	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
-		database.parameter_variables.destroy_symbol(node->symbol.handle());
+		database.parameter_variables.destroy_symbol(node->symbol.handle(), &database);
 	});
 
 	reset();
