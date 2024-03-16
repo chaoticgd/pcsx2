@@ -9,14 +9,14 @@ bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& 
 {
 	bool data_changed = false;
 
-	QVariant new_value = valueToVariant(cpu, database);
+	QVariant new_value = readValueAsVariant(cpu, database);
 	if (!new_value.isNull())
 	{
 		data_changed |= new_value != value;
 		value = std::move(new_value);
 	}
 
-	QString new_display_value = valueToString(cpu, database);
+	QString new_display_value = readValueAsString(cpu, database);
 	if (!new_display_value.isNull())
 	{
 		data_changed |= new_display_value != display_value;
@@ -43,20 +43,20 @@ bool SymbolTreeNode::writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& d
 		return false;
 
 	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-	return fromVariant(value, physical_type, cpu);
+	return writeValueFromVariant(value, physical_type, cpu);
 }
 
-QVariant SymbolTreeNode::valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+QVariant SymbolTreeNode::readValueAsVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
 	const ccc::ast::Node* logical_type = type.lookup_node(database);
 	if (!logical_type)
 		return QVariant();
 
 	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-	return valueToVariant(physical_type, cpu, database);
+	return readValueAsVariant(physical_type, cpu, database);
 }
 
-QVariant SymbolTreeNode::valueToVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+QVariant SymbolTreeNode::readValueAsVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
 	switch (physical_type.descriptor)
 	{
@@ -114,7 +114,7 @@ QVariant SymbolTreeNode::valueToVariant(const ccc::ast::Node& physical_type, Deb
 	return QVariant();
 }
 
-bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const
+bool SymbolTreeNode::writeValueFromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const
 {
 	switch (physical_type.descriptor)
 	{
@@ -189,7 +189,7 @@ bool SymbolTreeNode::fromVariant(QVariant value, const ccc::ast::Node& physical_
 	return true;
 }
 
-QString SymbolTreeNode::valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+QString SymbolTreeNode::readValueAsString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
 {
 	QString result;
 
@@ -197,7 +197,7 @@ QString SymbolTreeNode::valueToString(DebugInterface& cpu, const ccc::SymbolData
 	if (logical_type)
 	{
 		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-		result = valueToString(physical_type, cpu, database, 0);
+		result = readValueAsString(physical_type, cpu, database, 0);
 	}
 
 	if (result.isEmpty())
@@ -215,7 +215,7 @@ QString SymbolTreeNode::valueToString(DebugInterface& cpu, const ccc::SymbolData
 	return result;
 }
 
-QString SymbolTreeNode::valueToString(
+QString SymbolTreeNode::readValueAsString(
 	const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const
 {
 	s32 max_elements_to_display = 0;
@@ -246,7 +246,7 @@ QString SymbolTreeNode::valueToString(
 
 				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
 
-				QString element = node.valueToString(element_type, cpu, database, depth + 1);
+				QString element = node.readValueAsString(element_type, cpu, database, depth + 1);
 				if (element.isEmpty())
 					element = QString("(%1)").arg(ccc::ast::node_type_to_string(element_type));
 				result += element;
@@ -376,7 +376,7 @@ QString SymbolTreeNode::valueToString(
 
 				const ccc::ast::Node& field_type = *resolvePhysicalType(struct_or_union.fields[i].get(), database).first;
 
-				QString field_value = node.valueToString(field_type, cpu, database, depth + 1);
+				QString field_value = node.readValueAsString(field_type, cpu, database, depth + 1);
 				if (field_value.isEmpty())
 					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
 				result += QString(".%1=%2").arg(field_name).arg(field_value);

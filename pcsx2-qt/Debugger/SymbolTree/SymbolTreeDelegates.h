@@ -13,7 +13,7 @@ class SymbolTreeValueDelegate : public QStyledItemDelegate
 
 public:
 	SymbolTreeValueDelegate(
-		SymbolGuardian& guardian,
+		DebugInterface& cpu,
 		QObject* parent = nullptr);
 
 	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -25,7 +25,7 @@ protected:
 	// deselected rather than when an option was picked.
 	void onComboBoxIndexChanged(int index);
 
-	SymbolGuardian& m_guardian;
+	DebugInterface& m_cpu;
 };
 
 class SymbolTreeLocationDelegate : public QStyledItemDelegate

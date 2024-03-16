@@ -12,10 +12,10 @@
 #include "Debugger/SymbolTree/TypeString.h"
 
 SymbolTreeValueDelegate::SymbolTreeValueDelegate(
-	SymbolGuardian& guardian,
+	DebugInterface& cpu,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
-	, m_guardian(guardian)
+	, m_cpu(cpu)
 {
 }
 
@@ -33,8 +33,9 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 		return nullptr;
 
 	QWidget* result = nullptr;
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
+		QVariant value = node->readValueAsVariant(m_cpu, database);
 
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
@@ -55,7 +56,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 					case ccc::ast::BuiltInClass::UNSIGNED_64:
 					{
 						QLineEdit* editor = new QLineEdit(parent);
-						editor->setText(QString::number(index.data(Qt::UserRole).toULongLong()));
+						editor->setText(QString::number(value.toULongLong()));
 						result = editor;
 
 						break;
@@ -66,7 +67,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 					case ccc::ast::BuiltInClass::SIGNED_64:
 					{
 						QLineEdit* editor = new QLineEdit(parent);
-						editor->setText(QString::number(index.data(Qt::UserRole).toLongLong()));
+						editor->setText(QString::number(value.toLongLong()));
 						result = editor;
 
 						break;
@@ -74,7 +75,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* editor = new QCheckBox(parent);
-						editor->setChecked(index.data(Qt::UserRole).toBool());
+						editor->setChecked(value.toBool());
 						result = editor;
 
 						break;
@@ -82,7 +83,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 					case ccc::ast::BuiltInClass::FLOAT_32:
 					{
 						QLineEdit* editor = new QLineEdit(parent);
-						editor->setText(QString::number(index.data(Qt::UserRole).toFloat()));
+						editor->setText(QString::number(value.toFloat()));
 						result = editor;
 
 						break;
@@ -90,7 +91,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 					case ccc::ast::BuiltInClass::FLOAT_64:
 					{
 						QLineEdit* editor = new QLineEdit(parent);
-						editor->setText(QString::number(index.data(Qt::UserRole).toDouble()));
+						editor->setText(QString::number(value.toDouble()));
 						result = editor;
 
 						break;
@@ -104,13 +105,12 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QVariant data = index.data(Qt::UserRole);
 
 				QComboBox* combo_box = new QComboBox(parent);
 				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
 				{
 					combo_box->addItem(QString::fromStdString(enumeration.constants[i].second));
-					if (enumeration.constants[i].first == data.toInt())
+					if (enumeration.constants[i].first == value.toInt())
 						combo_box->setCurrentIndex(i);
 				}
 				connect(combo_box, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
@@ -122,7 +122,7 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 			case ccc::ast::POINTER_TO_DATA_MEMBER:
 			{
 				QLineEdit* editor = new QLineEdit(parent);
-				editor->setText(QString::number(index.data(Qt::UserRole).toULongLong(), 16));
+				editor->setText(QString::number(value.toULongLong(), 16));
 				result = editor;
 
 				break;
@@ -155,7 +155,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 	if (!node || !node->type.valid())
 		return;
 
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;

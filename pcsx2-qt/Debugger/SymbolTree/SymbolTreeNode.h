@@ -52,12 +52,12 @@ public:
 	// Write the value back to the VM memory. Returns true on success.
 	bool writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& database);
 
-	QVariant valueToVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	QVariant valueToVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	bool fromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const;
+	QVariant readValueAsVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	QVariant readValueAsVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	bool writeValueFromVariant(QVariant value, const ccc::ast::Node& physical_type, DebugInterface& cpu) const;
 	
-	QString valueToString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
-	QString valueToString(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const;
+	QString readValueAsString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const;
+	QString readValueAsString(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const;
 
 	const SymbolTreeNode* parent() const;
 
