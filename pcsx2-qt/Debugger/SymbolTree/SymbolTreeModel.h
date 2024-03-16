@@ -71,5 +71,4 @@ protected:
 	std::unique_ptr<SymbolTreeNode> m_root;
 	QString m_filter;
 	DebugInterface& m_cpu;
-	SymbolGuardian& m_guardian;
 };

@@ -34,7 +34,7 @@ class SymbolTreeLocationDelegate : public QStyledItemDelegate
 
 public:
 	SymbolTreeLocationDelegate(
-		SymbolGuardian& guardian,
+		DebugInterface& cpu,
 		u32 alignment,
 		QObject* parent = nullptr);
 
@@ -43,7 +43,7 @@ public:
 	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
 
 protected:
-	SymbolGuardian& m_guardian;
+	DebugInterface& m_cpu;
 	u32 m_alignment;
 };
 
@@ -53,7 +53,7 @@ class SymbolTreeTypeDelegate : public QStyledItemDelegate
 
 public:
 	SymbolTreeTypeDelegate(
-		SymbolGuardian& guardian,
+		DebugInterface& cpu,
 		QObject* parent = nullptr);
 
 	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -61,5 +61,5 @@ public:
 	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
 
 protected:
-	SymbolGuardian& m_guardian;
+	DebugInterface& m_cpu;
 };

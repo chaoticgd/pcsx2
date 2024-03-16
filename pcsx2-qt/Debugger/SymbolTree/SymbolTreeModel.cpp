@@ -14,7 +14,6 @@
 SymbolTreeModel::SymbolTreeModel(DebugInterface& cpu, QObject* parent)
 	: QAbstractItemModel(parent)
 	, m_cpu(cpu)
-	, m_guardian(cpu.GetSymbolGuardian())
 {
 }
 
@@ -82,7 +81,7 @@ bool SymbolTreeModel::hasChildren(const QModelIndex& parent) const
 		return !parent_node->children().empty();
 
 	bool result = true;
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* type = parent_node->type.lookup_node(database);
 		if (!type)
 			return;
@@ -125,7 +124,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				return QVariant();
 
 			QVariant result;
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				switch (role)
 				{
 					case Qt::DisplayRole:
@@ -146,7 +145,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		case TYPE:
 		{
 			QVariant result;
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::ast::Node* type = node->type.lookup_node(database);
 				if (!type)
 					return;
@@ -178,7 +177,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 		return false;
 
 	bool data_changed = false;
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		if (role == Qt::EditRole)
 		{
 			node->value = value;
@@ -208,7 +207,7 @@ void SymbolTreeModel::fetchMore(const QModelIndex& parent)
 		return;
 
 	std::vector<std::unique_ptr<SymbolTreeNode>> children;
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* logical_parent_type = parent_node->type.lookup_node(database);
 		if (!logical_parent_type)
 			return;
@@ -235,7 +234,7 @@ bool SymbolTreeModel::canFetchMore(const QModelIndex& parent) const
 		return false;
 
 	bool result = false;
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* parent_type = parent_node->type.lookup_node(database);
 		if (!parent_type)
 			return;
@@ -348,7 +347,7 @@ std::optional<QString> SymbolTreeModel::changeTypeTemporarily(QModelIndex index,
 	resetChildren(index);
 
 	QString error_message;
-	m_guardian.BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
 		std::unique_ptr<ccc::ast::Node> type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty())
 			return;
@@ -367,7 +366,7 @@ std::optional<QString> SymbolTreeModel::typeFromModelIndexToString(QModelIndex i
 		return std::nullopt;
 
 	QString result;
-	m_guardian.BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) -> void {
 		const ccc::ast::Node* type = node->type.lookup_node(database);
 		if (!type)
 			return;
@@ -501,7 +500,7 @@ bool SymbolTreeModel::symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const
 	{
 		case ccc::SymbolDescriptor::FUNCTION:
 		{
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::Function* function = database.functions.symbol_from_handle(symbol.handle());
 				if (!function || function->original_hash() == 0)
 					return;
@@ -512,7 +511,7 @@ bool SymbolTreeModel::symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const
 		}
 		case ccc::SymbolDescriptor::GLOBAL_VARIABLE:
 		{
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::GlobalVariable* global_variable = database.global_variables.symbol_from_handle(symbol.handle());
 				if (!global_variable)
 					return;
@@ -527,7 +526,7 @@ bool SymbolTreeModel::symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const
 		}
 		case ccc::SymbolDescriptor::LOCAL_VARIABLE:
 		{
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::LocalVariable* local_variable = database.local_variables.symbol_from_handle(symbol.handle());
 				if (!local_variable)
 					return;
@@ -546,7 +545,7 @@ bool SymbolTreeModel::symbolMatchesMemory(ccc::MultiSymbolHandle& symbol) const
 		}
 		case ccc::SymbolDescriptor::PARAMETER_VARIABLE:
 		{
-			m_guardian.TryRead([&](const ccc::SymbolDatabase& database) -> void {
+			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 				const ccc::ParameterVariable* parameter_variable = database.parameter_variables.symbol_from_handle(symbol.handle());
 				if (!parameter_variable)
 					return;

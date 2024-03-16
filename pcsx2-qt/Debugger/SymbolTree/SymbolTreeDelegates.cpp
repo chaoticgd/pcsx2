@@ -279,11 +279,11 @@ void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)
 // *****************************************************************************
 
 SymbolTreeLocationDelegate::SymbolTreeLocationDelegate(
-	SymbolGuardian& guardian,
+	DebugInterface& cpu,
 	u32 alignment,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
-	, m_guardian(guardian)
+	, m_cpu(cpu)
 	, m_alignment(alignment)
 {
 }
@@ -304,7 +304,7 @@ QWidget* SymbolTreeLocationDelegate::createEditor(QWidget* parent, const QStyleO
 	if (!node->is_location_editable)
 		return nullptr;
 
-	if (m_guardian.IsBusy())
+	if (m_cpu.GetSymbolGuardian().IsBusy())
 		return nullptr;
 
 	return new QLineEdit(parent);
@@ -326,7 +326,7 @@ void SymbolTreeLocationDelegate::setEditorData(QWidget* editor, const QModelInde
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
 	Q_ASSERT(line_edit);
 
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol || !symbol->address().valid())
 			return;
@@ -362,7 +362,7 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	address -= address % m_alignment;
 
 	bool success = false;
-	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		if (node->symbol.move_symbol(address, database))
 			success = true;
 	});
@@ -377,10 +377,10 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 // *****************************************************************************
 
 SymbolTreeTypeDelegate::SymbolTreeTypeDelegate(
-	SymbolGuardian& guardian,
+	DebugInterface& cpu,
 	QObject* parent)
 	: QStyledItemDelegate(parent)
-	, m_guardian(guardian)
+	, m_cpu(cpu)
 {
 }
 
@@ -397,7 +397,7 @@ QWidget* SymbolTreeTypeDelegate::createEditor(QWidget* parent, const QStyleOptio
 	if (!node || !node->symbol.valid())
 		return nullptr;
 
-	if (m_guardian.IsBusy())
+	if (m_cpu.GetSymbolGuardian().IsBusy())
 		return nullptr;
 
 	return new QLineEdit(parent);
@@ -419,7 +419,7 @@ void SymbolTreeTypeDelegate::setEditorData(QWidget* editor, const QModelIndex& i
 	QLineEdit* line_edit = qobject_cast<QLineEdit*>(editor);
 	Q_ASSERT(line_edit);
 
-	m_guardian.TryRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol || !symbol->type())
 			return;
@@ -448,7 +448,7 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	Q_ASSERT(symbol_tree_model);
 
 	QString error_message;
-	m_guardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol)
 		{
