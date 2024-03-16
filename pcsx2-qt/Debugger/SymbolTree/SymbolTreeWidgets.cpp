@@ -935,7 +935,8 @@ std::vector<SymbolTreeWidget::SymbolWork> ParameterVariableTreeWidget::getSymbol
 
 		work.module_symbol = database.modules.symbol_from_handle(parameter_variable->module_handle());
 		work.section = database.sections.symbol_overlapping_address(parameter_variable->address());
-		work.source_file = function ? database.source_files.symbol_from_handle(function->source_file()) : nullptr;
+		if (function)
+			work.source_file = database.source_files.symbol_from_handle(function->source_file());
 	}
 
 	return symbols;
