@@ -240,13 +240,16 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			case ccc::ast::ENUM:
 			{
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
-				QComboBox* combo_box = static_cast<QComboBox*>(editor);
+				QComboBox* combo_box = qobject_cast<QComboBox*>(editor);
+				Q_ASSERT(combo_box);
+
 				s32 comboIndex = combo_box->currentIndex();
-				if (comboIndex < (s32)enumeration.constants.size())
-				{
-					s32 value = enumeration.constants[comboIndex].first;
-					model->setData(index, QVariant(value), Qt::EditRole);
-				}
+				if (comboIndex < 0 || comboIndex >= (s32)enumeration.constants.size())
+					break;
+
+				s32 value = enumeration.constants[comboIndex].first;
+				model->setData(index, QVariant(value), Qt::EditRole);
+
 				break;
 			}
 			case ccc::ast::POINTER_OR_REFERENCE:
