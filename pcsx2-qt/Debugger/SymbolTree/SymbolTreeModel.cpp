@@ -178,14 +178,17 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 
 	bool data_changed = false;
 	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
-		if (role == Qt::EditRole)
+		switch (role)
 		{
-			node->value = value;
-			node->writeToVM(m_cpu, database);
-			data_changed = true;
+			case Qt::EditRole:
+				node->value = value;
+				node->writeToVM(m_cpu, database);
+				data_changed = true;
+				break;
+			case Qt::UserRole:
+				data_changed = node->readFromVM(m_cpu, database);
+				break;
 		}
-
-		data_changed |= node->readFromVM(m_cpu, database);
 	});
 
 	if (data_changed)
