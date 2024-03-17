@@ -34,11 +34,12 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 
 	QWidget* result = nullptr;
 	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
-		QVariant value = node->readValueAsVariant(m_cpu, database);
-
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
 			return;
+
+		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		QVariant value = node->readValueAsVariant(physical_type, m_cpu, database);
 
 		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
 		switch (type.descriptor)

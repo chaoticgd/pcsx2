@@ -7,31 +7,25 @@
 
 bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
+	QVariant new_value;
+
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (logical_type)
+	{
+		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		new_value = readValueAsVariant(physical_type, cpu, database);
+	}
+
 	bool data_changed = false;
 
-	QVariant new_value = readValueAsVariant(cpu, database);
-	if (!new_value.isNull())
+	if (new_value != value)
 	{
-		data_changed |= new_value != value;
 		value = std::move(new_value);
+		data_changed = true;
 	}
 
-	QString new_display_value = readValueAsString(cpu, database);
-	if (!new_display_value.isNull())
-	{
-		data_changed |= new_display_value != display_value;
-		display_value = std::move(new_display_value);
-	}
-
-	std::optional<bool> new_liveness;
-	if (live_range.low.valid() && live_range.high.valid())
-	{
-		u32 pc = cpu.getPC();
-		new_liveness = pc >= live_range.low && pc < live_range.high;
-	}
-
-	data_changed |= new_liveness != liveness;
-	liveness = new_liveness;
+	data_changed |= updateDisplayString(cpu, database);
+	data_changed |= updateLiveness(cpu);
 
 	return data_changed;
 }
@@ -43,17 +37,14 @@ bool SymbolTreeNode::writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& d
 		return false;
 
 	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-	return writeValueFromVariant(value, physical_type, cpu);
-}
 
-QVariant SymbolTreeNode::readValueAsVariant(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
-{
-	const ccc::ast::Node* logical_type = type.lookup_node(database);
-	if (!logical_type)
-		return QVariant();
+	bool data_changed = false;
 
-	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-	return readValueAsVariant(physical_type, cpu, database);
+	data_changed |= writeValueFromVariant(value, physical_type, cpu);
+	data_changed |= updateDisplayString(cpu, database);
+	data_changed |= updateLiveness(cpu);
+
+	return data_changed;
 }
 
 QVariant SymbolTreeNode::readValueAsVariant(const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database) const
@@ -189,7 +180,7 @@ bool SymbolTreeNode::writeValueFromVariant(QVariant value, const ccc::ast::Node&
 	return true;
 }
 
-QString SymbolTreeNode::readValueAsString(DebugInterface& cpu, const ccc::SymbolDatabase& database) const
+bool SymbolTreeNode::updateDisplayString(DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
 	QString result;
 
@@ -197,7 +188,7 @@ QString SymbolTreeNode::readValueAsString(DebugInterface& cpu, const ccc::Symbol
 	if (logical_type)
 	{
 		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-		result = readValueAsString(physical_type, cpu, database, 0);
+		result = generateDisplayString(physical_type, cpu, database, 0);
 	}
 
 	if (result.isEmpty())
@@ -212,10 +203,15 @@ QString SymbolTreeNode::readValueAsString(DebugInterface& cpu, const ccc::Symbol
 					 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
 	}
 
-	return result;
+	if (result == display_value)
+		return false;
+
+	display_value = std::move(result);
+
+	return true;
 }
 
-QString SymbolTreeNode::readValueAsString(
+QString SymbolTreeNode::generateDisplayString(
 	const ccc::ast::Node& physical_type, DebugInterface& cpu, const ccc::SymbolDatabase& database, s32 depth) const
 {
 	s32 max_elements_to_display = 0;
@@ -246,7 +242,7 @@ QString SymbolTreeNode::readValueAsString(
 
 				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
 
-				QString element = node.readValueAsString(element_type, cpu, database, depth + 1);
+				QString element = node.generateDisplayString(element_type, cpu, database, depth + 1);
 				if (element.isEmpty())
 					element = QString("(%1)").arg(ccc::ast::node_type_to_string(element_type));
 				result += element;
@@ -376,7 +372,7 @@ QString SymbolTreeNode::readValueAsString(
 
 				const ccc::ast::Node& field_type = *resolvePhysicalType(struct_or_union.fields[i].get(), database).first;
 
-				QString field_value = node.readValueAsString(field_type, cpu, database, depth + 1);
+				QString field_value = node.generateDisplayString(field_type, cpu, database, depth + 1);
 				if (field_value.isEmpty())
 					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
 				result += QString(".%1=%2").arg(field_name).arg(field_value);
@@ -397,6 +393,23 @@ QString SymbolTreeNode::readValueAsString(
 	}
 
 	return QString();
+}
+
+bool SymbolTreeNode::updateLiveness(DebugInterface& cpu)
+{
+	std::optional<bool> new_liveness;
+	if (live_range.low.valid() && live_range.high.valid())
+	{
+		u32 pc = cpu.getPC();
+		new_liveness = pc >= live_range.low && pc < live_range.high;
+	}
+
+	if (new_liveness == liveness)
+		return false;
+
+	liveness = new_liveness;
+
+	return true;
 }
 
 const SymbolTreeNode* SymbolTreeNode::parent() const
