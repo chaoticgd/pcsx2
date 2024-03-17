@@ -21,7 +21,6 @@ public:
 
 	void reset();
 	void updateVisibleNodes();
-	void updateChildren(QModelIndex index);
 	void expandGroups(QModelIndex index);
 
 signals:

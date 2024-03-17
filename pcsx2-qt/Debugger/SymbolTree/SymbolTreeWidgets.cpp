@@ -61,8 +61,8 @@ void SymbolTreeWidget::reset()
 		root->sortChildrenRecursively(m_sort_by_if_type_is_known && m_sort_by_if_type_is_known->isChecked());
 		m_model->reset(std::move(root));
 
-		// Read the initial values for all the nodes.
-		updateChildren(QModelIndex());
+		// Read the initial values for visible nodes.
+		updateVisibleNodes();
 
 		if (!filters.string.isEmpty())
 			expandGroups(QModelIndex());
@@ -74,32 +74,12 @@ void SymbolTreeWidget::updateVisibleNodes()
 	if (!m_model)
 		return;
 
-	QModelIndex first_visible = m_ui.treeView->indexAt(m_ui.treeView->rect().topLeft());
-	QModelIndex last_visible = m_ui.treeView->indexAt(m_ui.treeView->rect().bottomLeft());
-
-	if (!first_visible.isValid() || !last_visible.isValid())
-		return;
-
 	// Update all the visible nodes with the current contents of memory.
-	for (QModelIndex index = first_visible; index.isValid() && index != last_visible; index = m_ui.treeView->indexBelow(index))
+	QModelIndex index = m_ui.treeView->indexAt(m_ui.treeView->rect().topLeft());
+	for (; m_ui.treeView->visualRect(index).intersects(m_ui.treeView->viewport()->rect()); index = m_ui.treeView->indexBelow(index))
 		m_model->setData(index, QVariant(), Qt::UserRole);
 
 	m_ui.treeView->update();
-}
-
-void SymbolTreeWidget::updateChildren(QModelIndex index)
-{
-	if (!m_model)
-		return;
-
-	m_model->setData(index, QVariant(), Qt::UserRole);
-
-	int child_count = m_model->rowCount(index);
-	for (int i = 0; i < child_count; i++)
-	{
-		QModelIndex child = m_model->index(i, 0, index);
-		updateChildren(child);
-	}
 }
 
 void SymbolTreeWidget::expandGroups(QModelIndex index)
