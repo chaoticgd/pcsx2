@@ -116,21 +116,6 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 	{
 		case NAME:
 		{
-			// Handle anonymous structs and unions.
-			if (node->name.isEmpty() && node->type.valid())
-			{
-				QString name;
-				m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
-					const ccc::ast::Node* type = node->type.lookup_node(database);
-					if (!type)
-						return;
-
-					name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*type));
-				});
-
-				return name;
-			}
-
 			return node->name;
 		}
 		case VALUE:
@@ -460,7 +445,10 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 			for (const std::unique_ptr<ccc::ast::Node>& field : struct_or_union.fields)
 			{
 				std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
-				child_node->name = QString::fromStdString(field->name);
+				if (!field->name.empty())
+					child_node->name = QString::fromStdString(field->name);
+				else
+					child_node->name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*field));
 				child_node->type = parent_handle.handle_for_child(field.get());
 				child_node->location = location.addOffset(field->offset_bytes);
 				if (child_node->location.type != SymbolTreeLocation::NONE)
