@@ -116,6 +116,21 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 	{
 		case NAME:
 		{
+			// Handle anonymous structs and unions.
+			if (node->name.isEmpty() && node->type.valid())
+			{
+				QString name;
+				m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
+					const ccc::ast::Node* type = node->type.lookup_node(database);
+					if (!type)
+						return;
+
+					name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*type));
+				});
+
+				return name;
+			}
+
 			return node->name;
 		}
 		case VALUE:
