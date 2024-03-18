@@ -136,9 +136,6 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 {
 	std::vector<SymbolWork> symbols = getSymbols(filters.string, database);
 
-	// We should be able to compare the pointers directly, but lets compare the
-	// handles instead in case the implementation changes.
-
 	auto source_file_comparator = [](const SymbolWork& lhs, const SymbolWork& rhs) -> bool {
 		if (lhs.source_file)
 			return rhs.source_file && lhs.source_file->handle() < rhs.source_file->handle();
@@ -160,6 +157,8 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 			return rhs.module_symbol;
 	};
 
+	// Sort all of the symbols so that we can iterate over them in order and
+	// build a tree.
 	if (filters.group_by_source_file)
 		std::stable_sort(symbols.begin(), symbols.end(), source_file_comparator);
 
@@ -180,6 +179,9 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 	const SymbolWork* section_work = nullptr;
 	const SymbolWork* module_work = nullptr;
 
+	// Build the tree. Whenever we enounter a symbol with a different source
+	// file, section or module, because they're all sorted we know that we have
+	// to create a new group node (if we're grouping by that attribute).
 	for (SymbolWork& work : symbols)
 	{
 		std::unique_ptr<SymbolTreeNode> node = buildNode(work, database);
