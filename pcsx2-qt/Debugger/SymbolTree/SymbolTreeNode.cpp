@@ -390,21 +390,23 @@ QString SymbolTreeNode::generateDisplayString(
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
 			const auto& pointer_or_reference = physical_type.as<ccc::ast::PointerOrReference>();
+			const ccc::ast::Node& value_type =
+				*resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
 
-			QString result = QString::number(location.read32(cpu), 16);
+			u32 address = location.read32(cpu);
+			QString result = QString::number(address, 16);
 
-			// For char* nodes add the value of the string to the output.
-			if (pointer_or_reference.is_pointer)
+			if (pointer_or_reference.is_pointer && value_type.name == "char")
 			{
-				const ccc::ast::Node* value_type =
-					resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
-				if (value_type->name == "char")
-				{
-					u32 pointer = location.read32(cpu);
-					const char* string = cpu.stringFromPointer(pointer);
-					if (string)
-						result += QString(" \"%1\"").arg(string);
-				}
+				const char* string = cpu.stringFromPointer(address);
+				if (string)
+					result += QString(" \"%1\"").arg(string);
+			}
+			else if (address != 0 && depth == 0)
+			{
+				QString pointee = generateDisplayString(value_type, cpu, database, depth + 1);
+				if (!pointee.isEmpty())
+					result += QString(" -> %1").arg(pointee);
 			}
 
 			return result;
