@@ -42,6 +42,8 @@ protected:
 
 	explicit SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, DebugInterface& cpu, QWidget* parent = nullptr);
 
+	void resizeEvent(QResizeEvent* event) override;
+
 	void setupTree();
 	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);
 

@@ -38,6 +38,13 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, Debu
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;
 
+void SymbolTreeWidget::resizeEvent(QResizeEvent* event)
+{
+	QWidget::resizeEvent(event);
+
+	updateVisibleNodes();
+}
+
 void SymbolTreeWidget::reset()
 {
 	if (!m_model)
