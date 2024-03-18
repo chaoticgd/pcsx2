@@ -344,6 +344,8 @@ std::optional<QString> SymbolTreeModel::changeTypeTemporarily(QModelIndex index,
 		node->type = ccc::NodeHandle(node->temporary_type.get());
 	});
 
+	setData(index, QVariant(), UPDATE_FROM_MEMORY_ROLE);
+
 	return error_message;
 }
 

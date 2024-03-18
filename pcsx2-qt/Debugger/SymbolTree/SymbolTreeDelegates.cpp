@@ -377,6 +377,7 @@ void SymbolTreeLocationDelegate::setModelData(QWidget* editor, QAbstractItemMode
 	if (success)
 	{
 		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
+		symbol_tree_model->setData(index, QVariant(), SymbolTreeModel::UPDATE_FROM_MEMORY_ROLE);
 		symbol_tree_model->resetChildren(index);
 	}
 }
@@ -472,7 +473,10 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 	});
 
 	if (error_message.isEmpty())
+	{
+		symbol_tree_model->setData(index, QVariant(), SymbolTreeModel::UPDATE_FROM_MEMORY_ROLE);
 		symbol_tree_model->resetChildren(index);
+	}
 	else
 		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
 }
