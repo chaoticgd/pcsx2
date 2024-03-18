@@ -229,7 +229,7 @@ void DebugInterface::resumeCpu()
 
 char* DebugInterface::stringFromPointer(u32 p)
 {
-	const int BUFFER_LEN = 25;
+	const int BUFFER_LEN = 64;
 	static char buf[BUFFER_LEN] = {0};
 
 	if (!isValidAddress(p))

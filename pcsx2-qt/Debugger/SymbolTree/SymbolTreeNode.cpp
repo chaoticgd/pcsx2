@@ -251,6 +251,14 @@ QString SymbolTreeNode::generateDisplayString(
 		case ccc::ast::ARRAY:
 		{
 			const ccc::ast::Array& array = physical_type.as<ccc::ast::Array>();
+			const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
+
+			if (element_type.name == "char" && location.type == SymbolTreeLocation::MEMORY)
+			{
+				char* string = cpu.stringFromPointer(location.address);
+				if (string)
+					return QString("\"%1\"").arg(string);
+			}
 
 			QString result;
 			result += "{";
@@ -260,8 +268,6 @@ QString SymbolTreeNode::generateDisplayString(
 			{
 				SymbolTreeNode node;
 				node.location = location.addOffset(i * array.element_type->size_bytes);
-
-				const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
 
 				QString element = node.generateDisplayString(element_type, cpu, database, depth + 1);
 				if (element.isEmpty())
@@ -281,37 +287,51 @@ QString SymbolTreeNode::generateDisplayString(
 		case ccc::ast::BUILTIN:
 		{
 			const ccc::ast::BuiltIn& builtIn = physical_type.as<ccc::ast::BuiltIn>();
+
+			QString result;
 			switch (builtIn.bclass)
 			{
 				case ccc::ast::BuiltInClass::UNSIGNED_8:
-					return QString::number(location.read8(cpu));
+					result = QString::number(location.read8(cpu));
+					break;
 				case ccc::ast::BuiltInClass::SIGNED_8:
-					return QString::number((s8)location.read8(cpu));
+					result = QString::number((s8)location.read8(cpu));
+					break;
 				case ccc::ast::BuiltInClass::UNQUALIFIED_8:
-					return QString::number(location.read8(cpu));
+					result = QString::number(location.read8(cpu));
+					break;
 				case ccc::ast::BuiltInClass::BOOL_8:
-					return location.read8(cpu) ? "true" : "false";
+					result = location.read8(cpu) ? "true" : "false";
+					break;
 				case ccc::ast::BuiltInClass::UNSIGNED_16:
-					return QString::number(location.read16(cpu));
+					result = QString::number(location.read16(cpu));
+					break;
 				case ccc::ast::BuiltInClass::SIGNED_16:
-					return QString::number((s16)location.read16(cpu));
+					result = QString::number((s16)location.read16(cpu));
+					break;
 				case ccc::ast::BuiltInClass::UNSIGNED_32:
-					return QString::number(location.read32(cpu));
+					result = QString::number(location.read32(cpu));
+					break;
 				case ccc::ast::BuiltInClass::SIGNED_32:
-					return QString::number((s32)location.read32(cpu));
+					result = QString::number((s32)location.read32(cpu));
+					break;
 				case ccc::ast::BuiltInClass::FLOAT_32:
 				{
 					u32 value = location.read32(cpu);
-					return QString::number(*reinterpret_cast<float*>(&value));
+					result = QString::number(*reinterpret_cast<float*>(&value));
+					break;
 				}
 				case ccc::ast::BuiltInClass::UNSIGNED_64:
-					return QString::number(location.read64(cpu));
+					result = QString::number(location.read64(cpu));
+					break;
 				case ccc::ast::BuiltInClass::SIGNED_64:
-					return QString::number((s64)location.read64(cpu));
+					result = QString::number((s64)location.read64(cpu));
+					break;
 				case ccc::ast::BuiltInClass::FLOAT_64:
 				{
 					u64 value = location.read64(cpu);
-					return QString::number(*reinterpret_cast<double*>(&value));
+					result = QString::number(*reinterpret_cast<double*>(&value));
+					break;
 				}
 				case ccc::ast::BuiltInClass::UNSIGNED_128:
 				case ccc::ast::BuiltInClass::SIGNED_128:
@@ -319,9 +339,11 @@ QString SymbolTreeNode::generateDisplayString(
 				case ccc::ast::BuiltInClass::FLOAT_128:
 				{
 					if (depth > 0)
-						return "(128-bit value)";
+					{
+						result = "(128-bit value)";
+						break;
+					}
 
-					QString result;
 					for (s32 i = 0; i < 16; i++)
 					{
 						u8 value = location.addOffset(i).read8(cpu);
@@ -330,13 +352,28 @@ QString SymbolTreeNode::generateDisplayString(
 							result += " ";
 					}
 
-					return result;
+					break;
 				}
 				default:
 				{
 				}
 			}
-			break;
+
+			if (result.isEmpty())
+				break;
+
+			if (builtIn.name == "char")
+			{
+				char c = location.read8(cpu);
+				if (QChar::fromLatin1(c).isPrint())
+				{
+					if (depth == 0)
+						result = result.leftJustified(3);
+					result += QString(" '%1'").arg(c);
+				}
+			}
+
+			return result;
 		}
 		case ccc::ast::ENUM:
 		{
