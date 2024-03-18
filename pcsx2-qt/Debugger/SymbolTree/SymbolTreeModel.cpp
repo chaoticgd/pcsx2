@@ -128,10 +128,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 				switch (role)
 				{
 					case Qt::DisplayRole:
-						result = node->display_value;
+						result = node->display_value();
 						break;
 					case Qt::UserRole:
-						result = node->value;
+						result = node->value();
 						break;
 				}
 			});
@@ -157,10 +157,10 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		}
 		case LIVENESS:
 		{
-			if (!node->liveness.has_value())
+			if (!node->liveness().has_value())
 				return QVariant();
 
-			return *node->liveness ? tr("Alive") : tr("Dead");
+			return *node->liveness() ? tr("Alive") : tr("Dead");
 		}
 	}
 
@@ -181,9 +181,7 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 		switch (role)
 		{
 			case Qt::EditRole:
-				node->value = value;
-				node->writeToVM(m_cpu, database);
-				data_changed = true;
+				data_changed = node->writeToVM(value, m_cpu, database);
 				break;
 			case Qt::UserRole:
 				data_changed = node->readFromVM(m_cpu, database);

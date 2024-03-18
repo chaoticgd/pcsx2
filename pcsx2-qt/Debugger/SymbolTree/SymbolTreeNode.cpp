@@ -5,6 +5,21 @@
 
 #include "DebugTools/ccc/ast.h"
 
+const QVariant& SymbolTreeNode::value() const
+{
+	return m_value;
+}
+
+const QString& SymbolTreeNode::display_value() const
+{
+	return m_display_value;
+}
+
+std::optional<bool> SymbolTreeNode::liveness()
+{
+	return m_liveness;
+}
+
 bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
 	QVariant new_value;
@@ -18,9 +33,9 @@ bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& 
 
 	bool data_changed = false;
 
-	if (new_value != value)
+	if (new_value != m_value)
 	{
-		value = std::move(new_value);
+		m_value = std::move(new_value);
 		data_changed = true;
 	}
 
@@ -30,17 +45,23 @@ bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& 
 	return data_changed;
 }
 
-bool SymbolTreeNode::writeToVM(DebugInterface& cpu, const ccc::SymbolDatabase& database)
+bool SymbolTreeNode::writeToVM(QVariant value, DebugInterface& cpu, const ccc::SymbolDatabase& database)
 {
-	const ccc::ast::Node* logical_type = type.lookup_node(database);
-	if (!logical_type)
-		return false;
-
-	const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
-
 	bool data_changed = false;
 
-	data_changed |= writeValueFromVariant(value, physical_type, cpu);
+	if (value != m_value)
+	{
+		m_value = std::move(value);
+		data_changed = true;
+	}
+
+	const ccc::ast::Node* logical_type = type.lookup_node(database);
+	if (logical_type)
+	{
+		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		writeValueFromVariant(m_value, physical_type, cpu);
+	}
+
 	data_changed |= updateDisplayString(cpu, database);
 	data_changed |= updateLiveness(cpu);
 
@@ -203,10 +224,10 @@ bool SymbolTreeNode::updateDisplayString(DebugInterface& cpu, const ccc::SymbolD
 					 .arg((value >> 24) & 0xff, 2, 16, QChar('0'));
 	}
 
-	if (result == display_value)
+	if (result == m_display_value)
 		return false;
 
-	display_value = std::move(result);
+	m_display_value = std::move(result);
 
 	return true;
 }
@@ -404,10 +425,10 @@ bool SymbolTreeNode::updateLiveness(DebugInterface& cpu)
 		new_liveness = pc >= live_range.low && pc < live_range.high;
 	}
 
-	if (new_liveness == liveness)
+	if (new_liveness == m_liveness)
 		return false;
 
-	liveness = new_liveness;
+	m_liveness = new_liveness;
 
 	return true;
 }
