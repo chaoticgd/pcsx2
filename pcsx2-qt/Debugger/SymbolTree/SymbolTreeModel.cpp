@@ -109,7 +109,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		return QBrush(QApplication::palette().color(group, QPalette::Text));
 	}
 
-	if (role != Qt::DisplayRole && role != Qt::UserRole)
+	if (role != Qt::DisplayRole)
 		return QVariant();
 
 	switch (index.column())
@@ -123,20 +123,7 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 			if (node->tag != SymbolTreeNode::OBJECT)
 				return QVariant();
 
-			QVariant result;
-			m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
-				switch (role)
-				{
-					case Qt::DisplayRole:
-						result = node->display_value();
-						break;
-					case Qt::UserRole:
-						result = node->value();
-						break;
-				}
-			});
-
-			return result;
+			return node->display_value();
 		}
 		case LOCATION:
 		{
@@ -180,10 +167,10 @@ bool SymbolTreeModel::setData(const QModelIndex& index, const QVariant& value, i
 	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
 		switch (role)
 		{
-			case Qt::EditRole:
+			case EDIT_ROLE:
 				data_changed = node->writeToVM(value, m_cpu, database);
 				break;
-			case Qt::UserRole:
+			case UPDATE_FROM_MEMORY_ROLE:
 				data_changed = node->readFromVM(m_cpu, database);
 				break;
 		}

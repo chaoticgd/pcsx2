@@ -156,6 +156,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 	if (!node || !node->type.valid())
 		return;
 
+	QVariant value;
 	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
 		const ccc::ast::Node* logical_type = node->type.lookup_node(database);
 		if (!logical_type)
@@ -180,9 +181,9 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						Q_ASSERT(line_edit);
 
 						bool ok;
-						qulonglong value = line_edit->text().toULongLong(&ok);
+						qulonglong i = line_edit->text().toULongLong(&ok);
 						if (ok)
-							model->setData(index, value, Qt::EditRole);
+							value = i;
 
 						break;
 					}
@@ -195,16 +196,16 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						Q_ASSERT(line_edit);
 
 						bool ok;
-						qlonglong value = line_edit->text().toLongLong(&ok);
+						qlonglong i = line_edit->text().toLongLong(&ok);
 						if (ok)
-							model->setData(index, value, Qt::EditRole);
+							value = i;
 
 						break;
 					}
 					case ccc::ast::BuiltInClass::BOOL_8:
 					{
 						QCheckBox* check_box = qobject_cast<QCheckBox*>(editor);
-						model->setData(index, check_box->isChecked(), Qt::EditRole);
+						value = check_box->isChecked();
 
 						break;
 					}
@@ -214,9 +215,9 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						Q_ASSERT(line_edit);
 
 						bool ok;
-						float value = line_edit->text().toFloat(&ok);
+						float f = line_edit->text().toFloat(&ok);
 						if (ok)
-							model->setData(index, value, Qt::EditRole);
+							value = f;
 
 						break;
 					}
@@ -226,9 +227,9 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 						Q_ASSERT(line_edit);
 
 						bool ok;
-						double value = line_edit->text().toDouble(&ok);
+						double d = line_edit->text().toDouble(&ok);
 						if (ok)
-							model->setData(index, value, Qt::EditRole);
+							value = d;
 
 						break;
 					}
@@ -248,8 +249,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				if (comboIndex < 0 || comboIndex >= (s32)enumeration.constants.size())
 					break;
 
-				s32 value = enumeration.constants[comboIndex].first;
-				model->setData(index, QVariant(value), Qt::EditRole);
+				value = enumeration.constants[comboIndex].first;
 
 				break;
 			}
@@ -262,7 +262,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 				bool ok;
 				qulonglong address = line_edit->text().toUInt(&ok, 16);
 				if (ok)
-					model->setData(index, address, Qt::EditRole);
+					value = address;
 
 				break;
 			}
@@ -271,6 +271,9 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			}
 		}
 	});
+
+	if (value.isValid())
+		model->setData(index, value, SymbolTreeModel::EDIT_ROLE);
 }
 
 void SymbolTreeValueDelegate::onComboBoxIndexChanged(int index)

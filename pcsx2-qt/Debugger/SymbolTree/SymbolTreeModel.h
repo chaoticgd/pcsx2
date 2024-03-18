@@ -28,6 +28,12 @@ public:
 		COLUMN_COUNT = 5
 	};
 
+	enum SetDataRole
+	{
+		EDIT_ROLE = Qt::EditRole,
+		UPDATE_FROM_MEMORY_ROLE = Qt::UserRole
+	};
+
 	SymbolTreeModel(DebugInterface& cpu, QObject* parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
@@ -35,8 +41,8 @@ public:
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 	bool hasChildren(const QModelIndex& parent = QModelIndex()) const override;
-	QVariant data(const QModelIndex& index, int role) const override;
-	bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+	QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+	bool setData(const QModelIndex& index, const QVariant& value, int role = EDIT_ROLE) override;
 	void fetchMore(const QModelIndex& parent) override;
 	bool canFetchMore(const QModelIndex& parent) const override;
 	Qt::ItemFlags flags(const QModelIndex& index) const override;

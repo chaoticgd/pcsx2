@@ -74,11 +74,10 @@ void SymbolTreeWidget::updateVisibleNodes()
 	if (!m_model)
 		return;
 
-	// Update all the visible nodes with the current contents of memory.
 	QModelIndex index = m_ui.treeView->indexAt(m_ui.treeView->rect().topLeft());
 	while (m_ui.treeView->visualRect(index).intersects(m_ui.treeView->viewport()->rect()))
 	{
-		m_model->setData(index, QVariant(), Qt::UserRole);
+		m_model->setData(index, QVariant(), SymbolTreeModel::UPDATE_FROM_MEMORY_ROLE);
 		index = m_ui.treeView->indexBelow(index);
 	}
 
