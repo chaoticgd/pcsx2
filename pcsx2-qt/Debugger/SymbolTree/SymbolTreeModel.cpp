@@ -389,58 +389,72 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		case ccc::ast::ARRAY:
 		{
 			const ccc::ast::Array& array = type->as<ccc::ast::Array>();
+
 			for (s32 i = 0; i < array.element_count; i++)
 			{
+				SymbolTreeLocation element_location = location.addOffset(i * array.element_type->size_bytes);
+				if (element_location.type == SymbolTreeLocation::NONE)
+					continue;
+
 				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
 				element->name = QString("[%1]").arg(i);
 				element->type = parent_handle.handle_for_child(array.element_type.get());
-				element->location = location.addOffset(i * array.element_type->size_bytes);
-				if (element->location.type != SymbolTreeLocation::NONE)
-					children.emplace_back(std::move(element));
+				element->location = element_location;
+				children.emplace_back(std::move(element));
 			}
+
 			break;
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
+			const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
+
 			u32 address = location.read32(cpu);
-			if (cpu.isValidAddress(address))
-			{
-				const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
-				std::unique_ptr<SymbolTreeNode> element = std::make_unique<SymbolTreeNode>();
-				element->name = QString("*%1").arg(name);
-				element->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
-				element->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
-				children.emplace_back(std::move(element));
-			}
+			if (!cpu.isValidAddress(address))
+				break;
+
+			std::unique_ptr<SymbolTreeNode> pointee = std::make_unique<SymbolTreeNode>();
+			pointee->name = QString("*%1").arg(name);
+			pointee->type = parent_handle.handle_for_child(pointer_or_reference.value_type.get());
+			pointee->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, address);
+			children.emplace_back(std::move(pointee));
+
 			break;
 		}
 		case ccc::ast::STRUCT_OR_UNION:
 		{
 			const ccc::ast::StructOrUnion& struct_or_union = type->as<ccc::ast::StructOrUnion>();
+
 			for (const std::unique_ptr<ccc::ast::Node>& base_class : struct_or_union.base_classes)
 			{
 				SymbolTreeLocation base_class_location = location.addOffset(base_class->offset_bytes);
-				if (base_class_location.type != SymbolTreeLocation::NONE)
-				{
-					std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
-						name, base_class_location, *base_class.get(), parent_handle, cpu, database);
-					children.insert(children.end(),
-						std::make_move_iterator(fields.begin()),
-						std::make_move_iterator(fields.end()));
-				}
+				if (base_class_location.type == SymbolTreeLocation::NONE)
+					continue;
+
+				std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
+					name, base_class_location, *base_class.get(), parent_handle, cpu, database);
+
+				children.insert(children.end(),
+					std::make_move_iterator(fields.begin()),
+					std::make_move_iterator(fields.end()));
 			}
+
 			for (const std::unique_ptr<ccc::ast::Node>& field : struct_or_union.fields)
 			{
+				SymbolTreeLocation field_location = location.addOffset(field->offset_bytes);
+				if (field_location.type == SymbolTreeLocation::NONE)
+					continue;
+
 				std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
 				if (!field->name.empty())
 					child_node->name = QString::fromStdString(field->name);
 				else
 					child_node->name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*field));
 				child_node->type = parent_handle.handle_for_child(field.get());
-				child_node->location = location.addOffset(field->offset_bytes);
-				if (child_node->location.type != SymbolTreeLocation::NONE)
-					children.emplace_back(std::move(child_node));
+				child_node->location = field_location;
+				children.emplace_back(std::move(child_node));
 			}
+
 			break;
 		}
 		default:
