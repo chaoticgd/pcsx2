@@ -27,7 +27,7 @@ bool SymbolTreeNode::readFromVM(DebugInterface& cpu, const ccc::SymbolDatabase& 
 	const ccc::ast::Node* logical_type = type.lookup_node(database);
 	if (logical_type)
 	{
-		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& physical_type = *logical_type->physical_type(database).first;
 		new_value = readValueAsVariant(physical_type, cpu, database);
 	}
 
@@ -58,7 +58,7 @@ bool SymbolTreeNode::writeToVM(QVariant value, DebugInterface& cpu, const ccc::S
 	const ccc::ast::Node* logical_type = type.lookup_node(database);
 	if (logical_type)
 	{
-		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& physical_type = *logical_type->physical_type(database).first;
 		writeValueFromVariant(m_value, physical_type, cpu);
 	}
 
@@ -208,7 +208,7 @@ bool SymbolTreeNode::updateDisplayString(DebugInterface& cpu, const ccc::SymbolD
 	const ccc::ast::Node* logical_type = type.lookup_node(database);
 	if (logical_type)
 	{
-		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& physical_type = *logical_type->physical_type(database).first;
 		result = generateDisplayString(physical_type, cpu, database, 0);
 	}
 
@@ -251,7 +251,7 @@ QString SymbolTreeNode::generateDisplayString(
 		case ccc::ast::ARRAY:
 		{
 			const ccc::ast::Array& array = physical_type.as<ccc::ast::Array>();
-			const ccc::ast::Node& element_type = *resolvePhysicalType(array.element_type.get(), database).first;
+			const ccc::ast::Node& element_type = *array.element_type->physical_type(database).first;
 
 			if (element_type.name == "char" && location.type == SymbolTreeLocation::MEMORY)
 			{
@@ -391,7 +391,7 @@ QString SymbolTreeNode::generateDisplayString(
 		{
 			const auto& pointer_or_reference = physical_type.as<ccc::ast::PointerOrReference>();
 			const ccc::ast::Node& value_type =
-				*resolvePhysicalType(pointer_or_reference.value_type.get(), database).first;
+				*pointer_or_reference.value_type->physical_type(database).first;
 
 			u32 address = location.read32(cpu);
 			QString result = QString::number(address, 16);
@@ -423,7 +423,7 @@ QString SymbolTreeNode::generateDisplayString(
 			result += "{";
 
 			std::vector<std::pair<const ccc::ast::Node*, const ccc::DataType*>> fields;
-			bool all_fields = struct_or_union.flatten_fields(fields, max_elements_to_display, 100, nullptr, database);
+			bool all_fields = struct_or_union.flatten_fields(fields, nullptr, database, max_elements_to_display);
 
 			for (size_t i = 0; i < fields.size(); i++)
 			{
@@ -432,7 +432,7 @@ QString SymbolTreeNode::generateDisplayString(
 				SymbolTreeNode node;
 				node.location = location.addOffset(field->offset_bytes);
 
-				const ccc::ast::Node& field_type = *resolvePhysicalType(field, database).first;
+				const ccc::ast::Node& field_type = *field->physical_type(database).first;
 				QString field_value = node.generateDisplayString(field_type, cpu, database, depth + 1);
 				if (field_value.isEmpty())
 					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
@@ -536,18 +536,4 @@ void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 
 	for (std::unique_ptr<SymbolTreeNode>& child : m_children)
 		child->sortChildrenRecursively(sort_by_if_type_is_known);
-}
-
-std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database)
-{
-	const ccc::DataType* symbol = nullptr;
-	for (s32 i = 0; i < 10 && type->descriptor == ccc::ast::TYPE_NAME; i++)
-	{
-		const ccc::DataType* data_type = database.data_types.symbol_from_handle(type->as<ccc::ast::TypeName>().data_type_handle);
-		if (!data_type || !data_type->type())
-			break;
-		type = data_type->type();
-		symbol = data_type;
-	}
-	return std::pair(type, symbol);
 }

@@ -80,5 +80,3 @@ protected:
 	std::vector<std::unique_ptr<SymbolTreeNode>> m_children;
 	bool m_children_fetched = false;
 };
-
-std::pair<const ccc::ast::Node*, const ccc::DataType*> resolvePhysicalType(const ccc::ast::Node* type, const ccc::SymbolDatabase& database);

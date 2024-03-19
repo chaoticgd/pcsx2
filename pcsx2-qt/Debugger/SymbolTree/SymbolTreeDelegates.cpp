@@ -38,10 +38,10 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 		if (!logical_type)
 			return;
 
-		const ccc::ast::Node& physical_type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& physical_type = *logical_type->physical_type(database).first;
 		QVariant value = node->readValueAsVariant(physical_type, m_cpu, database);
 
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& type = *logical_type->physical_type(database).first;
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:
@@ -162,7 +162,7 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 		if (!logical_type)
 			return;
 
-		const ccc::ast::Node& type = *resolvePhysicalType(logical_type, database).first;
+		const ccc::ast::Node& type = *logical_type->physical_type(database).first;
 		switch (type.descriptor)
 		{
 			case ccc::ast::BUILTIN:

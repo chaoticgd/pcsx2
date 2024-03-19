@@ -375,7 +375,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 	DebugInterface& cpu,
 	const ccc::SymbolDatabase& database)
 {
-	auto [physical_type, symbol] = resolvePhysicalType(&logical_type, database);
+	auto [physical_type, symbol] = logical_type.physical_type(database);
 
 	// If we went through a type name, we need to make the node handles for the
 	// children point to the new symbol instead of the original one.
@@ -426,7 +426,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 			const ccc::ast::StructOrUnion& struct_or_union = physical_type->as<ccc::ast::StructOrUnion>();
 
 			std::vector<std::pair<const ccc::ast::Node*, const ccc::DataType*>> fields;
-			struct_or_union.flatten_fields(fields, 100000, 100, nullptr, database);
+			struct_or_union.flatten_fields(fields, nullptr, database);
 
 			for (const auto& [field, symbol] : fields)
 			{
@@ -462,7 +462,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 
 bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& logical_type, const ccc::SymbolDatabase& database)
 {
-	const ccc::ast::Node& type = *resolvePhysicalType(&logical_type, database).first;
+	const ccc::ast::Node& type = *logical_type.physical_type(database).first;
 
 	bool result = false;
 	switch (type.descriptor)
