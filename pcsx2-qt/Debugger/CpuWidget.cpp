@@ -155,9 +155,9 @@ void CpuWidget::setupSymbolTrees()
 	m_ui.tabLocalVariables->layout()->addWidget(m_local_variable_tree);
 	m_ui.tabParameterVariables->layout()->addWidget(m_parameter_variable_tree);
 
-	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::reset);
-	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::reset);
-	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_local_variable_tree, &SymbolTreeWidget::reset);
+	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::updateModel);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::updateModel);
+	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_local_variable_tree, &SymbolTreeWidget::updateModel);
 
 	connect(m_function_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
@@ -182,9 +182,9 @@ void CpuWidget::refreshDebugger()
 		m_ui.memoryviewWidget->update();
 		m_ui.memorySearchWidget->update();
 
-		m_global_variable_tree->updateVisibleNodes();
-		m_local_variable_tree->updateVisibleNodes();
-		m_parameter_variable_tree->updateVisibleNodes();
+		m_global_variable_tree->updateModel();
+		m_local_variable_tree->updateModel();
+		m_parameter_variable_tree->updateModel();
 	}
 }
 

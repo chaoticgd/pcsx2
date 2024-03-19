@@ -19,6 +19,7 @@ class SymbolTreeWidget : public QWidget
 public:
 	virtual ~SymbolTreeWidget();
 
+	void updateModel();
 	void reset();
 	void updateVisibleNodes();
 	void expandGroups(QModelIndex index);
