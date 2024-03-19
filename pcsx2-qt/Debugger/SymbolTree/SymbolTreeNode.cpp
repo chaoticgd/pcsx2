@@ -394,6 +394,9 @@ QString SymbolTreeNode::generateDisplayString(
 				*pointer_or_reference.value_type->physical_type(database).first;
 
 			u32 address = location.read32(cpu);
+			if (address == 0)
+				return "NULL";
+
 			QString result = QString::number(address, 16);
 
 			if (pointer_or_reference.is_pointer && value_type.name == "char")
@@ -402,7 +405,7 @@ QString SymbolTreeNode::generateDisplayString(
 				if (string)
 					result += QString(" \"%1\"").arg(string);
 			}
-			else if (address != 0 && depth == 0)
+			else if (depth == 0)
 			{
 				QString pointee = generateDisplayString(value_type, cpu, database, depth + 1);
 				if (!pointee.isEmpty())
