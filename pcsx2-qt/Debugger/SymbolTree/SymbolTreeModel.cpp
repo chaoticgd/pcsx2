@@ -375,7 +375,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 	DebugInterface& cpu,
 	const ccc::SymbolDatabase& database)
 {
-	auto [type, symbol] = resolvePhysicalType(&logical_type, database);
+	auto [physical_type, symbol] = resolvePhysicalType(&logical_type, database);
 
 	// If we went through a type name, we need to make the node handles for the
 	// children point to the new symbol instead of the original one.
@@ -384,11 +384,11 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 
 	std::vector<std::unique_ptr<SymbolTreeNode>> children;
 
-	switch (type->descriptor)
+	switch (physical_type->descriptor)
 	{
 		case ccc::ast::ARRAY:
 		{
-			const ccc::ast::Array& array = type->as<ccc::ast::Array>();
+			const ccc::ast::Array& array = physical_type->as<ccc::ast::Array>();
 
 			for (s32 i = 0; i < array.element_count; i++)
 			{
@@ -407,7 +407,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{
-			const ccc::ast::PointerOrReference& pointer_or_reference = type->as<ccc::ast::PointerOrReference>();
+			const ccc::ast::PointerOrReference& pointer_or_reference = physical_type->as<ccc::ast::PointerOrReference>();
 
 			u32 address = location.read32(cpu);
 			if (!cpu.isValidAddress(address))
@@ -423,24 +423,16 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		}
 		case ccc::ast::STRUCT_OR_UNION:
 		{
-			const ccc::ast::StructOrUnion& struct_or_union = type->as<ccc::ast::StructOrUnion>();
+			const ccc::ast::StructOrUnion& struct_or_union = physical_type->as<ccc::ast::StructOrUnion>();
 
-			for (const std::unique_ptr<ccc::ast::Node>& base_class : struct_or_union.base_classes)
+			std::vector<std::pair<const ccc::ast::Node*, const ccc::DataType*>> fields;
+			struct_or_union.flatten_fields(fields, 100000, 100, nullptr, database);
+
+			for (const auto& [field, symbol] : fields)
 			{
-				SymbolTreeLocation base_class_location = location.addOffset(base_class->offset_bytes);
-				if (base_class_location.type == SymbolTreeLocation::NONE)
-					continue;
+				if (symbol)
+					parent_handle = ccc::NodeHandle(*symbol, nullptr);
 
-				std::vector<std::unique_ptr<SymbolTreeNode>> fields = populateChildren(
-					name, base_class_location, *base_class.get(), parent_handle, cpu, database);
-
-				children.insert(children.end(),
-					std::make_move_iterator(fields.begin()),
-					std::make_move_iterator(fields.end()));
-			}
-
-			for (const std::unique_ptr<ccc::ast::Node>& field : struct_or_union.fields)
-			{
 				SymbolTreeLocation field_location = location.addOffset(field->offset_bytes);
 				if (field_location.type == SymbolTreeLocation::NONE)
 					continue;
@@ -450,7 +442,7 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 					child_node->name = QString::fromStdString(field->name);
 				else
 					child_node->name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*field));
-				child_node->type = parent_handle.handle_for_child(field.get());
+				child_node->type = parent_handle.handle_for_child(field);
 				child_node->location = field_location;
 				children.emplace_back(std::move(child_node));
 			}
