@@ -531,8 +531,9 @@ void SymbolTreeNode::sortChildrenRecursively(bool sort_by_if_type_is_known)
 			return lhs->tag < rhs->tag;
 		if (sort_by_if_type_is_known && lhs->type.valid() != rhs->type.valid())
 			return lhs->type.valid() > rhs->type.valid();
-
-		return lhs->location < rhs->location;
+		if (lhs->location != rhs->location)
+			return lhs->location < rhs->location;
+		return lhs->name < rhs->name;
 	};
 
 	std::sort(m_children.begin(), m_children.end(), comparator);

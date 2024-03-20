@@ -238,6 +238,8 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySourceFile(
 			group_node->name = QString::fromStdString(child_work.source_file->command_line_path);
 		else
 			group_node->name = QString::fromStdString(child_work.source_file->name());
+		if (child_work.source_file->address().valid())
+			group_node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, child_work.source_file->address().value);
 	}
 	else
 	{
@@ -268,6 +270,8 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
 	{
 		group_node->tag = SymbolTreeNode::GROUP;
 		group_node->name = QString::fromStdString(child_work.section->name());
+		if (child_work.section->address().valid())
+			group_node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, child_work.section->address().value);
 	}
 	else
 	{
@@ -299,6 +303,8 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
 
 		group_node->tag = SymbolTreeNode::GROUP;
 		group_node->name = QString::fromStdString(child_work.module_symbol->name());
+		if (child_work.module_symbol->address().valid())
+			group_node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, child_work.module_symbol->address().value);
 		if (child_work.module_symbol->is_irx)
 		{
 			s32 major = child_work.module_symbol->version_major;
