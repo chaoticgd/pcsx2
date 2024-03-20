@@ -326,6 +326,19 @@ void SymbolTreeModel::resetChildrenRecursive(SymbolTreeNode& node)
 		endRemoveRows();
 }
 
+bool SymbolTreeModel::needsReset() const
+{
+	if (!m_root)
+		return true;
+
+	bool needs_reset = false;
+	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
+		needs_reset = !m_root->anySymbolsValid(database);
+	});
+
+	return needs_reset;
+}
+
 std::optional<QString> SymbolTreeModel::changeTypeTemporarily(QModelIndex index, std::string_view type_string)
 {
 	SymbolTreeNode* node = nodeFromIndex(index);

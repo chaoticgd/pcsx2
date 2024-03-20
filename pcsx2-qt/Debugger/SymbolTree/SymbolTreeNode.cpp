@@ -478,6 +478,18 @@ bool SymbolTreeNode::updateLiveness(DebugInterface& cpu)
 	return true;
 }
 
+bool SymbolTreeNode::anySymbolsValid(const ccc::SymbolDatabase& database) const
+{
+	if (symbol.lookup_symbol(database))
+		return true;
+
+	for (const std::unique_ptr<SymbolTreeNode>& child : children())
+		if (child->anySymbolsValid(database))
+			return true;
+
+	return false;
+}
+
 const SymbolTreeNode* SymbolTreeNode::parent() const
 {
 	return m_parent;

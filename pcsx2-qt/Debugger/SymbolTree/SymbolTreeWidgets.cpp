@@ -47,7 +47,7 @@ void SymbolTreeWidget::resizeEvent(QResizeEvent* event)
 
 void SymbolTreeWidget::updateModel()
 {
-	if (!m_model || m_model->rowCount(QModelIndex()) == 0)
+	if (!m_model || m_model->needsReset())
 		reset();
 
 	updateVisibleNodes();

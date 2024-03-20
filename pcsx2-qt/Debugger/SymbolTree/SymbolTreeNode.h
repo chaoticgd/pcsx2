@@ -60,6 +60,8 @@ public:
 
 	bool updateLiveness(DebugInterface& cpu);
 
+	bool anySymbolsValid(const ccc::SymbolDatabase& database) const;
+
 	const SymbolTreeNode* parent() const;
 
 	const std::vector<std::unique_ptr<SymbolTreeNode>>& children() const;

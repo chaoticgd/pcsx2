@@ -182,6 +182,7 @@ void CpuWidget::refreshDebugger()
 		m_ui.memoryviewWidget->update();
 		m_ui.memorySearchWidget->update();
 
+		m_function_tree->updateModel();
 		m_global_variable_tree->updateModel();
 		m_local_variable_tree->updateModel();
 		m_parameter_variable_tree->updateModel();

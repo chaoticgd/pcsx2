@@ -58,6 +58,8 @@ public:
 	void resetChildren(QModelIndex index);
 	void resetChildrenRecursive(SymbolTreeNode& node);
 
+	bool needsReset() const;
+
 	std::optional<QString> changeTypeTemporarily(QModelIndex index, std::string_view type_string);
 	std::optional<QString> typeFromModelIndexToString(QModelIndex index);
 
