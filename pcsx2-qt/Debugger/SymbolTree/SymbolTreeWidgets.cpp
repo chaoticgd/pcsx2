@@ -196,21 +196,21 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 
 		if (filters.group_by_source_file)
 		{
-			node = groupBySourceFile(std::move(node), work, source_file_node, source_file_work);
+			node = groupBySourceFile(std::move(node), work, source_file_node, source_file_work, filters);
 			if (!node)
 				continue;
 		}
 
 		if (filters.group_by_section)
 		{
-			node = groupBySection(std::move(node), work, section_node, section_work);
+			node = groupBySection(std::move(node), work, section_node, section_work, filters);
 			if (!node)
 				continue;
 		}
 
 		if (filters.group_by_module)
 		{
-			node = groupByModule(std::move(node), work, module_node, module_work);
+			node = groupByModule(std::move(node), work, module_node, module_work, filters);
 			if (!node)
 				continue;
 		}
@@ -222,9 +222,18 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::buildTree(const SymbolFilters&
 }
 
 std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySourceFile(
-	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+	std::unique_ptr<SymbolTreeNode> child,
+	const SymbolWork& child_work,
+	SymbolTreeNode*& prev_group,
+	const SymbolWork*& prev_work,
+	const SymbolFilters& filters)
 {
-	if (prev_group && child_work.source_file == prev_work->source_file)
+	bool group_exists =
+		prev_group &&
+		child_work.source_file == prev_work->source_file &&
+		(!filters.group_by_section || child_work.section == prev_work->section) &&
+		(!filters.group_by_module || child_work.module_symbol == prev_work->module_symbol);
+	if (group_exists)
 	{
 		prev_group->emplaceChild(std::move(child));
 		return nullptr;
@@ -257,9 +266,17 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySourceFile(
 }
 
 std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
-	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+	std::unique_ptr<SymbolTreeNode> child,
+	const SymbolWork& child_work,
+	SymbolTreeNode*& prev_group,
+	const SymbolWork*& prev_work,
+	const SymbolFilters& filters)
 {
-	if (prev_group && child_work.section == prev_work->section)
+	bool group_exists =
+		prev_group &&
+		child_work.section == prev_work->section &&
+		(!filters.group_by_module || child_work.module_symbol == prev_work->module_symbol);
+	if (group_exists)
 	{
 		prev_group->emplaceChild(std::move(child));
 		return nullptr;
@@ -289,9 +306,16 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupBySection(
 }
 
 std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
-	std::unique_ptr<SymbolTreeNode> child, const SymbolWork& child_work, SymbolTreeNode*& prev_group, const SymbolWork*& prev_work)
+	std::unique_ptr<SymbolTreeNode> child,
+	const SymbolWork& child_work,
+	SymbolTreeNode*& prev_group,
+	const SymbolWork*& prev_work,
+	const SymbolFilters& filters)
 {
-	if (prev_group && child_work.module_symbol == prev_work->module_symbol)
+	bool group_exists =
+		prev_group &&
+		child_work.module_symbol == prev_work->module_symbol;
+	if (group_exists)
 	{
 		prev_group->emplaceChild(std::move(child));
 		return nullptr;
