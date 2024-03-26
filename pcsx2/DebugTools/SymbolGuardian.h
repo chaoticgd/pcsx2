@@ -67,6 +67,10 @@ public:
 		ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
 	static bool ImportNocashSymbols(ccc::SymbolDatabase& database, const std::string& file_name);
 
+	// Compute original hashes for all the functions based on the code stored in
+	// the ELF file.
+	static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf);
+
 	// Compute new hashes for all the functions to check if any of them have
 	// been overwritten.
 	void UpdateFunctionHashes(DebugInterface& cpu);

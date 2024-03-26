@@ -20,10 +20,41 @@
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
 
-static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database);
-static void CreateBuiltInDataType(
-	ccc::SymbolDatabase& database, ccc::SymbolSourceHandle source, const char* name, ccc::ast::BuiltInClass bclass);
-static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf);
+struct DefaultBuiltInType
+{
+	const char* name;
+	ccc::ast::BuiltInClass bclass;
+};
+
+static const std::vector<DefaultBuiltInType> DEFAULT_BUILT_IN_TYPES = {
+	{"char", ccc::ast::BuiltInClass::UNQUALIFIED_8},
+	{"signed char", ccc::ast::BuiltInClass::SIGNED_8},
+	{"unsigned char", ccc::ast::BuiltInClass::UNSIGNED_8},
+	{"short", ccc::ast::BuiltInClass::SIGNED_16},
+	{"unsigned short", ccc::ast::BuiltInClass::UNSIGNED_16},
+	{"int", ccc::ast::BuiltInClass::SIGNED_32},
+	{"unsigned int", ccc::ast::BuiltInClass::UNSIGNED_32},
+	{"unsigned", ccc::ast::BuiltInClass::UNSIGNED_32},
+	{"long", ccc::ast::BuiltInClass::SIGNED_64},
+	{"unsigned long", ccc::ast::BuiltInClass::UNSIGNED_64},
+	{"long long", ccc::ast::BuiltInClass::SIGNED_64},
+	{"unsigned long long", ccc::ast::BuiltInClass::UNSIGNED_64},
+	{"float", ccc::ast::BuiltInClass::FLOAT_32},
+	{"double", ccc::ast::BuiltInClass::FLOAT_64},
+	{"void", ccc::ast::BuiltInClass::VOID_TYPE},
+	{"s8", ccc::ast::BuiltInClass::SIGNED_8},
+	{"u8", ccc::ast::BuiltInClass::UNSIGNED_8},
+	{"s16", ccc::ast::BuiltInClass::SIGNED_16},
+	{"u16", ccc::ast::BuiltInClass::UNSIGNED_16},
+	{"s32", ccc::ast::BuiltInClass::SIGNED_32},
+	{"u32", ccc::ast::BuiltInClass::UNSIGNED_32},
+	{"s64", ccc::ast::BuiltInClass::SIGNED_64},
+	{"u64", ccc::ast::BuiltInClass::UNSIGNED_64},
+	{"s128", ccc::ast::BuiltInClass::SIGNED_128},
+	{"u128", ccc::ast::BuiltInClass::UNSIGNED_128},
+	{"f32", ccc::ast::BuiltInClass::FLOAT_32},
+	{"f64", ccc::ast::BuiltInClass::FLOAT_64},
+};
 
 static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
@@ -68,46 +99,26 @@ void SymbolGuardian::Reset()
 	ReadWrite([&](ccc::SymbolDatabase& database) {
 		database.clear();
 
-		CreateDefaultBuiltInDataTypes(database);
+		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Built-in");
+		if (!source.success())
+			return;
+
+		// Create some built-in data type symbols so that users still have some
+		// types to use even if there isn't a symbol table loaded. Maybe in the
+		// future we could add PS2-specific types like DMA tags here too.
+		for (const DefaultBuiltInType& default_type : DEFAULT_BUILT_IN_TYPES)
+		{
+			ccc::Result<ccc::DataType*> symbol = database.data_types.create_symbol(default_type.name, *source, nullptr);
+			if (!symbol.success())
+				return;
+
+			std::unique_ptr<ccc::ast::BuiltIn> type = std::make_unique<ccc::ast::BuiltIn>();
+			type->name = default_type.name;
+			type->size_bytes = ccc::ast::builtin_class_size(default_type.bclass);
+			type->bclass = default_type.bclass;
+			(*symbol)->set_type(std::move(type));
+		}
 	});
-}
-
-static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database)
-{
-	ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("Built-in");
-	if (!source.success())
-		return;
-
-	// Create some built-in data type symbols so that users still have some
-	// types to use even if there isn't a symbol table loaded. Maybe in the
-	// future we could add PS2-specific types like DMA tags here too.
-	CreateBuiltInDataType(database, *source, "char", ccc::ast::BuiltInClass::UNQUALIFIED_8);
-	CreateBuiltInDataType(database, *source, "signed char", ccc::ast::BuiltInClass::SIGNED_8);
-	CreateBuiltInDataType(database, *source, "unsigned char", ccc::ast::BuiltInClass::UNSIGNED_8);
-	CreateBuiltInDataType(database, *source, "short", ccc::ast::BuiltInClass::SIGNED_16);
-	CreateBuiltInDataType(database, *source, "unsigned short", ccc::ast::BuiltInClass::UNSIGNED_16);
-	CreateBuiltInDataType(database, *source, "int", ccc::ast::BuiltInClass::SIGNED_32);
-	CreateBuiltInDataType(database, *source, "unsigned int", ccc::ast::BuiltInClass::UNSIGNED_32);
-	CreateBuiltInDataType(database, *source, "unsigned", ccc::ast::BuiltInClass::UNSIGNED_32);
-	CreateBuiltInDataType(database, *source, "long", ccc::ast::BuiltInClass::SIGNED_64);
-	CreateBuiltInDataType(database, *source, "unsigned long", ccc::ast::BuiltInClass::UNSIGNED_64);
-	CreateBuiltInDataType(database, *source, "long long", ccc::ast::BuiltInClass::SIGNED_64);
-	CreateBuiltInDataType(database, *source, "unsigned long long", ccc::ast::BuiltInClass::UNSIGNED_64);
-	CreateBuiltInDataType(database, *source, "float", ccc::ast::BuiltInClass::FLOAT_32);
-	CreateBuiltInDataType(database, *source, "double", ccc::ast::BuiltInClass::FLOAT_64);
-	CreateBuiltInDataType(database, *source, "void", ccc::ast::BuiltInClass::VOID_TYPE);
-	CreateBuiltInDataType(database, *source, "s8", ccc::ast::BuiltInClass::SIGNED_8);
-	CreateBuiltInDataType(database, *source, "u8", ccc::ast::BuiltInClass::UNSIGNED_8);
-	CreateBuiltInDataType(database, *source, "s16", ccc::ast::BuiltInClass::SIGNED_16);
-	CreateBuiltInDataType(database, *source, "u16", ccc::ast::BuiltInClass::UNSIGNED_16);
-	CreateBuiltInDataType(database, *source, "s32", ccc::ast::BuiltInClass::SIGNED_32);
-	CreateBuiltInDataType(database, *source, "u32", ccc::ast::BuiltInClass::UNSIGNED_32);
-	CreateBuiltInDataType(database, *source, "s64", ccc::ast::BuiltInClass::SIGNED_64);
-	CreateBuiltInDataType(database, *source, "u64", ccc::ast::BuiltInClass::UNSIGNED_64);
-	CreateBuiltInDataType(database, *source, "s128", ccc::ast::BuiltInClass::SIGNED_128);
-	CreateBuiltInDataType(database, *source, "u128", ccc::ast::BuiltInClass::UNSIGNED_128);
-	CreateBuiltInDataType(database, *source, "f32", ccc::ast::BuiltInClass::FLOAT_32);
-	CreateBuiltInDataType(database, *source, "f64", ccc::ast::BuiltInClass::FLOAT_64);
 }
 
 static void CreateBuiltInDataType(
@@ -328,7 +339,7 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 	return true;
 }
 
-static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf)
+void SymbolGuardian::ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf)
 {
 	for (ccc::Function& function : database.functions)
 	{
