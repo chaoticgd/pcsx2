@@ -124,7 +124,7 @@ static void CreateBuiltInDataType(
 	(*symbol)->set_type(std::move(type));
 }
 
-void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, std::string nocash_path)
+void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, const std::string& nocash_path)
 {
 	ccc::Result<ccc::ElfFile> parsed_elf = ccc::ElfFile::parse(std::move(elf));
 	if (!parsed_elf.success())

@@ -58,7 +58,7 @@ public:
 
 	// Import symbols from the ELF file, nocash symbols, and scan for functions.
 	// Should be called from the CPU thread.
-	void ImportElf(std::vector<u8> elf, std::string elf_file_name, std::string nocash_path);
+	void ImportElf(std::vector<u8> elf, std::string elf_file_name, const std::string& nocash_path);
 
 	// Interrupt the import thread. Should be called from the CPU thread.
 	void ShutdownWorkerThread();
