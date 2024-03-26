@@ -63,7 +63,7 @@ static void parseDisasm(SymbolGuardian& guardian, const char* disasm, char* opco
 			u32 branchTarget;
 			sscanf(disasm+3,"0x%08x",&branchTarget);
 
-			const std::string addressSymbol = guardian.FunctionStartingAtAddress(branchTarget, SDA_TRY).name;
+			const std::string addressSymbol = guardian.FunctionStartingAtAddress(branchTarget).name;
 			if (!addressSymbol.empty() && insertSymbols)
 			{
 				arguments += std::snprintf(arguments, arguments_size, "%s",addressSymbol.c_str());
@@ -147,7 +147,7 @@ void DisassemblyManager::analyze(u32 address, u32 size = 1024)
 		}
 
 		SymbolInfo info = cpu->GetSymbolGuardian().SymbolOverlappingAddress(
-			address, SDA_TRY, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
+			address, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
 		
 		if (info.descriptor.has_value())
 		{
@@ -181,7 +181,7 @@ void DisassemblyManager::analyze(u32 address, u32 size = 1024)
 			if (address % 4)
 			{
 				u32 next = std::min<u32>((address+3) & ~3,cpu->GetSymbolGuardian().SymbolAfterAddress(
-					address, SDA_TRY, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE).address.value);
+					address, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE).address.value);
 				DisassemblyData* data = new DisassemblyData(cpu,address,next-address,DATATYPE_BYTE);
 				entries[address] = data;
 				address = next;
@@ -189,7 +189,7 @@ void DisassemblyManager::analyze(u32 address, u32 size = 1024)
 			}
 
 			u32 next = cpu->GetSymbolGuardian().SymbolAfterAddress(
-				address, SDA_TRY, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE).address.value;
+				address, ccc::FUNCTION | ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE).address.value;
 
 			if ((next % 4) && next != 0xFFFFFFFF)
 			{
@@ -540,7 +540,7 @@ void DisassemblyFunction::load()
 	u32 funcEnd = address+size;
 
 	SymbolInfo nextData = cpu->GetSymbolGuardian().SymbolAfterAddress(
-		funcPos-1, SDA_TRY, ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
+		funcPos-1, ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
 	u32 opcodeSequenceStart = funcPos;
 	while (funcPos < funcEnd)
 	{
@@ -554,7 +554,7 @@ void DisassemblyFunction::load()
 			lineAddresses.push_back(funcPos);
 			funcPos += data->getTotalSize();
 
-			nextData = cpu->GetSymbolGuardian().SymbolAfterAddress(funcPos-1, SDA_TRY,
+			nextData = cpu->GetSymbolGuardian().SymbolAfterAddress(funcPos-1,
 				ccc::GLOBAL_VARIABLE | ccc::LOCAL_VARIABLE);
 			opcodeSequenceStart = funcPos;
 			continue;
@@ -776,7 +776,7 @@ bool DisassemblyMacro::disassemble(u32 address, DisassemblyLineInfo& dest, bool 
 	case MACRO_LI:
 		dest.name = name;
 
-		addressSymbol = cpu->GetSymbolGuardian().SymbolStartingAtAddress(immediate, SDA_TRY).name;
+		addressSymbol = cpu->GetSymbolGuardian().SymbolStartingAtAddress(immediate).name;
 		if (!addressSymbol.empty() && insertSymbols)
 		{
 			std::snprintf(buffer,std::size(buffer),"%s,%s",cpu->getRegisterName(0,rt),addressSymbol.c_str());
@@ -792,7 +792,7 @@ bool DisassemblyMacro::disassemble(u32 address, DisassemblyLineInfo& dest, bool 
 	case MACRO_MEMORYIMM:
 		dest.name = name;
 
-		addressSymbol = cpu->GetSymbolGuardian().SymbolStartingAtAddress(immediate, SDA_TRY).name;
+		addressSymbol = cpu->GetSymbolGuardian().SymbolStartingAtAddress(immediate).name;
 		if (!addressSymbol.empty() && insertSymbols)
 		{
 			std::snprintf(buffer,std::size(buffer),"%s,%s",cpu->getRegisterName(0,rt),addressSymbol.c_str());
@@ -987,7 +987,7 @@ void DisassemblyData::createLines()
 			case DATATYPE_WORD:
 				{
 					value = memRead32(pos);
-					const std::string label = cpu->GetSymbolGuardian().SymbolStartingAtAddress(value, SDA_TRY).name;
+					const std::string label = cpu->GetSymbolGuardian().SymbolStartingAtAddress(value).name;
 					if (!label.empty())
 						std::snprintf(buffer,std::size(buffer),"%s",label.c_str());
 					else

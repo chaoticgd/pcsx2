@@ -190,13 +190,13 @@ void DisassemblyWidget::contextAddFunction()
 
 void DisassemblyWidget::contextCopyFunctionName()
 {
-	std::string name = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(m_selectedAddressStart, SDA_BLOCK).name;
+	std::string name = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(m_selectedAddressStart).name;
 	QGuiApplication::clipboard()->setText(QString::fromStdString(name));
 }
 
 void DisassemblyWidget::contextRemoveFunction()
 {
-	m_cpu->GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Function* curFunc = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (!curFunc)
 			return;
@@ -211,7 +211,7 @@ void DisassemblyWidget::contextRemoveFunction()
 
 void DisassemblyWidget::contextRenameFunction()
 {
-	const FunctionInfo curFunc = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(m_selectedAddressStart, SDA_BLOCK);
+	const FunctionInfo curFunc = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(m_selectedAddressStart);
 
 	if (!curFunc.address.valid())
 	{
@@ -232,14 +232,14 @@ void DisassemblyWidget::contextRenameFunction()
 		return;
 	}
 
-	m_cpu->GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		database.functions.rename_symbol(curFunc.handle, newName.toStdString());
 	});
 }
 
 void DisassemblyWidget::contextStubFunction()
 {
-	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(m_selectedAddressStart, SDA_BLOCK);
+	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(m_selectedAddressStart);
 	u32 address = function.address.valid() ? function.address.value : m_selectedAddressStart;
 
 	Host::RunOnCPUThread([this, address, cpu = m_cpu] {
@@ -253,7 +253,7 @@ void DisassemblyWidget::contextStubFunction()
 void DisassemblyWidget::contextRestoreFunction()
 {
 	u32 address = m_selectedAddressStart;
-	m_cpu->GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu->GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(m_selectedAddressStart);
 		if (function)
 			address = function->address().value;
@@ -618,7 +618,7 @@ void DisassemblyWidget::customMenuRequested(QPoint pos)
 	contextMenu->addAction(action = new QAction(tr("&Copy Instruction Text"), this));
 	action->setShortcut(QKeySequence(Qt::Key_C));
 	connect(action, &QAction::triggered, this, &DisassemblyWidget::contextCopyInstructionText);
-	if (m_cpu->GetSymbolGuardian().FunctionExistsWithStartingAddress(m_selectedAddressStart, SDA_TRY))
+	if (m_cpu->GetSymbolGuardian().FunctionExistsWithStartingAddress(m_selectedAddressStart))
 	{
 		contextMenu->addAction(action = new QAction(tr("Copy Function Name"), this));
 		connect(action, &QAction::triggered, this, &DisassemblyWidget::contextCopyFunctionName);
@@ -693,7 +693,7 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 	const bool isConditionalMet = line.info.conditionMet;
 	const bool isCurrentPC = m_cpu->getPC() == address;
 
-	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(address, SDA_TRY);
+	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(address);
 	const bool showOpcode = m_showInstructionOpcode && m_cpu->isAlive();
 
 	QString lineString;
@@ -775,7 +775,7 @@ QColor DisassemblyWidget::GetAddressFunctionColor(u32 address)
 		};
 	}
 
-	ccc::FunctionHandle handle = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(address, SDA_TRY).handle;
+	ccc::FunctionHandle handle = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(address).handle;
 	if (!handle.valid())
 		return palette().text().color();
 
@@ -839,7 +839,7 @@ bool DisassemblyWidget::AddressCanRestore(u32 start, u32 end)
 
 bool DisassemblyWidget::FunctionCanRestore(u32 address)
 {
-	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(address, SDA_BLOCK);
+	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionOverlappingAddress(address);
 	if (function.address.valid())
 		address = function.address.value;
 

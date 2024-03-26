@@ -33,17 +33,10 @@ struct FunctionInfo
 	bool is_no_return = false;
 };
 
-enum SymbolDatabaseAccessMode
-{
-	SDA_TRY, // If the symbol database is busy, do nothing and return.
-	SDA_BLOCK, // If the symbol database is busy, block until it's available.
-	SDA_ASYNC // Submit the callback to be run on the work thread and return immediately.
-};
-
 struct SymbolGuardian
 {
 public:
-	SymbolGuardian(const char* thread_name);
+	SymbolGuardian();
 	SymbolGuardian(const SymbolGuardian& rhs) = delete;
 	SymbolGuardian(SymbolGuardian&& rhs) = delete;
 	~SymbolGuardian();
@@ -51,38 +44,24 @@ public:
 	SymbolGuardian& operator=(SymbolGuardian&& rhs) = delete;
 
 	using ReadCallback = std::function<void(const ccc::SymbolDatabase&)>;
-	using ReadWriteCallback = std::function<void(ccc::SymbolDatabase&, const std::atomic_bool& interrupt)>;
-	using SynchronousReadWriteCallback = std::function<void(ccc::SymbolDatabase&)>;
+	using ReadWriteCallback = std::function<void(ccc::SymbolDatabase&)>;
 
-	// Take a shared lock on the symbol database and run the callback. If the
-	// symbol database is busy, nothing happens and we return false.
-	bool TryRead(ReadCallback callback) const noexcept;
+	// Take a shared lock on the symbol database and run the callback.
+	void Read(ReadCallback callback) const noexcept;
 
-	// Take a shared lock on the symbol database and run the callback. If the
-	// symbol database is busy, we block until it's available.
-	void BlockingRead(ReadCallback callback) const noexcept;
+	// Take an exclusive lock on the symbol database and run the callback.
+	void ReadWrite(ReadWriteCallback callback) noexcept;
 
-	// Take an exclusive lock on the symbol database. If the symbol database is
-	// busy, nothing happens and we return false. TryRead and TryReadWrite calls
-	// will block until the lock is released when the function returns.
-	bool TryReadWrite(SynchronousReadWriteCallback callback) noexcept;
-
-	// Take an exclusive lock on the symbol database. If the symbol table is
-	// busy, we block until it's available. TryRead and TryReadWrite calls will
-	// block until the lock is released when the function returns.
-	void BlockingReadWrite(SynchronousReadWriteCallback callback) noexcept;
-
-	// Push the callback onto a work queue so it can be run from the symbol
-	// table import thread. TryRead and TryReadWrite calls will fail and return
-	// false until the lock is released when the function returns.
-	void AsyncReadWrite(ReadWriteCallback callback) noexcept;
-
-	bool IsBusy() const;
-
-	// Interrupt the import thread, delete all symbols, create built-ins.
+	// Interrupt the import thread, delete all symbols, create built-ins. Call
+	// on the CPU thread.
 	void Reset();
 
-	void ImportElf(std::vector<u8> elf, std::string elf_file_name);
+	// Import symbols from the ELF file, nocash symbols, and scan for functions.
+	// Call on the CPU thread.
+	void ImportElf(std::vector<u8> elf, std::string elf_file_name, std::string nocash_path);
+
+	void SetElfTextRange(u32 begin, u32 size);
+	void SetNocashPath(std::string nocash_path);
 
 	static ccc::ModuleHandle ImportSymbolTables(
 		ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);
@@ -97,35 +76,31 @@ public:
 
 	// Copy commonly used attributes of a symbol into a temporary object.
 	SymbolInfo SymbolStartingAtAddress(
-		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+		u32 address, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
 	SymbolInfo SymbolAfterAddress(
-		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+		u32 address, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
 	SymbolInfo SymbolOverlappingAddress(
-		u32 address, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+		u32 address, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
 	SymbolInfo SymbolWithName(
-		const std::string& name, SymbolDatabaseAccessMode mode, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
-	
-	bool FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
-	bool FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const;
+		const std::string& name, u32 descriptors = ccc::ALL_SYMBOL_TYPES) const;
+
+	bool FunctionExistsWithStartingAddress(u32 address) const;
+	bool FunctionExistsThatOverlapsAddress(u32 address) const;
 
 	// Copy commonly used attributes of a function so they can be used by the
 	// calling thread without needing to keep the lock held.
-	FunctionInfo FunctionStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode) const;
-	FunctionInfo FunctionOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode) const;
+	FunctionInfo FunctionStartingAtAddress(u32 address) const;
+	FunctionInfo FunctionOverlappingAddress(u32 address) const;
 
 protected:
-	bool Read(SymbolDatabaseAccessMode mode, ReadCallback callback) const noexcept;
-	bool ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback callback) noexcept;
-
 	ccc::SymbolDatabase m_database;
 	mutable std::shared_mutex m_big_symbol_lock;
-	std::atomic_bool m_busy;
 
 	std::thread m_import_thread;
-	std::atomic_bool m_shutdown_import_thread = false;
 	std::atomic_bool m_interrupt_import_thread = false;
-	std::queue<ReadWriteCallback> m_work_queue;
-	std::mutex m_work_queue_lock;
+
+	std::queue<ccc::SymbolDatabase> m_load_queue;
+	std::mutex m_load_queue_lock;
 };
 
 extern SymbolGuardian R5900SymbolGuardian;

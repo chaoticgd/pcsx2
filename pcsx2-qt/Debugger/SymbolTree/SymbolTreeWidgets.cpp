@@ -62,7 +62,7 @@ void SymbolTreeWidget::reset()
 
 	SymbolFilters filters;
 	std::unique_ptr<SymbolTreeNode> root;
-	m_cpu.GetSymbolGuardian().TryRead([&](const ccc::SymbolDatabase& database) -> void {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) -> void {
 		filters.group_by_module = m_group_by_module && m_group_by_module->isChecked();
 		filters.group_by_section = m_group_by_section && m_group_by_section->isChecked();
 		filters.group_by_source_file = m_group_by_source_file && m_group_by_source_file->isChecked();
@@ -456,7 +456,7 @@ void SymbolTreeWidget::onDeleteButtonPressed()
 	if (QMessageBox::question(this, tr("Confirm Deletion"), tr("Delete '%1'?").arg(node->name)) != QMessageBox::Yes)
 		return;
 
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		node->symbol.destroy_symbol(database, true);
 	});
 
@@ -491,7 +491,7 @@ void SymbolTreeWidget::onRenameSymbol()
 	QString label = tr("Name:");
 
 	QString text;
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		const ccc::Symbol* symbol = node->symbol.lookup_symbol(database);
 		if (!symbol || !symbol->address().valid())
 			return;
@@ -504,7 +504,7 @@ void SymbolTreeWidget::onRenameSymbol()
 	if (!ok)
 		return;
 
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		node->symbol.rename_symbol(name, database);
 	});
 }

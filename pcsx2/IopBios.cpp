@@ -1058,7 +1058,7 @@ namespace R3000A
 			s32 version_minor = iopMemRead8(a0reg + 8);
 			DevCon.WriteLn(Color_Gray, "RegisterLibraryEntries: %8.8s version %x.%02x", modname.data(), version_major, version_minor);
 
-			R3000SymbolGuardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+			R3000SymbolGuardian.ReadWrite([&](ccc::SymbolDatabase& database) {
 				ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("IRX Export Table");
 				if (!source.success())
 					return;
@@ -1128,7 +1128,7 @@ namespace R3000A
 
 			DevCon.WriteLn(Color_Gray, "ReleaseLibraryEntries: %8.8s version %x.%02x", modname.c_str(), version_major, version_minor);
 
-			R3000SymbolGuardian.BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+			R3000SymbolGuardian.ReadWrite([&](ccc::SymbolDatabase& database) {
 				// Destroy the symbols for the module.
 				for (const auto& pair : database.modules.handles_from_name(modname))
 				{

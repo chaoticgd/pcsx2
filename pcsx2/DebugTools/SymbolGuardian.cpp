@@ -3,7 +3,6 @@
 
 #include "SymbolGuardian.h"
 
-#include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
@@ -15,15 +14,16 @@
 #include "ccc/importer_flags.h"
 #include "ccc/symbol_file.h"
 #include "DebugInterface.h"
+#include "MIPSAnalyst.h"
+#include "Host.h"
 
-SymbolGuardian R5900SymbolGuardian("EE Symbol Worker");
-SymbolGuardian R3000SymbolGuardian("IOP Symbol Worker");
+SymbolGuardian R5900SymbolGuardian;
+SymbolGuardian R3000SymbolGuardian;
 
 static void CreateDefaultBuiltInDataTypes(ccc::SymbolDatabase& database);
 static void CreateBuiltInDataType(
 	ccc::SymbolDatabase& database, ccc::SymbolSourceHandle source, const char* name, ccc::ast::BuiltInClass bclass);
-static void ComputeOriginalFunctionHashes(
-	ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module);
+static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf);
 
 static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 {
@@ -38,128 +38,40 @@ static void error_callback(const ccc::Error& error, ccc::ErrorLevel level)
 	}
 }
 
-SymbolGuardian::SymbolGuardian(const char* thread_name)
+SymbolGuardian::SymbolGuardian()
 {
 	ccc::set_custom_error_callback(error_callback);
-
-	m_import_thread = std::thread([this, thread_name]() {
-		Threading::SetNameOfCurrentThread(thread_name);
-
-		while (!m_shutdown_import_thread)
-		{
-			ReadWriteCallback callback;
-			m_work_queue_lock.lock();
-			if (!m_work_queue.empty() && !m_interrupt_import_thread)
-			{
-				ReadWriteCallback& front = m_work_queue.front();
-				callback = std::move(front);
-				m_work_queue.pop();
-			}
-			m_work_queue_lock.unlock();
-
-			if (callback)
-			{
-				m_busy = true;
-				m_big_symbol_lock.lock();
-				callback(m_database, m_interrupt_import_thread);
-				m_big_symbol_lock.unlock();
-				m_busy = false;
-			}
-
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		}
-	});
 }
 
 SymbolGuardian::~SymbolGuardian()
 {
-	m_shutdown_import_thread = true;
+	// TODO: Fix crash on exit here.
 	m_interrupt_import_thread = true;
-	if (m_import_thread.joinable())
-		m_import_thread.join();
 }
 
-bool SymbolGuardian::TryRead(ReadCallback callback) const noexcept
+void SymbolGuardian::Read(ReadCallback callback) const noexcept
 {
-	return Read(SDA_TRY, std::move(callback));
-}
-
-void SymbolGuardian::BlockingRead(ReadCallback callback) const noexcept
-{
-	Read(SDA_BLOCK, std::move(callback));
-}
-
-bool SymbolGuardian::Read(SymbolDatabaseAccessMode mode, ReadCallback callback) const noexcept
-{
-	pxAssertRel(mode != SDA_ASYNC, "SDA_ASYNC not supported for read operations.");
-
-	if (mode == SDA_TRY && m_busy)
-		return false;
-
 	m_big_symbol_lock.lock_shared();
 	callback(m_database);
 	m_big_symbol_lock.unlock_shared();
-
-	return true;
 }
 
-bool SymbolGuardian::TryReadWrite(SynchronousReadWriteCallback callback) noexcept
+void SymbolGuardian::ReadWrite(ReadWriteCallback callback) noexcept
 {
-	return ReadWrite(SDA_TRY, [callback](ccc::SymbolDatabase& database, const std::atomic_bool&) {
-		return callback(database);
-	});
-}
-
-void SymbolGuardian::BlockingReadWrite(std::function<void(ccc::SymbolDatabase&)> callback) noexcept
-{
-	ReadWrite(SDA_BLOCK, [callback](ccc::SymbolDatabase& database, const std::atomic_bool&) {
-		callback(database);
-	});
-}
-
-void SymbolGuardian::AsyncReadWrite(ReadWriteCallback callback) noexcept
-{
-	ReadWrite(SDA_ASYNC, callback);
-}
-
-bool SymbolGuardian::ReadWrite(SymbolDatabaseAccessMode mode, ReadWriteCallback callback) noexcept
-{
-	if (mode == SDA_ASYNC)
-	{
-		m_work_queue_lock.lock();
-		m_work_queue.emplace(std::move(callback));
-		m_work_queue_lock.unlock();
-		return true;
-	}
-
-	if (mode == SDA_TRY && m_busy)
-		return false;
-
 	m_big_symbol_lock.lock();
-	callback(m_database, m_interrupt_import_thread);
+	callback(m_database);
 	m_big_symbol_lock.unlock();
-
-	return true;
-}
-
-bool SymbolGuardian::IsBusy() const
-{
-	return m_busy;
 }
 
 void SymbolGuardian::Reset()
 {
-	// Since the clear command is going to delete everything in the database, we
-	// can discard any pending async read/write operations.
-	m_work_queue_lock.lock();
-	m_work_queue = std::queue<ReadWriteCallback>();
-	m_work_queue_lock.unlock();
-
 	m_interrupt_import_thread = true;
+	if (m_import_thread.joinable())
+		m_import_thread.join();
+	m_interrupt_import_thread = false;
 
-	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	ReadWrite([&](ccc::SymbolDatabase& database) {
 		database.clear();
-		m_interrupt_import_thread = false;
 
 		CreateDefaultBuiltInDataTypes(database);
 	});
@@ -217,7 +129,7 @@ static void CreateBuiltInDataType(
 	(*symbol)->set_type(std::move(type));
 }
 
-void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name)
+void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, std::string nocash_path)
 {
 	ccc::Result<ccc::ElfFile> parsed_elf = ccc::ElfFile::parse(std::move(elf));
 	if (!parsed_elf.success())
@@ -229,13 +141,40 @@ void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name)
 	std::unique_ptr<ccc::ElfSymbolFile> symbol_file =
 		std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf), std::move(elf_file_name));
 
-	AsyncReadWrite([file_pointer = symbol_file.release()](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
-		std::unique_ptr<ccc::ElfSymbolFile> symbol_file(file_pointer);
+	m_interrupt_import_thread = true;
+	if (m_import_thread.joinable())
+		m_import_thread.join();
+	m_interrupt_import_thread = false;
 
-		ccc::ModuleHandle module_handle = ImportSymbolTables(database, *symbol_file, &interrupt);
+	m_import_thread = std::thread([this, nocash_path, file = std::move(symbol_file)]() {
+		Threading::SetNameOfCurrentThread("Symbol Worker");
 
-		if (module_handle.valid())
-			ComputeOriginalFunctionHashes(database, symbol_file->elf(), module_handle);
+		ccc::SymbolDatabase temp_database;
+		ImportSymbolTables(temp_database, *file, &m_interrupt_import_thread);
+
+		if (m_interrupt_import_thread)
+			return;
+
+		ImportNocashSymbols(temp_database, nocash_path);
+
+		if (m_interrupt_import_thread)
+			return;
+
+		ComputeOriginalFunctionHashes(temp_database, file->elf());
+
+		if (m_interrupt_import_thread)
+			return;
+
+		Host::RunOnCPUThread([this, &temp_database, &file, nocash_path]() {
+			ReadWrite([&](ccc::SymbolDatabase& database) {
+				database.merge_from(temp_database);
+
+				const ccc::ElfProgramHeader* entry_segment = file->elf().entry_point_segment();
+				if (entry_segment)
+					MIPSAnalyst::ScanForFunctions(database, entry_segment->vaddr, entry_segment->vaddr + entry_segment->filesz);
+			});
+		},
+			true);
 	});
 }
 
@@ -253,7 +192,7 @@ ccc::ModuleHandle SymbolGuardian::ImportSymbolTables(
 	demangler.cplus_demangle = cplus_demangle;
 	demangler.cplus_demangle_opname = cplus_demangle_opname;
 
-	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE;
+	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE | ccc::NO_MEMBER_FUNCTIONS;
 
 	ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
 		database, symbol_file.name(), *symbol_tables, importer_flags, demangler, interrupt);
@@ -388,14 +327,10 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 	return true;
 }
 
-static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf, ccc::ModuleHandle module)
+static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const ccc::ElfFile& elf)
 {
 	for (ccc::Function& function : database.functions)
 	{
-
-		if (function.module_handle() != module)
-			continue;
-
 		if (!function.address().valid())
 			continue;
 
@@ -420,7 +355,7 @@ static void ComputeOriginalFunctionHashes(ccc::SymbolDatabase& database, const c
 
 void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
 {
-	TryReadWrite([&](ccc::SymbolDatabase& database) {
+	ReadWrite([&](ccc::SymbolDatabase& database) {
 		for (ccc::Function& function : database.functions)
 		{
 			if (!function.address().valid())
@@ -443,7 +378,7 @@ void SymbolGuardian::UpdateFunctionHashes(DebugInterface& cpu)
 
 void SymbolGuardian::ClearIrxModules()
 {
-	BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	ReadWrite([&](ccc::SymbolDatabase& database) {
 		std::vector<ccc::ModuleHandle> irx_modules;
 		for (const ccc::Module& module : m_database.modules)
 			if (module.is_irx)
@@ -455,10 +390,10 @@ void SymbolGuardian::ClearIrxModules()
 }
 
 SymbolInfo SymbolGuardian::SymbolStartingAtAddress(
-	u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+	u32 address, u32 descriptors) const
 {
 	SymbolInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::SymbolDescriptor descriptor;
 		const ccc::Symbol* symbol = database.symbol_starting_at_address(address, descriptors, &descriptor);
 		if (!symbol)
@@ -473,10 +408,10 @@ SymbolInfo SymbolGuardian::SymbolStartingAtAddress(
 }
 
 SymbolInfo SymbolGuardian::SymbolAfterAddress(
-	u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+	u32 address, u32 descriptors) const
 {
 	SymbolInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::SymbolDescriptor descriptor;
 		const ccc::Symbol* symbol = database.symbol_after_address(address, descriptors, &descriptor);
 		if (!symbol)
@@ -491,10 +426,10 @@ SymbolInfo SymbolGuardian::SymbolAfterAddress(
 }
 
 SymbolInfo SymbolGuardian::SymbolOverlappingAddress(
-	u32 address, SymbolDatabaseAccessMode mode, u32 descriptors) const
+	u32 address, u32 descriptors) const
 {
 	SymbolInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::SymbolDescriptor descriptor;
 		const ccc::Symbol* symbol = database.symbol_overlapping_address(address, descriptors, &descriptor);
 		if (!symbol)
@@ -509,10 +444,10 @@ SymbolInfo SymbolGuardian::SymbolOverlappingAddress(
 }
 
 SymbolInfo SymbolGuardian::SymbolWithName(
-	const std::string& name, SymbolDatabaseAccessMode mode, u32 descriptors) const
+	const std::string& name, u32 descriptors) const
 {
 	SymbolInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::SymbolDescriptor descriptor;
 		const ccc::Symbol* symbol = database.symbol_with_name(name, descriptors, &descriptor);
 		if (!symbol)
@@ -526,30 +461,30 @@ SymbolInfo SymbolGuardian::SymbolWithName(
 	return info;
 }
 
-bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address, SymbolDatabaseAccessMode mode) const
+bool SymbolGuardian::FunctionExistsWithStartingAddress(u32 address) const
 {
 	bool exists = false;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		exists = handle.valid();
 	});
 	return exists;
 }
 
-bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address, SymbolDatabaseAccessMode mode) const
+bool SymbolGuardian::FunctionExistsThatOverlapsAddress(u32 address) const
 {
 	bool exists = false;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		exists = function != nullptr;
 	});
 	return exists;
 }
 
-FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address, SymbolDatabaseAccessMode mode) const
+FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address) const
 {
 	FunctionInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		ccc::FunctionHandle handle = database.functions.first_handle_from_starting_address(address);
 		const ccc::Function* function = database.functions.symbol_from_handle(handle);
 		if (!function)
@@ -564,10 +499,10 @@ FunctionInfo SymbolGuardian::FunctionStartingAtAddress(u32 address, SymbolDataba
 	return info;
 }
 
-FunctionInfo SymbolGuardian::FunctionOverlappingAddress(u32 address, SymbolDatabaseAccessMode mode) const
+FunctionInfo SymbolGuardian::FunctionOverlappingAddress(u32 address) const
 {
 	FunctionInfo info;
-	Read(mode, [&](const ccc::SymbolDatabase& database) {
+	Read([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* function = database.functions.symbol_overlapping_address(address);
 		if (!function)
 			return;

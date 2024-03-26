@@ -102,7 +102,7 @@ public:
 
 	virtual bool parseSymbol(char* str, u64& symbolValue)
 	{
-		SymbolInfo symbol = cpu->GetSymbolGuardian().SymbolWithName(std::string(str), SDA_TRY);
+		SymbolInfo symbol = cpu->GetSymbolGuardian().SymbolWithName(std::string(str));
 		if (!symbol.address.valid())
 			return false;
 

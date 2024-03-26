@@ -6,7 +6,6 @@
 #include "CDVD/IsoReader.h"
 #include "Counters.h"
 #include "DEV9/DEV9.h"
-#include "DebugTools/MIPSAnalyst.h"
 #include "DebugTools/SymbolGuardian.h"
 #include "Elfheader.h"
 #include "FW.h"
@@ -1080,12 +1079,6 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	Console.WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
 	Patch::ReloadPatches(s_disc_serial, crc_to_report, false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
-
-	u32 text_begin = s_elf_text_range.first;
-	u32 text_size = s_elf_text_range.second;
-	R5900SymbolGuardian.AsyncReadWrite([text_begin, text_size](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
-		MIPSAnalyst::ScanForFunctions(database, text_begin, text_begin + text_size);
-	});
 }
 
 void VMManager::UpdateELFInfo(std::string elf_path)
@@ -1112,26 +1105,22 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 
 	R5900SymbolGuardian.Reset();
 
-	// Load the symbols stored in the ELF file.
-	R5900SymbolGuardian.ImportElf(elfo.ReleaseData(), s_elf_path);
-
 	// Search for a .sym file to load symbols from.
+	std::string nocash_path;
 	CDVD_SourceType source_type = CDVDsys_GetSourceType();
 	if (source_type == CDVD_SourceType::Iso)
 	{
 		std::string iso_file_path = CDVDsys_GetFile(source_type);
 
-		std::string sym_name;
 		std::string::size_type n = iso_file_path.rfind('.');
 		if (n == std::string::npos)
-			sym_name = iso_file_path + ".sym";
+			nocash_path = iso_file_path + ".sym";
 		else
-			sym_name = iso_file_path.substr(0, n) + ".sym";
-
-		R5900SymbolGuardian.AsyncReadWrite([sym_name](ccc::SymbolDatabase& database, const std::atomic_bool& interrupt) {
-			SymbolGuardian::ImportNocashSymbols(database, sym_name);
-		});
+			nocash_path = iso_file_path.substr(0, n) + ".sym";
 	}
+
+	// Load the symbols stored in the ELF file.
+	R5900SymbolGuardian.ImportElf(elfo.ReleaseData(), s_elf_path, nocash_path);
 }
 
 void VMManager::ClearELFInfo()

@@ -89,7 +89,7 @@ void NewSymbolDialog::setupSizeField()
 
 void NewSymbolDialog::setupFunctionField()
 {
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		const ccc::Function* default_function = database.functions.symbol_overlapping_address(m_cpu.getPC());
 
 		for (const ccc::Function& function : database.functions)
@@ -145,7 +145,7 @@ void NewSymbolDialog::updateSizeField()
 	u32 address = m_ui.addressLineEdit->text().toUInt(&ok, 16);
 	if (ok)
 	{
-		m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+		m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 			std::optional<u32> fill_existing_function_size = fillExistingFunctionSize(address, database);
 			if (fill_existing_function_size.has_value())
 				m_ui.fillExistingFunctionRadioButton->setText(
@@ -249,7 +249,7 @@ NewFunctionDialog::NewFunctionDialog(DebugInterface& cpu, QWidget* parent)
 bool NewFunctionDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		m_name = parseName(error_message);
 		if (!error_message.isEmpty())
 			return;
@@ -335,7 +335,7 @@ void NewFunctionDialog::createSymbol()
 		return;
 
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -372,7 +372,7 @@ NewGlobalVariableDialog::NewGlobalVariableDialog(DebugInterface& cpu, QWidget* p
 bool NewGlobalVariableDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		m_name = parseName(error_message);
 		if (!error_message.isEmpty())
 			return;
@@ -396,7 +396,7 @@ void NewGlobalVariableDialog::createSymbol()
 		return;
 
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Result<ccc::SymbolSourceHandle> source = database.get_symbol_source("User-defined");
 		if (!source.success())
 		{
@@ -429,7 +429,7 @@ NewLocalVariableDialog::NewLocalVariableDialog(DebugInterface& cpu, QWidget* par
 bool NewLocalVariableDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		m_name = parseName(error_message);
 		if (!error_message.isEmpty())
 			return;
@@ -488,7 +488,7 @@ void NewLocalVariableDialog::createSymbol()
 		return;
 
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Function* function = database.functions.symbol_from_handle(m_function);
 		if (!function)
 		{
@@ -536,7 +536,7 @@ NewParameterVariableDialog::NewParameterVariableDialog(DebugInterface& cpu, QWid
 bool NewParameterVariableDialog::parseUserInput()
 {
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingRead([&](const ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().Read([&](const ccc::SymbolDatabase& database) {
 		m_name = parseName(error_message);
 		if (!error_message.isEmpty())
 			return;
@@ -591,7 +591,7 @@ void NewParameterVariableDialog::createSymbol()
 		return;
 
 	QString error_message;
-	m_cpu.GetSymbolGuardian().BlockingReadWrite([&](ccc::SymbolDatabase& database) {
+	m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 		ccc::Function* function = database.functions.symbol_from_handle(m_function);
 		if (!function)
 		{
