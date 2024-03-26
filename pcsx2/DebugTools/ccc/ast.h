@@ -179,15 +179,26 @@ struct StructOrUnion : Node {
 	StructOrUnion() : Node(DESCRIPTOR) {}
 	static const constexpr NodeDescriptor DESCRIPTOR = STRUCT_OR_UNION;
 	
+	struct FlatField {
+		// The field itself.
+		const Node* node;
+		// The symbol that owns the node.
+		const DataType* symbol;
+		// Offset of the innermost enclosing base class in the object.
+		s32 base_offset = 0;
+	};
+	
 	// Generate a flat list of all the fields in this class as well as all the
 	// base classes recursively, but only until the max_fields or max_depth
 	// limits are reached. Return true if all the fields were enumerated.
 	bool flatten_fields(
-		std::vector<std::pair<const Node*, const DataType*>>& output,
+		std::vector<FlatField>& output,
 		const DataType* symbol,
 		const SymbolDatabase& database,
-		size_t max_fields = 100000,
-		size_t max_depth = 100) const;
+		bool skip_statics,
+		s32 base_offset = 0,
+		s32 max_fields = 100000,
+		s32 max_depth = 100) const;
 };
 
 enum class TypeNameSource : u8 {
@@ -218,9 +229,6 @@ struct TypeName : Node {
 		SourceFileHandle referenced_file_handle;
 		StabsTypeNumber stabs_type_number;
 		std::optional<ForwardDeclaredType> type;
-		
-		UnresolvedStabs() {}
-		friend auto operator<=>(const UnresolvedStabs& lhs, const UnresolvedStabs& rhs) = default;
 	};
 	
 	std::unique_ptr<UnresolvedStabs> unresolved_stabs;

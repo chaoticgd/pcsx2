@@ -425,22 +425,22 @@ QString SymbolTreeNode::generateDisplayString(
 			QString result;
 			result += "{";
 
-			std::vector<std::pair<const ccc::ast::Node*, const ccc::DataType*>> fields;
-			bool all_fields = struct_or_union.flatten_fields(fields, nullptr, database, max_elements_to_display);
+			std::vector<ccc::ast::StructOrUnion::FlatField> fields;
+			bool all_fields = struct_or_union.flatten_fields(fields, nullptr, database, true, 0, max_elements_to_display);
 
 			for (size_t i = 0; i < fields.size(); i++)
 			{
-				const ccc::ast::Node* field = fields[i].first;
+				const ccc::ast::StructOrUnion::FlatField& field = fields[i];
 
 				SymbolTreeNode node;
-				node.location = location.addOffset(field->offset_bytes);
+				node.location = location.addOffset(field.base_offset + field.node->offset_bytes);
 
-				const ccc::ast::Node& field_type = *field->physical_type(database).first;
+				const ccc::ast::Node& field_type = *field.node->physical_type(database).first;
 				QString field_value = node.generateDisplayString(field_type, cpu, database, depth + 1);
 				if (field_value.isEmpty())
 					field_value = QString("(%1)").arg(ccc::ast::node_type_to_string(field_type));
 
-				QString field_name = QString::fromStdString(field->name);
+				QString field_name = QString::fromStdString(field.node->name);
 				result += QString(".%1=%2").arg(field_name).arg(field_value);
 
 				if (i + 1 != fields.size() || !all_fields)

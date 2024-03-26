@@ -1086,7 +1086,7 @@ namespace R3000A
 
 				// Destroy the old symbols for this IRX module if any exist.
 				for (ccc::ModuleHandle existing_module : existing_modules)
-					database.destroy_symbols_from_module(existing_module, nullptr);
+					database.destroy_symbols_from_module(existing_module, true);
 
 				ccc::Result<ccc::Module*> module_symbol = database.modules.create_symbol(modname, *source, nullptr);
 				if (!module_symbol.success())
@@ -1139,7 +1139,7 @@ namespace R3000A
 					if (existing_module->version_major != version_major || existing_module->version_minor != version_minor)
 						continue;
 
-					database.destroy_symbols_from_module(existing_module->handle(), nullptr);
+					database.destroy_symbols_from_module(existing_module->handle(), true);
 				}
 			});
 		}

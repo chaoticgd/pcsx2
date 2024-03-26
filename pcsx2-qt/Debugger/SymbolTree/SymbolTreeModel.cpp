@@ -438,24 +438,24 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		{
 			const ccc::ast::StructOrUnion& struct_or_union = physical_type->as<ccc::ast::StructOrUnion>();
 
-			std::vector<std::pair<const ccc::ast::Node*, const ccc::DataType*>> fields;
-			struct_or_union.flatten_fields(fields, nullptr, database);
+			std::vector<ccc::ast::StructOrUnion::FlatField> fields;
+			struct_or_union.flatten_fields(fields, nullptr, database, true);
 
-			for (const auto& [field, symbol] : fields)
+			for (const ccc::ast::StructOrUnion::FlatField& field : fields)
 			{
 				if (symbol)
 					parent_handle = ccc::NodeHandle(*symbol, nullptr);
 
-				SymbolTreeLocation field_location = location.addOffset(field->offset_bytes);
+				SymbolTreeLocation field_location = location.addOffset(field.base_offset + field.node->offset_bytes);
 				if (field_location.type == SymbolTreeLocation::NONE)
 					continue;
 
 				std::unique_ptr<SymbolTreeNode> child_node = std::make_unique<SymbolTreeNode>();
-				if (!field->name.empty())
-					child_node->name = QString::fromStdString(field->name);
+				if (!field.node->name.empty())
+					child_node->name = QString::fromStdString(field.node->name);
 				else
-					child_node->name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*field));
-				child_node->type = parent_handle.handle_for_child(field);
+					child_node->name = QString("(anonymous %1)").arg(ccc::ast::node_type_to_string(*field.node));
+				child_node->type = parent_handle.handle_for_child(field.node);
 				child_node->location = field_location;
 				children.emplace_back(std::move(child_node));
 			}
