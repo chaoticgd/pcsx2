@@ -91,9 +91,6 @@ protected:
 	void onResetChildren();
 	void onChangeTypeTemporarily();
 
-	bool currentNodeIsObject();
-	bool currentNodeIsSymbol();
-
 	void onTreeViewClicked(const QModelIndex& index);
 
 	SymbolTreeNode* currentNode();
@@ -105,6 +102,8 @@ protected:
 
 	QMenu* m_context_menu = nullptr;
 	QAction* m_rename_symbol = nullptr;
+	QAction* m_go_to_in_disassembly = nullptr;
+	QAction* m_m_go_to_in_memory_view = nullptr;
 	QAction* m_group_by_module = nullptr;
 	QAction* m_group_by_section = nullptr;
 	QAction* m_group_by_source_file = nullptr;

@@ -371,13 +371,13 @@ void SymbolTreeWidget::setupMenu()
 
 	m_context_menu->addSeparator();
 
-	QAction* go_to_in_disassembly = new QAction(tr("Go to in Disassembly"), this);
-	connect(go_to_in_disassembly, &QAction::triggered, this, &SymbolTreeWidget::onGoToInDisassembly);
-	m_context_menu->addAction(go_to_in_disassembly);
+	m_go_to_in_disassembly = new QAction(tr("Go to in Disassembly"), this);
+	connect(m_go_to_in_disassembly, &QAction::triggered, this, &SymbolTreeWidget::onGoToInDisassembly);
+	m_context_menu->addAction(m_go_to_in_disassembly);
 
-	QAction* go_to_in_memory_view = new QAction(tr("Go to in Memory View"), this);
-	connect(go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
-	m_context_menu->addAction(go_to_in_memory_view);
+	m_m_go_to_in_memory_view = new QAction(tr("Go to in Memory View"), this);
+	connect(m_m_go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
+	m_context_menu->addAction(m_m_go_to_in_memory_view);
 
 	if (m_flags & ALLOW_GROUPING)
 	{
@@ -430,10 +430,15 @@ void SymbolTreeWidget::setupMenu()
 
 void SymbolTreeWidget::openMenu(QPoint pos)
 {
-	bool node_is_object = currentNodeIsObject();
-	bool node_is_symbol = currentNodeIsSymbol();
+	SymbolTreeNode* node = currentNode();
+
+	bool node_is_object = node->tag == SymbolTreeNode::OBJECT;
+	bool node_is_symbol = node->symbol.valid();
+	bool node_is_memory = node->location.type == SymbolTreeLocation::MEMORY;
 
 	m_rename_symbol->setEnabled(node_is_symbol);
+	m_go_to_in_disassembly->setEnabled(node_is_memory);
+	m_m_go_to_in_memory_view->setEnabled(node_is_memory);
 
 	if (m_reset_children)
 		m_reset_children->setEnabled(node_is_object);
@@ -565,24 +570,6 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 	std::optional<QString> error_message = m_model->changeTypeTemporarily(index, type_string.toStdString());
 	if (error_message.has_value() && !error_message->isEmpty())
 		QMessageBox::warning(this, tr("Cannot Change Type"), *error_message);
-}
-
-bool SymbolTreeWidget::currentNodeIsObject()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return false;
-
-	return node->tag == SymbolTreeNode::OBJECT;
-}
-
-bool SymbolTreeWidget::currentNodeIsSymbol()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return false;
-
-	return node->symbol.valid();
 }
 
 void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
