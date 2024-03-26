@@ -52,16 +52,16 @@ public:
 	// Take an exclusive lock on the symbol database and run the callback.
 	void ReadWrite(ReadWriteCallback callback) noexcept;
 
-	// Interrupt the import thread, delete all symbols, create built-ins. Call
-	// on the CPU thread.
+	// Delete all stored symbols and create some default built-ins. Should be
+	// called from the CPU thread.
 	void Reset();
 
 	// Import symbols from the ELF file, nocash symbols, and scan for functions.
-	// Call on the CPU thread.
+	// Should be called from the CPU thread.
 	void ImportElf(std::vector<u8> elf, std::string elf_file_name, std::string nocash_path);
 
-	void SetElfTextRange(u32 begin, u32 size);
-	void SetNocashPath(std::string nocash_path);
+	// Interrupt the import thread. Should be called from the CPU thread.
+	void ShutdownWorkerThread();
 
 	static ccc::ModuleHandle ImportSymbolTables(
 		ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt);

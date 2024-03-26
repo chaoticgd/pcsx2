@@ -45,8 +45,6 @@ SymbolGuardian::SymbolGuardian()
 
 SymbolGuardian::~SymbolGuardian()
 {
-	// TODO: Fix crash on exit here.
-	m_interrupt_import_thread = true;
 }
 
 void SymbolGuardian::Read(ReadCallback callback) const noexcept
@@ -65,10 +63,7 @@ void SymbolGuardian::ReadWrite(ReadWriteCallback callback) noexcept
 
 void SymbolGuardian::Reset()
 {
-	m_interrupt_import_thread = true;
-	if (m_import_thread.joinable())
-		m_import_thread.join();
-	m_interrupt_import_thread = false;
+	ShutdownWorkerThread();
 
 	ReadWrite([&](ccc::SymbolDatabase& database) {
 		database.clear();
@@ -141,10 +136,7 @@ void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, s
 	std::unique_ptr<ccc::ElfSymbolFile> symbol_file =
 		std::make_unique<ccc::ElfSymbolFile>(std::move(*parsed_elf), std::move(elf_file_name));
 
-	m_interrupt_import_thread = true;
-	if (m_import_thread.joinable())
-		m_import_thread.join();
-	m_interrupt_import_thread = false;
+	ShutdownWorkerThread();
 
 	m_import_thread = std::thread([this, nocash_path, file = std::move(symbol_file)]() {
 		Threading::SetNameOfCurrentThread("Symbol Worker");
@@ -177,6 +169,15 @@ void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, s
 			true);
 	});
 }
+
+void SymbolGuardian::ShutdownWorkerThread()
+{
+	m_interrupt_import_thread = true;
+	if (m_import_thread.joinable())
+		m_import_thread.join();
+	m_interrupt_import_thread = false;
+}
+
 
 ccc::ModuleHandle SymbolGuardian::ImportSymbolTables(
 	ccc::SymbolDatabase& database, const ccc::SymbolFile& symbol_file, const std::atomic_bool* interrupt)

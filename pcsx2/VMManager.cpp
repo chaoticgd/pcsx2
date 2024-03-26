@@ -437,6 +437,9 @@ void VMManager::Internal::CPUThreadShutdown()
 
 	// Ensure emulog gets flushed.
 	Log::SetFileOutputLevel(LOGLEVEL_NONE, std::string());
+
+	R3000SymbolGuardian.ShutdownWorkerThread();
+	R5900SymbolGuardian.ShutdownWorkerThread();
 }
 
 void VMManager::Internal::SetFileLogPath(std::string path)
