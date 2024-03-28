@@ -16,6 +16,7 @@
 #include "DebugInterface.h"
 #include "MIPSAnalyst.h"
 #include "Host.h"
+#include "VMManager.h"
 
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;
@@ -167,6 +168,22 @@ void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, c
 
 		if (m_interrupt_import_thread)
 			return;
+
+		// Wait for the ELF to be loaded into memory, otherwise the call to
+		// ScanForFunctions below won't work.
+		bool has_booted_elf = false;
+		while (!has_booted_elf)
+		{
+			Host::RunOnCPUThread([&]() {
+				has_booted_elf = VMManager::Internal::HasBootedELF();
+			},
+				true);
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+			if (m_interrupt_import_thread)
+				return;
+		}
 
 		Host::RunOnCPUThread([this, &temp_database, &file, nocash_path]() {
 			ReadWrite([&](ccc::SymbolDatabase& database) {
