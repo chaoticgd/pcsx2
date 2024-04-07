@@ -47,7 +47,6 @@ if(WIN32)
 		WINVER=${MIN_WIN32}
 		_WIN32_WINNT=${MIN_WIN32}
 		WIN32_LEAN_AND_MEAN
-		LZMA_API_STATIC
 		WIL_SUPPRESS_EXCEPTIONS
 	)
 endif(WIN32)
@@ -386,6 +385,7 @@ set(pcsx2USBSources
 	USB/qemu-usb/input-keymap-qcode-to-qnum.cpp
 	USB/qemu-usb/usb-ohci.cpp
 	USB/shared/ringbuffer.cpp
+	USB/usb-eyetoy/cam-jpeg.cpp
 	USB/usb-eyetoy/jo_mpeg.cpp
 	USB/usb-eyetoy/usb-eyetoy-webcam.cpp
 	USB/usb-hid/usb-hid.cpp
@@ -415,6 +415,7 @@ set(pcsx2USBHeaders
 	USB/qemu-usb/queue.h
 	USB/qemu-usb/qusb.h
 	USB/shared/ringbuffer.h
+	USB/usb-eyetoy/cam-jpeg.h
 	USB/usb-eyetoy/jo_mpeg.h
 	USB/usb-eyetoy/ov519.h
 	USB/usb-eyetoy/usb-eyetoy-webcam.h
@@ -581,14 +582,10 @@ if(USE_OPENGL)
 		list(APPEND pcsx2GSSources GS/Renderers/OpenGL/GLContextWGL.cpp)
 		list(APPEND pcsx2GSHeaders GS/Renderers/OpenGL/GLContextWGL.h)
 		target_link_libraries(PCSX2_FLAGS INTERFACE opengl32.lib WinPixEventRuntime::WinPixEventRuntime)
-	elseif(APPLE)
-		list(APPEND pcsx2GSSources GS/Renderers/OpenGL/GLContextAGL.mm)
-		list(APPEND pcsx2GSHeaders GS/Renderers/OpenGL/GLContextAGL.h)
 	else()
 		if(X11_API OR WAYLAND_API)
 			list(APPEND pcsx2GSSources GS/Renderers/OpenGL/GLContextEGL.cpp)
 			list(APPEND pcsx2GSHeaders GS/Renderers/OpenGL/GLContextEGL.h)
-			target_link_libraries(PCSX2_FLAGS INTERFACE PkgConfig::EGL)
 		endif()
 
 		if(X11_API)
@@ -629,7 +626,7 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
 	)
-	target_link_libraries(PCSX2_FLAGS INTERFACE Vulkan-Headers glslang)
+	target_link_libraries(PCSX2_FLAGS INTERFACE Vulkan-Headers Shaderc::shaderc_shared)
 endif()
 
 set(pcsx2GSMetalShaders
@@ -1113,7 +1110,6 @@ if(WIN32)
 endif()
 
 target_sources(PCSX2 PRIVATE ${pcsx2USBSources} ${pcsx2USBHeaders})
-target_link_libraries(PCSX2_FLAGS INTERFACE jpgd)
 
 if(APPLE OR BSD)
 	if(APPLE)
@@ -1144,7 +1140,7 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 	LZ4::LZ4
 	SoundTouch::SoundTouch
 	PNG::PNG
-	LibLZMA::LibLZMA
+	LZMA::LZMA
 	Zstd::Zstd
 	${LIBC_LIBRARIES}
 )
@@ -1177,13 +1173,8 @@ if(WIN32)
 		dwmapi.lib
 		OneCore.lib
 	)
-elseif(APPLE)
-	target_link_libraries(PCSX2_FLAGS INTERFACE
-		PCAP::PCAP
-	)
 else()
 	target_link_libraries(PCSX2_FLAGS INTERFACE
-		OpenGL::GL
 		PCAP::PCAP
 	)
 endif()
@@ -1279,19 +1270,16 @@ function(setup_main_executable target)
 		if(MSVC)
 			install(FILES $<TARGET_PDB_FILE:${target}> DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 		endif()
-		if(TARGET SDL2::SDL2)
-			# Copy SDL2 DLL to binary directory.
-			if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-				get_property(SDL2_DLL_PATH TARGET SDL2::SDL2 PROPERTY IMPORTED_LOCATION_DEBUG)
-			else()
-				get_property(SDL2_DLL_PATH TARGET SDL2::SDL2 PROPERTY IMPORTED_LOCATION_RELEASE)
-			endif()
-			if(SDL2_DLL_PATH)
-				install(FILES ${SDL2_DLL_PATH} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
-			endif()
-		endif()
+
+		# Copy dependency libraries.
+		set(DEPS_BINDIR "${CMAKE_SOURCE_DIR}/deps/bin")
+		set(DEPS_TO_COPY freetype.dll harfbuzz.dll libjpeg.dll libpng16.dll libsharpyuv.dll libwebp.dll lz4.dll SDL2.dll shaderc_shared.dll zlib1.dll zstd.dll)
+		foreach(DEP_TO_COPY ${DEPS_TO_COPY})
+			install(FILES "${DEPS_BINDIR}/${DEP_TO_COPY}" DESTINATION "${CMAKE_SOURCE_DIR}/bin")
+		endforeach()
+
 		find_program(WINDEPLOYQT_EXE windeployqt HINTS "${QT_BINARY_DIRECTORY}")
-		install(CODE "execute_process(COMMAND \"${WINDEPLOYQT_EXE}\" \"${CMAKE_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:${target}>\" --plugindir \"${CMAKE_SOURCE_DIR}/bin/QtPlugins\" --no-compiler-runtime --no-system-d3d-compiler --no-translations COMMAND_ERROR_IS_FATAL ANY)")
+		install(CODE "execute_process(COMMAND \"${WINDEPLOYQT_EXE}\" \"${CMAKE_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:${target}>\" --plugindir \"${CMAKE_SOURCE_DIR}/bin/QtPlugins\" --no-compiler-runtime --no-system-d3d-compiler --no-system-dxc-compiler --no-translations COMMAND_ERROR_IS_FATAL ANY)")
 		install(CODE "file(WRITE \"${CMAKE_SOURCE_DIR}/bin/qt.conf\" \"[Paths]\\nPlugins = ./QtPlugins\")")
 	endif()
 
@@ -1343,6 +1331,20 @@ function(setup_main_executable target)
 		)
 
 		pcsx2_resource(${target} ${PCSX2_SOURCE_DIR}/Resources/PCSX2.icns ${PCSX2_SOURCE_DIR}/Resources)
+
+		# Copy MoltenVK into the bundle
+		unset(MOLTENVK_PATH CACHE)
+		find_file(MOLTENVK_PATH NAMES
+			libMoltenVK.dylib
+			lib/libMoltenVK.dylib
+		)
+		if (MOLTENVK_PATH)
+			target_sources(${target} PRIVATE "${MOLTENVK_PATH}")
+			set_source_files_properties("${MOLTENVK_PATH}" PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
+			message(STATUS "Using MoltenVK from ${MOLTENVK_PATH}")
+		else()
+			message(WARNING "MoltenVK not found in path, it will depend on the target system having it.")
+		endif()
 
 		# If they say to skip postprocess bundle, leave the target in but make it so they have
 		# to manually run it

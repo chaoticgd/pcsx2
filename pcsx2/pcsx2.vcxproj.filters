@@ -1455,6 +1455,9 @@
     <ClCompile Include="DebugTools\ccc\util.cpp">
       <Filter>System\Ps2\Debug\ccc</Filter>
     </ClCompile>
+    <ClCompile Include="USB\usb-eyetoy\cam-jpeg.cpp">
+      <Filter>System\Ps2\USB\usb-eyetoy</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Patch.h">
@@ -2416,6 +2419,9 @@
     </ClInclude>
     <ClInclude Include="DebugTools\ccc\util.h">
       <Filter>System\Ps2\Debug\ccc</Filter>
+    </ClInclude>
+    <ClInclude Include="USB\usb-eyetoy\cam-jpeg.h">
+      <Filter>System\Ps2\USB\usb-eyetoy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

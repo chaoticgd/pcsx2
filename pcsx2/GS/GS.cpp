@@ -58,21 +58,6 @@ static GSRendererType GSCurrentRenderer;
 
 static u64 s_next_manual_present_time;
 
-void GSinit()
-{
-	GSVertexSW::InitStatic();
-
-	GSUtil::Init();
-}
-
-void GSshutdown()
-{
-	GSclose();
-
-	// ensure all screenshots have been saved
-	GSJoinSnapshotThreads();
-}
-
 GSRendererType GSGetCurrentRenderer()
 {
 	return GSCurrentRenderer;
@@ -191,6 +176,8 @@ static bool OpenGSRenderer(GSRendererType renderer, u8* basemem)
 {
 	// Must be done first, initialization routines in GSState use GSIsHardwareRenderer().
 	GSCurrentRenderer = renderer;
+
+	GSVertexSW::InitStatic();
 
 	if (renderer == GSRendererType::Null)
 	{
@@ -323,8 +310,8 @@ bool GSopen(const Pcsx2Config::GSOptions& config, GSRendererType renderer, u8* b
 	if (!res)
 	{
 		Host::ReportErrorAsync(
-			"Error", fmt::format("Failed to create render device. This may be due to your GPU not supporting the "
-								 "chosen renderer ({}), or because your graphics drivers need to be updated.",
+			"Error", fmt::format(TRANSLATE_FS("GS","Failed to create render device. This may be due to your GPU not supporting the "
+								 "chosen renderer ({}), or because your graphics drivers need to be updated."),
 						 Pcsx2Config::GSOptions::GetRendererName(GSConfig.Renderer)));
 		return false;
 	}

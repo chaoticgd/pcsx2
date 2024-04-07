@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
 // SPDX-License-Identifier: LGPL-3.0+
 
 #include "AutoUpdaterDialog.h"
@@ -34,6 +34,7 @@
 #include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/CrashHandler.h"
+#include "common/Error.h"
 #include "common/FileSystem.h"
 #include "common/HTTPDownloader.h"
 #include "common/Path.h"
@@ -183,13 +184,13 @@ void EmuThread::startFullscreenUI(bool fullscreen)
 
 	// this should just set the flag so it gets automatically started
 	ImGuiManager::InitializeFullscreenUI();
-	m_run_fullscreen_ui = true;
+	m_run_fullscreen_ui.store(true, std::memory_order_release);
 	m_is_rendering_to_main = shouldRenderToMain();
 	m_is_fullscreen = fullscreen;
 
 	if (!MTGS::WaitForOpen())
 	{
-		m_run_fullscreen_ui = false;
+		m_run_fullscreen_ui.store(false, std::memory_order_release);
 		return;
 	}
 
@@ -207,20 +208,21 @@ void EmuThread::stopFullscreenUI()
 		QMetaObject::invokeMethod(this, &EmuThread::stopFullscreenUI, Qt::QueuedConnection);
 
 		// wait until the host display is gone
-		while (!QtHost::IsVMValid() && MTGS::IsOpen())
+		// have to test the bool, because MTGS::IsOpen() goes false as soon as the close request happens.
+		while (m_run_fullscreen_ui.load(std::memory_order_acquire) || (!QtHost::IsVMValid() && MTGS::IsOpen()))
 			QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 1);
 
 		return;
 	}
 
-	if (m_run_fullscreen_ui)
-	{
-		m_run_fullscreen_ui = false;
-		emit onFullscreenUIStateChange(false);
-	}
-
 	if (MTGS::IsOpen() && !VMManager::HasValidVM())
 		MTGS::WaitForClose();
+
+	if (m_run_fullscreen_ui.load(std::memory_order_acquire))
+	{
+		m_run_fullscreen_ui.store(false, std::memory_order_release);
+		emit onFullscreenUIStateChange(false);
+	}
 }
 
 void EmuThread::startVM(std::shared_ptr<VMBootParameters> boot_params)
@@ -927,6 +929,7 @@ void Host::OnVMStarting()
 
 void Host::OnVMStarted()
 {
+	g_emu_thread->updatePerformanceMetrics(true);
 	emit g_emu_thread->onVMStarted();
 }
 
@@ -1001,49 +1004,41 @@ void EmuThread::updatePerformanceMetrics(bool force)
 	if (iwidth != m_last_internal_width || iheight != m_last_internal_height || speed != m_last_speed || gfps != m_last_game_fps ||
 		vfps != m_last_video_fps || renderer != m_last_renderer || force)
 	{
-		if (iwidth == 0 && iheight == 0)
+		if (renderer != m_last_renderer || force)
 		{
-			// if we don't have width/height yet, we're not going to have fps either.
-			// and we'll probably be <100% due to compiling. so just leave it blank for now.
-			QString blank;
-			QMetaObject::invokeMethod(
-				g_main_window->getStatusRendererWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, blank));
-			QMetaObject::invokeMethod(
-				g_main_window->getStatusResolutionWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, blank));
-			QMetaObject::invokeMethod(g_main_window->getStatusFPSWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, blank));
-			QMetaObject::invokeMethod(g_main_window->getStatusVPSWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, blank));
-			return;
+			QMetaObject::invokeMethod(g_main_window->getStatusRendererWidget(), "setText", Qt::QueuedConnection,
+				Q_ARG(const QString&, QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer))));
+			m_last_renderer = renderer;
 		}
-		else
+
+		if (iwidth != m_last_internal_width || iheight != m_last_internal_height || force)
 		{
-			if (renderer != m_last_renderer || force)
-			{
-				QMetaObject::invokeMethod(g_main_window->getStatusRendererWidget(), "setText", Qt::QueuedConnection,
-					Q_ARG(const QString&, QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer))));
-				m_last_renderer = renderer;
-			}
-			if (iwidth != m_last_internal_width || iheight != m_last_internal_height || force)
-			{
-				QMetaObject::invokeMethod(g_main_window->getStatusResolutionWidget(), "setText", Qt::QueuedConnection,
-					Q_ARG(const QString&, tr("%1x%2").arg(iwidth).arg(iheight)));
-				m_last_internal_width = iwidth;
-				m_last_internal_height = iheight;
-			}
+			QString text;
+			if (iwidth == 0 || iheight == 0)
+				text = tr("No Image");
+			else
+				text = tr("%1x%2").arg(iwidth).arg(iheight);
 
-			if (gfps != m_last_game_fps || force)
-			{
-				QMetaObject::invokeMethod(g_main_window->getStatusFPSWidget(), "setText", Qt::QueuedConnection,
-					Q_ARG(const QString&, tr("Game: %1 FPS").arg(gfps, 0, 'f', 0)));
-				m_last_game_fps = gfps;
-			}
+			QMetaObject::invokeMethod(
+				g_main_window->getStatusResolutionWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, text));
 
-			if (speed != m_last_speed || vfps != m_last_video_fps || force)
-			{
-				QMetaObject::invokeMethod(g_main_window->getStatusVPSWidget(), "setText", Qt::QueuedConnection,
-					Q_ARG(const QString&, tr("Video: %1 FPS (%2%)").arg(vfps, 0, 'f', 0).arg(speed, 0, 'f', 0)));
-				m_last_speed = speed;
-				m_last_video_fps = vfps;
-			}
+			m_last_internal_width = iwidth;
+			m_last_internal_height = iheight;
+		}
+
+		if (gfps != m_last_game_fps || force)
+		{
+			QMetaObject::invokeMethod(g_main_window->getStatusFPSWidget(), "setText", Qt::QueuedConnection,
+				Q_ARG(const QString&, tr("Game: %1 FPS").arg(gfps, 0, 'f', 0)));
+			m_last_game_fps = gfps;
+		}
+
+		if (speed != m_last_speed || vfps != m_last_video_fps || force)
+		{
+			QMetaObject::invokeMethod(g_main_window->getStatusVPSWidget(), "setText", Qt::QueuedConnection,
+				Q_ARG(const QString&, tr("Video: %1 FPS (%2%)").arg(vfps, 0, 'f', 0).arg(speed, 0, 'f', 0)));
+			m_last_speed = speed;
+			m_last_video_fps = vfps;
 		}
 	}
 }
@@ -1203,23 +1198,41 @@ void Host::OnCaptureStopped()
 
 bool QtHost::InitializeConfig()
 {
-	if (!EmuFolders::InitializeCriticalFolders())
+	Error error;
+
+	EmuFolders::SetAppRoot();
+
+	if (!EmuFolders::SetResourcesDirectory())
 	{
 		QMessageBox::critical(nullptr, QStringLiteral("PCSX2"),
-			QStringLiteral("One or more critical directories are missing, your installation may be incomplete."));
+			QStringLiteral("Resources directory is missing, your installation is incomplete."));
+		return false;
+	}
+
+	if (!EmuFolders::SetDataDirectory(&error))
+	{
+		// no point translating, config isn't loaded
+		QMessageBox::critical(
+			nullptr, QStringLiteral("PCSX2"),
+			QStringLiteral("Failed to create data directory at path\n\n%1\n\n"
+				"The error was: %2\n"
+				"Please ensure this directory is writable. You can also try portable mode "
+				"by creating portable.txt in the same directory you installed PCSX2 into.")
+				.arg(QString::fromStdString(EmuFolders::DataRoot))
+				.arg(QString::fromStdString(error.GetDescription())));
 		return false;
 	}
 
 	// Write crash dumps to the data directory, since that'll be accessible for certain.
 	CrashHandler::SetWriteDirectory(EmuFolders::DataRoot);
 
-	const std::string path(Path::Combine(EmuFolders::Settings, "PCSX2.ini"));
-	s_run_setup_wizard = s_run_setup_wizard || !FileSystem::FileExists(path.c_str());
-	Console.WriteLn("Loading config from %s.", path.c_str());
+	const std::string path = Path::Combine(EmuFolders::Settings, "PCSX2.ini");
+	const bool settings_exists = FileSystem::FileExists(path.c_str());
+	Console.WriteLnFmt("Loading config from {}.", path);
 
 	s_base_settings_interface = std::make_unique<INISettingsInterface>(std::move(path));
 	Host::Internal::SetBaseSettingsLayer(s_base_settings_interface.get());
-	if (!s_base_settings_interface->Load() || !VMManager::Internal::CheckSettingsVersion())
+	if (!settings_exists || !s_base_settings_interface->Load() || !VMManager::Internal::CheckSettingsVersion())
 	{
 		// If the config file doesn't exist, assume this is a new install and don't prompt to overwrite.
 		if (FileSystem::FileExists(s_base_settings_interface->GetFileName().c_str()) &&
@@ -1231,6 +1244,22 @@ bool QtHost::InitializeConfig()
 		}
 
 		VMManager::SetDefaultSettings(*s_base_settings_interface, true, true, true, true, true);
+
+		// Flag for running the setup wizard if this is our first run. We want to run it next time if they don't finish it.
+		s_base_settings_interface->SetBoolValue("UI", "SetupWizardIncomplete", true);
+
+		// Make sure we can actually save the config, and the user doesn't have some permission issue.
+		if (!s_base_settings_interface->Save(&error))
+		{
+			QMessageBox::critical(
+				nullptr, QStringLiteral("PCSX2"),
+				QStringLiteral(
+					"Failed to save configuration to\n\n%1\n\nThe error was: %2\n\nPlease ensure this directory is writable. You "
+					"can also try portable mode by creating portable.txt in the same directory you installed PCSX2 into.")
+					.arg(QString::fromStdString(s_base_settings_interface->GetFileName()))
+					.arg(QString::fromStdString(error.GetDescription())));
+			return false;
+		}
 
 		// Don't save if we're running the setup wizard. We want to run it next time if they don't finish it.
 		if (!s_run_setup_wizard)
@@ -1269,13 +1298,17 @@ void QtHost::SaveSettings()
 	pxAssertRel(!g_emu_thread->isOnEmuThread(), "Saving should happen on the UI thread.");
 
 	{
+		Error error;
 		auto lock = Host::GetSettingsLock();
-		if (!s_base_settings_interface->Save())
-			Console.Error("Failed to save settings.");
+		if (!s_base_settings_interface->Save(&error))
+			Console.ErrorFmt("Failed to save settings: {}", error.GetDescription());
 	}
 
-	s_settings_save_timer->deleteLater();
-	s_settings_save_timer.release();
+	if (s_settings_save_timer)
+	{
+		s_settings_save_timer->deleteLater();
+		s_settings_save_timer.release();
+	}
 }
 
 void Host::CommitBaseSettingChanges()
@@ -1385,8 +1418,7 @@ std::optional<bool> QtHost::DownloadFile(QWidget* parent, const QString& title, 
 	const std::string::size_type url_file_part_pos = url.rfind('/');
 	QtModalProgressCallback progress(parent);
 	progress.GetDialog().setLabelText(
-		qApp->translate("EmuThread", "Downloading %1...").arg(QtUtils::StringViewToQString(
-			std::string_view(url).substr((url_file_part_pos != std::string::npos) ? (url_file_part_pos + 1) : 0))));
+		qApp->translate("EmuThread", "Downloading %1...").arg(QtUtils::StringViewToQString(std::string_view(url).substr((url_file_part_pos != std::string::npos) ? (url_file_part_pos + 1) : 0))));
 	progress.GetDialog().setWindowTitle(title);
 	progress.GetDialog().setWindowIcon(GetAppIcon());
 	progress.SetCancellable(true);
@@ -1409,8 +1441,8 @@ std::optional<bool> QtHost::DownloadFile(QWidget* parent, const QString& title, 
 				QMessageBox::critical(parent, qApp->translate("EmuThread", "Error"),
 					qApp->translate("EmuThread", "Download failed: Data is empty.").arg(status_code));
 
-			download_result = false;
-			return;
+				download_result = false;
+				return;
 			}
 
 			*data = std::move(hdata);
@@ -1857,10 +1889,6 @@ void QtHost::RegisterTypes()
 
 bool QtHost::RunSetupWizard()
 {
-	// Set a flag in the config so that even though we created the ini, we'll run the wizard next time.
-	Host::SetBaseBoolSettingValue("UI", "SetupWizardIncomplete", true);
-	Host::CommitBaseSettingChanges();
-
 	SetupWizardDialog dialog;
 	if (dialog.exec() == QDialog::Rejected)
 		return false;

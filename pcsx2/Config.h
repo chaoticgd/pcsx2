@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
 // SPDX-License-Identifier: LGPL-3.0+
 
 #pragma once
@@ -24,6 +24,7 @@
 	} \
 	;
 
+class Error;
 class SettingsInterface;
 class SettingsWrapper;
 
@@ -325,6 +326,7 @@ enum class GSScreenshotFormat : u8
 {
 	PNG,
 	JPEG,
+	WebP,
 	Count,
 };
 
@@ -594,7 +596,6 @@ struct Pcsx2Config
 					UseDebugDevice : 1,
 					UseBlitSwapChain : 1,
 					DisableShaderCache : 1,
-					DisableDualSourceBlend : 1,
 					DisableFramebufferFetch : 1,
 					DisableVertexShaderExpand : 1,
 					DisableThreadedPresentation : 1,
@@ -1227,7 +1228,9 @@ namespace EmuFolders
 	extern std::string Videos;
 
 	/// Initializes critical folders (AppRoot, DataRoot, Settings). Call once on startup.
-	bool InitializeCriticalFolders();
+	void SetAppRoot();
+	bool SetResourcesDirectory();
+	bool SetDataDirectory(Error* error);
 
 	// Assumes that AppRoot and DataRoot have been initialized.
 	void SetDefaults(SettingsInterface& si);

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
 // SPDX-License-Identifier: LGPL-3.0+
 
 #include "GS/GS.h"
@@ -14,6 +14,7 @@
 
 #include "common/Console.h"
 #include "common/BitUtils.h"
+#include "common/Error.h"
 #include "common/HostSys.h"
 #include "common/ScopedGuard.h"
 #include "common/SmallString.h"
@@ -34,7 +35,7 @@ static u32 s_debug_scope_depth = 0;
 
 static bool IsDATMConvertShader(ShaderConvert i)
 {
-	return (i == ShaderConvert::DATM_0 || i == ShaderConvert::DATM_1);
+	return (i == ShaderConvert::DATM_0 || i == ShaderConvert::DATM_1 || i == ShaderConvert::DATM_0_RTA_CORRECTION || i == ShaderConvert::DATM_1_RTA_CORRECTION);
 }
 static bool IsDATEModePrimIDInit(u32 flag)
 {
@@ -855,9 +856,19 @@ bool GSDevice12::CreateSwapChain()
 			Console.Warning("Failed to create windowed swap chain.");
 	}
 
-	hr = m_dxgi_factory->MakeWindowAssociation(window_hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
-	if (FAILED(hr))
-		Console.Warning("MakeWindowAssociation() to disable ALT+ENTER failed");
+	// MWA needs to be called on the correct factory.
+	wil::com_ptr_nothrow<IDXGIFactory> swap_chain_factory;
+	hr = m_swap_chain->GetParent(IID_PPV_ARGS(swap_chain_factory.put()));
+	if (SUCCEEDED(hr))
+	{
+		hr = swap_chain_factory->MakeWindowAssociation(window_hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
+		if (FAILED(hr))
+			Console.ErrorFmt("MakeWindowAssociation() to disable ALT+ENTER failed: {}", Error::CreateHResult(hr).GetDescription());
+	}
+	else
+	{
+		Console.ErrorFmt("GetParent() on swap chain to get factory failed: {}", Error::CreateHResult(hr).GetDescription());
+	}
 
 	if (!CreateSwapChainRTV())
 	{
@@ -1195,8 +1206,6 @@ bool GSDevice12::CheckFeatures()
 	m_features.point_expand = false;
 	m_features.line_expand = false;
 	m_features.framebuffer_fetch = false;
-	m_features.dual_source_blend = true;
-	m_features.clip_control = true;
 	m_features.stencil_buffer = true;
 	m_features.cas_sharpening = true;
 	m_features.test_and_sample_depth = false;
@@ -1394,7 +1403,7 @@ void GSDevice12::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture*
 }
 
 void GSDevice12::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, bool red,
-	bool green, bool blue, bool alpha)
+	bool green, bool blue, bool alpha, ShaderConvert shader)
 {
 	GL_PUSH("ColorCopy Red:%d Green:%d Blue:%d Alpha:%d", red, green, blue, alpha);
 
@@ -1569,8 +1578,9 @@ void GSDevice12::DoMultiStretchRects(
 	SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	SetUtilityTexture(rects[0].src, rects[0].linear ? m_linear_sampler_cpu : m_point_sampler_cpu);
 
-	pxAssert(shader == ShaderConvert::COPY || rects[0].wmask.wrgba == 0xf);
-	SetPipeline((rects[0].wmask.wrgba != 0xf) ? m_color_copy[rects[0].wmask.wrgba].get() :
+	pxAssert(shader == ShaderConvert::COPY || shader == ShaderConvert::RTA_CORRECTION || rects[0].wmask.wrgba == 0xf);
+	int rta_bit = (shader == ShaderConvert::RTA_CORRECTION) ? 16 : 0;
+	SetPipeline((rects[0].wmask.wrgba != 0xf) ? m_color_copy[rects[0].wmask.wrgba | rta_bit].get() :
 												m_convert[static_cast<int>(shader)].get());
 
 	if (ApplyUtilityState())
@@ -1590,14 +1600,14 @@ void GSDevice12::BeginRenderPassForStretchRect(
 		BeginRenderPass(load_op, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE,
 			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
 			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-			dTex->GetClearColor());
+			dTex->GetUNormClearColor());
 	}
 	else
 	{
 		BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS,
 			D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, load_op, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE,
 			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-			0, dTex->GetClearDepth());
+			GSVector4::zero(), dTex->GetClearDepth());
 	}
 }
 
@@ -1714,7 +1724,7 @@ void GSDevice12::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, 
 		BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR,
 			D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE, D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS,
 			D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS,
-			D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, c);
+			D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, GSVector4::unorm8(c));
 		SetUtilityRootSignature();
 		SetPipeline(m_convert[static_cast<int>(ShaderConvert::COPY)].get());
 		DrawStretchRect(sRect[1], PMODE.SLBG ? dRect[2] : dRect[1], dsize);
@@ -1756,7 +1766,8 @@ void GSDevice12::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, 
 		OMSetRenderTargets(dTex, nullptr, darea);
 		BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE,
 			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS, c);
+			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
+			GSVector4::unorm8(c));
 		dTex->SetState(GSTexture::State::Dirty);
 	}
 	else if (!InRenderPass())
@@ -2401,6 +2412,8 @@ bool GSDevice12::CompileConvertPipelines()
 			break;
 			case ShaderConvert::DATM_0:
 			case ShaderConvert::DATM_1:
+			case ShaderConvert::DATM_0_RTA_CORRECTION:
+			case ShaderConvert::DATM_1_RTA_CORRECTION:
 			{
 				gpb.ClearRenderTargets();
 				gpb.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT_S8X24_UINT);
@@ -2446,17 +2459,42 @@ bool GSDevice12::CompileConvertPipelines()
 			// compile color copy pipelines
 			gpb.SetRenderTarget(0, DXGI_FORMAT_R8G8B8A8_UNORM);
 			gpb.SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
-			for (u32 i = 0; i < 16; i++)
+			for (u32 j = 0; j < 16; j++)
 			{
-				pxAssert(!m_color_copy[i]);
+				pxAssert(!m_color_copy[j]);
 				gpb.SetBlendState(0, false, D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, D3D12_BLEND_ONE,
-					D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, static_cast<u8>(i));
-				m_color_copy[i] = gpb.Create(m_device.get(), m_shader_cache, false);
-				if (!m_color_copy[i])
+					D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, static_cast<u8>(j));
+				m_color_copy[j] = gpb.Create(m_device.get(), m_shader_cache, false);
+				if (!m_color_copy[j])
 					return false;
 
-				D3D12::SetObjectName(m_color_copy[i].get(), TinyString::from_fmt("Color copy pipeline (r={}, g={}, b={}, a={})",
-					i & 1u, (i >> 1) & 1u, (i >> 2) & 1u, (i >> 3) & 1u));
+				D3D12::SetObjectName(m_color_copy[j].get(), TinyString::from_fmt("Color copy pipeline (r={}, g={}, b={}, a={})",
+					j & 1u, (j >> 1) & 1u, (j >> 2) & 1u, (j >> 3) & 1u));
+			}
+		}
+		else if (i == ShaderConvert::RTA_CORRECTION)
+		{
+			// compile color copy pipelines
+			gpb.SetRenderTarget(0, DXGI_FORMAT_R8G8B8A8_UNORM);
+			gpb.SetDepthStencilFormat(DXGI_FORMAT_UNKNOWN);
+
+			ComPtr<ID3DBlob> ps(GetUtilityPixelShader(*shader, shaderName(i)));
+			if (!ps)
+				return false;
+
+			gpb.SetPixelShader(ps.get());
+
+			for (u32 j = 16; j < 32; j++)
+			{
+				pxAssert(!m_color_copy[j]);
+				gpb.SetBlendState(0, false, D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, D3D12_BLEND_ONE,
+					D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, static_cast<u8>(j - 16));
+				m_color_copy[j] = gpb.Create(m_device.get(), m_shader_cache, false);
+				if (!m_color_copy[j])
+					return false;
+
+				D3D12::SetObjectName(m_color_copy[j].get(), TinyString::from_fmt("Color copy pipeline (r={}, g={}, b={}, a={})",
+																j & 1u, (j >> 1) & 1u, (j >> 2) & 1u, (j >> 3) & 1u));
 			}
 		}
 		else if (i == ShaderConvert::HDR_INIT || i == ShaderConvert::HDR_RESOLVE)
@@ -2478,10 +2516,10 @@ bool GSDevice12::CompileConvertPipelines()
 		}
 	}
 
-	for (u32 datm = 0; datm < 2; datm++)
+	for (u32 datm = 0; datm < 4; datm++)
 	{
-		ComPtr<ID3DBlob> ps(
-			GetUtilityPixelShader(*shader, datm ? "ps_stencil_image_init_1" : "ps_stencil_image_init_0"));
+		const std::string entry_point(StringUtil::StdStringFromFormat("ps_stencil_image_init_%d", datm));
+		ComPtr<ID3DBlob> ps(GetUtilityPixelShader(*shader, entry_point.c_str()));
 		if (!ps)
 			return false;
 
@@ -2501,7 +2539,7 @@ bool GSDevice12::CompileConvertPipelines()
 				return false;
 
 			D3D12::SetObjectName(m_date_image_setup_pipelines[ds][datm].get(),
-				TinyString::from_fmt("DATE image clear pipeline (ds={}, datm={})", ds, datm));
+				TinyString::from_fmt("DATE image clear pipeline (ds={}, datm={})", ds, (datm == 1 || datm == 3)));
 		}
 	}
 
@@ -2645,7 +2683,7 @@ bool GSDevice12::CompilePostProcessingPipelines()
 		}
 
 		ShaderMacro sm;
-		sm.AddMacro("FXAA_HLSL_5", "1");
+		sm.AddMacro("FXAA_HLSL", "1");
 		ComPtr<ID3DBlob> ps = m_shader_cache.GetPixelShader(*shader, sm.GetPtr());
 		if (!ps)
 			return false;
@@ -2793,6 +2831,7 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_TCC", sel.tcc);
 	sm.AddMacro("PS_DATE", sel.date);
 	sm.AddMacro("PS_ATST", sel.atst);
+	sm.AddMacro("PS_AFAIL", sel.afail);
 	sm.AddMacro("PS_FOG", sel.fog);
 	sm.AddMacro("PS_IIP", sel.iip);
 	sm.AddMacro("PS_BLEND_HW", sel.blend_hw);
@@ -2805,7 +2844,9 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_REGION_RECT", sel.region_rect);
 	sm.AddMacro("PS_SHUFFLE", sel.shuffle);
 	sm.AddMacro("PS_SHUFFLE_SAME", sel.shuffle_same);
-	sm.AddMacro("PS_READ_BA", sel.read_ba);
+	sm.AddMacro("PS_PROCESS_BA", sel.process_ba);
+	sm.AddMacro("PS_PROCESS_RG", sel.process_rg);
+	sm.AddMacro("PS_SHUFFLE_ACROSS", sel.shuffle_across);
 	sm.AddMacro("PS_READ16_SRC", sel.real16src);
 	sm.AddMacro("PS_CHANNEL_FETCH", sel.channel);
 	sm.AddMacro("PS_TALES_OF_ABYSS_HLE", sel.tales_of_abyss_hle);
@@ -2814,6 +2855,8 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_DEPTH_FMT", sel.depth_fmt);
 	sm.AddMacro("PS_PAL_FMT", sel.pal_fmt);
 	sm.AddMacro("PS_HDR", sel.hdr);
+	sm.AddMacro("PS_RTA_CORRECTION", sel.rta_correction);
+	sm.AddMacro("PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
 	sm.AddMacro("PS_COLCLIP", sel.colclip);
 	sm.AddMacro("PS_BLEND_A", sel.blend_a);
 	sm.AddMacro("PS_BLEND_B", sel.blend_b);
@@ -2832,8 +2875,6 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_TEX_IS_FB", sel.tex_is_fb);
 	sm.AddMacro("PS_NO_COLOR", sel.no_color);
 	sm.AddMacro("PS_NO_COLOR1", sel.no_color1);
-	sm.AddMacro("PS_NO_ABLEND", sel.no_ablend);
-	sm.AddMacro("PS_ONLY_ALPHA", sel.only_alpha);
 
 	ComPtr<ID3DBlob> ps(m_shader_cache.GetPixelShader(m_tfx_source, sm.GetPtr(), "ps_main"));
 	it = m_tfx_pixel_shaders.emplace(sel, std::move(ps)).first;
@@ -2850,7 +2891,7 @@ GSDevice12::ComPtr<ID3D12PipelineState> GSDevice12::CreateTFXPipeline(const Pipe
 
 	GSHWDrawConfig::BlendState pbs{p.bs};
 	GSHWDrawConfig::PSSelector pps{p.ps};
-	if ((p.cms.wrgba & 0x7) == 0)
+	if (!p.bs.IsEffective(p.cms))
 	{
 		// disable blending when colours are masked
 		pbs = {};
@@ -2936,7 +2977,8 @@ GSDevice12::ComPtr<ID3D12PipelineState> GSDevice12::CreateTFXPipeline(const Pipe
 		// clang-format on
 
 		gpb.SetBlendState(0, true, d3d_blend_factors[pbs.src_factor], d3d_blend_factors[pbs.dst_factor],
-			d3d_blend_ops[pbs.op], D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD, p.cms.wrgba);
+			d3d_blend_ops[pbs.op], d3d_blend_factors[pbs.src_factor_alpha], d3d_blend_factors[pbs.dst_factor_alpha],
+			D3D12_BLEND_OP_ADD, p.cms.wrgba);
 	}
 	else
 	{
@@ -3329,7 +3371,7 @@ bool GSDevice12::InRenderPass()
 void GSDevice12::BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE color_begin,
 	D3D12_RENDER_PASS_ENDING_ACCESS_TYPE color_end, D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE depth_begin,
 	D3D12_RENDER_PASS_ENDING_ACCESS_TYPE depth_end, D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE stencil_begin,
-	D3D12_RENDER_PASS_ENDING_ACCESS_TYPE stencil_end, u32 clear_color, float clear_depth, u8 clear_stencil)
+	D3D12_RENDER_PASS_ENDING_ACCESS_TYPE stencil_end, GSVector4 clear_color, float clear_depth, u8 clear_stencil)
 {
 	if (m_in_render_pass)
 		EndRenderPass();
@@ -3348,8 +3390,7 @@ void GSDevice12::BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE color_b
 		{
 			LookupNativeFormat(m_current_render_target->GetFormat(), nullptr,
 				&rt.BeginningAccess.Clear.ClearValue.Format, nullptr, nullptr);
-			GSVector4::store<false>(rt.BeginningAccess.Clear.ClearValue.Color,
-				GSVector4::unorm8(clear_color));
+			GSVector4::store<false>(rt.BeginningAccess.Clear.ClearValue.Color, clear_color);
 		}
 	}
 
@@ -3620,7 +3661,7 @@ void GSDevice12::SetPSConstantBuffer(const GSHWDrawConfig::PSConstantBuffer& cb)
 		m_dirty_flags |= DIRTY_FLAG_PS_CONSTANT_BUFFER;
 }
 
-void GSDevice12::SetupDATE(GSTexture* rt, GSTexture* ds, bool datm, const GSVector4i& bbox)
+void GSDevice12::SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox)
 {
 	GL_PUSH("SetupDATE {%d,%d} %dx%d", bbox.left, bbox.top, bbox.width(), bbox.height());
 
@@ -3640,11 +3681,12 @@ void GSDevice12::SetupDATE(GSTexture* rt, GSTexture* ds, bool datm, const GSVect
 	OMSetRenderTargets(nullptr, ds, bbox);
 	IASetVertexBuffer(vertices, sizeof(vertices[0]), 4);
 	SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	SetPipeline(m_convert[static_cast<int>(datm ? ShaderConvert::DATM_1 : ShaderConvert::DATM_0)].get());
+	SetPipeline(m_convert[SetDATMShader(datm)].get());
 	SetStencilRef(1);
 	BeginRenderPass(D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
 		D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE,
-		D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE, 0, 0.0f, 0);
+		D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE,
+		GSVector4::zero(), 0.0f, 0);
 	if (ApplyUtilityState())
 		DrawPrimitive();
 
@@ -3679,7 +3721,7 @@ GSTexture12* GSDevice12::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config, Pipe
 					D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS,
 		config.ds ? D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE : D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
 		D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-		0, config.ds ? config.ds->GetClearDepth() : 0.0f);
+		GSVector4::zero(), config.ds ? config.ds->GetClearDepth() : 0.0f);
 
 	// draw the quad to prefill the image
 	const GSVector4 src = GSVector4(config.drawarea) / GSVector4(rtsize).xyxy();
@@ -3692,7 +3734,7 @@ GSTexture12* GSDevice12::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config, Pipe
 	};
 	SetUtilityRootSignature();
 	SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	SetPipeline(m_date_image_setup_pipelines[pipe.ds][config.datm].get());
+	SetPipeline(m_date_image_setup_pipelines[pipe.ds][static_cast<u8>(config.datm)].get());
 	IASetVertexBuffer(vertices, sizeof(vertices[0]), std::size(vertices));
 	if (ApplyUtilityState())
 		DrawPrimitive();
@@ -3861,6 +3903,12 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 	// Begin render pass if new target or out of the area.
 	if (!m_in_render_pass)
 	{
+		GSVector4 clear_color = draw_rt ? draw_rt->GetUNormClearColor() : GSVector4::zero();
+		if (pipe.ps.hdr)
+		{
+			// Denormalize clear color for HDR.
+			clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);
+		}
 		BeginRenderPass(GetLoadOpForTexture(draw_rt),
 			draw_rt ? D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE : D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
 			GetLoadOpForTexture(draw_ds),
@@ -3869,7 +3917,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 						   D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS,
 			stencil_DATE ? D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_DISCARD :
 						   D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-			draw_rt ? draw_rt->GetClearColor() : 0, draw_ds ? draw_ds->GetClearDepth() : 0.0f, 1);
+			clear_color, draw_ds ? draw_ds->GetClearDepth() : 0.0f, 1);
 	}
 
 	// rt -> hdr blit if enabled
@@ -3892,15 +3940,18 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 
 	// now we can do the actual draw
 	if (BindDrawPipeline(pipe))
-	{
 		DrawIndexedPrimitive();
 
-		if (config.second_separate_alpha_pass)
-		{
-			SetHWDrawConfigForAlphaPass(&pipe.ps, &pipe.cms, &pipe.bs, &pipe.dss);
-			if (BindDrawPipeline(pipe))
-				DrawIndexedPrimitive();
-		}
+	// blend second pass
+	if (config.blend_second_pass.enable)
+	{
+		if (config.blend_second_pass.blend.constant_enable)
+			SetBlendConstants(config.blend_second_pass.blend.constant);
+
+		pipe.bs = config.blend_second_pass.blend;
+		pipe.ps.blend_hw = config.blend_second_pass.blend_hw;
+		if (BindDrawPipeline(pipe))
+			DrawIndexedPrimitive();
 	}
 
 	// and the alpha pass
@@ -3918,16 +3969,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 		pipe.dss = config.alpha_second_pass.depth;
 		pipe.bs = config.blend;
 		if (BindDrawPipeline(pipe))
-		{
 			DrawIndexedPrimitive();
-
-			if (config.second_separate_alpha_pass)
-			{
-				SetHWDrawConfigForAlphaPass(&pipe.ps, &pipe.cms, &pipe.bs, &pipe.dss);
-				if (BindDrawPipeline(pipe))
-					DrawIndexedPrimitive();
-			}
-		}
 	}
 
 	if (draw_rt_clone)
@@ -3952,7 +3994,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 			GetLoadOpForTexture(draw_ds),
 			draw_ds ? D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE : D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
 			D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS, D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS,
-			draw_rt->GetClearColor(), 0.0f, 0);
+			draw_rt->GetUNormClearColor(), 0.0f, 0);
 
 		const GSVector4 sRect(GSVector4(render_area) / GSVector4(rtsize.x, rtsize.y).xyxy());
 		SetPipeline(m_hdr_finish_pipelines[pipe.ds].get());

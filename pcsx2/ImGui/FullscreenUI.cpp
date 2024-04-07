@@ -1269,7 +1269,7 @@ void FullscreenUI::DrawInputBindingButton(
 	{
 		BeginInputBinding(bsi, type, section, name, display_name);
 	}
-	else if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsNavInputTest(ImGuiNavInput_Input, ImGuiNavReadMode_Pressed))
+	else if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsKeyPressed(ImGuiKey_NavGamepadInput, false))
 	{
 		bsi->DeleteValue(section, name);
 		SetSettingsChanged(bsi);
@@ -2499,12 +2499,12 @@ void FullscreenUI::DrawSettingsWindow()
 
 		if (!ImGui::IsPopupOpen(0u, ImGuiPopupFlags_AnyPopup))
 		{
-			if (ImGui::IsNavInputTest(ImGuiNavInput_FocusPrev, ImGuiNavReadMode_Pressed))
+			if (ImGui::IsKeyPressed(ImGuiKey_NavGamepadTweakSlow, false))
 			{
 				index = (index == 0) ? (count - 1) : (index - 1);
 				s_settings_page = pages[index];
 			}
-			else if (ImGui::IsNavInputTest(ImGuiNavInput_FocusNext, ImGuiNavReadMode_Pressed))
+			else if (ImGui::IsKeyPressed(ImGuiKey_NavGamepadTweakFast, false))
 			{
 				index = (index + 1) % count;
 				s_settings_page = pages[index];
@@ -2805,7 +2805,7 @@ void FullscreenUI::DrawBIOSSettingsPage()
 	DrawFolderSetting(bsi, FSUI_ICONSTR(ICON_FA_FOLDER_OPEN, "Change Search Directory"), "Folders", "Bios", EmuFolders::Bios);
 
 	const std::string bios_selection(GetEditingSettingsInterface()->GetStringValue("Filenames", "BIOS", ""));
-	if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_MICROCHIP, "BIOS Selection"),
+	if (MenuButtonWithValue(FSUI_ICONSTR(ICON_PF_MICROCHIP, "BIOS Selection"),
 			FSUI_CSTR("Changes the BIOS image used to start future sessions."),
 			bios_selection.empty() ? FSUI_CSTR("Automatic") : bios_selection.c_str()))
 	{
@@ -3219,6 +3219,7 @@ void FullscreenUI::DrawGraphicsSettingsPage()
 	static constexpr const char* s_screenshot_formats[] = {
 		FSUI_NSTR("PNG"),
 		FSUI_NSTR("JPEG"),
+		FSUI_NSTR("WebP"),
 	};
 
 	SettingsInterface* bsi = GetEditingSettingsInterface();
@@ -3556,8 +3557,6 @@ void FullscreenUI::DrawGraphicsSettingsPage()
 		"GSDumpCompression", static_cast<int>(GSDumpCompressionMethod::LZMA), s_gsdump_compression, std::size(s_gsdump_compression), true);
 	DrawToggleSetting(bsi, FSUI_CSTR("Disable Framebuffer Fetch"),
 		FSUI_CSTR("Prevents the usage of framebuffer fetch when supported by host GPU."), "EmuCore/GS", "DisableFramebufferFetch", false);
-	DrawToggleSetting(bsi, FSUI_CSTR("Disable Dual-Source Blending"),
-		FSUI_CSTR("Prevents the usage of dual-source blending when supported by host GPU."), "EmuCore/GS", "DisableDualSourceBlend", false);
 	DrawToggleSetting(bsi, FSUI_CSTR("Disable Shader Cache"), FSUI_CSTR("Prevents the loading and saving of shaders/pipelines to disk."),
 		"EmuCore/GS", "DisableShaderCache", false);
 	DrawToggleSetting(bsi, FSUI_CSTR("Disable Vertex Shader Expand"), FSUI_CSTR("Falls back to the CPU for expanding sprites/lines."),
@@ -5199,11 +5198,8 @@ void FullscreenUI::DrawSaveStateSelector(bool is_loading)
 					break;
 				}
 
-				if (hovered &&
-					(ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsNavInputTest(ImGuiNavInput_Input, ImGuiNavReadMode_Pressed)))
-				{
+				if (hovered && (ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsKeyPressed(ImGuiKey_NavGamepadInput, false)))
 					s_save_state_selector_submenu_index = static_cast<s32>(i);
-				}
 			}
 
 			grid_x++;
@@ -5461,12 +5457,12 @@ void FullscreenUI::DrawGameListWindow()
 
 		if (!ImGui::IsPopupOpen(0u, ImGuiPopupFlags_AnyPopup))
 		{
-			if (ImGui::IsNavInputTest(ImGuiNavInput_FocusPrev, ImGuiNavReadMode_Pressed))
+			if (ImGui::IsKeyPressed(ImGuiKey_NavGamepadTweakSlow, false))
 			{
 				s_game_list_page = static_cast<GameListPage>(
 					(s_game_list_page == static_cast<GameListPage>(0)) ? (count - 1) : (static_cast<u32>(s_game_list_page) - 1));
 			}
-			else if (ImGui::IsNavInputTest(ImGuiNavInput_FocusNext, ImGuiNavReadMode_Pressed))
+			else if (ImGui::IsKeyPressed(ImGuiKey_NavGamepadTweakFast, false))
 			{
 				s_game_list_page = static_cast<GameListPage>((static_cast<u32>(s_game_list_page) + 1) % count);
 			}
@@ -5598,7 +5594,7 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
 				selected_entry = entry;
 
 			if (selected_entry &&
-				(ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsNavInputTest(ImGuiNavInput_Input, ImGuiNavReadMode_Pressed)))
+				(ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsKeyPressed(ImGuiKey_NavGamepadInput, false)))
 			{
 				HandleGameListOptions(selected_entry);
 			}
@@ -5800,11 +5796,8 @@ void FullscreenUI::DrawGameGrid(const ImVec2& heading_size)
 			if (pressed)
 				HandleGameListActivate(entry);
 
-			if (hovered &&
-				(ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsNavInputTest(ImGuiNavInput_Input, ImGuiNavReadMode_Pressed)))
-			{
+			if (hovered && (ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsKeyPressed(ImGuiKey_NavGamepadInput, false)))
 				HandleGameListOptions(entry);
-			}
 		}
 
 		grid_x++;
@@ -6664,8 +6657,6 @@ TRANSLATE_NOOP("FullscreenUI", "GS Dump Compression");
 TRANSLATE_NOOP("FullscreenUI", "Sets the compression algorithm for GS dumps.");
 TRANSLATE_NOOP("FullscreenUI", "Disable Framebuffer Fetch");
 TRANSLATE_NOOP("FullscreenUI", "Prevents the usage of framebuffer fetch when supported by host GPU.");
-TRANSLATE_NOOP("FullscreenUI", "Disable Dual-Source Blending");
-TRANSLATE_NOOP("FullscreenUI", "Prevents the usage of dual-source blending when supported by host GPU.");
 TRANSLATE_NOOP("FullscreenUI", "Disable Shader Cache");
 TRANSLATE_NOOP("FullscreenUI", "Prevents the loading and saving of shaders/pipelines to disk.");
 TRANSLATE_NOOP("FullscreenUI", "Disable Vertex Shader Expand");

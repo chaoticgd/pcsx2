@@ -38,8 +38,8 @@ namespace ImGuiFullscreen
 
 	static constexpr float MENU_BACKGROUND_ANIMATION_TIME = 0.5f;
 
-	static std::optional<Common::RGBA8Image> LoadTextureImage(const char* path);
-	static std::shared_ptr<GSTexture> UploadTexture(const char* path, const Common::RGBA8Image& image);
+	static std::optional<RGBA8Image> LoadTextureImage(const char* path);
+	static std::shared_ptr<GSTexture> UploadTexture(const char* path, const RGBA8Image& image);
 	static void TextureLoaderThread();
 
 	static void DrawFileSelector();
@@ -92,7 +92,7 @@ namespace ImGuiFullscreen
 	static std::mutex s_texture_load_mutex;
 	static std::condition_variable s_texture_load_cv;
 	static std::deque<std::string> s_texture_load_queue;
-	static std::deque<std::pair<std::string, Common::RGBA8Image>> s_texture_upload_queue;
+	static std::deque<std::pair<std::string, RGBA8Image>> s_texture_upload_queue;
 	static Threading::Thread s_texture_load_thread;
 
 	static bool s_choice_dialog_open = false;
@@ -263,9 +263,9 @@ const std::shared_ptr<GSTexture>& ImGuiFullscreen::GetPlaceholderTexture()
 	return s_placeholder_texture;
 }
 
-std::optional<Common::RGBA8Image> ImGuiFullscreen::LoadTextureImage(const char* path)
+std::optional<RGBA8Image> ImGuiFullscreen::LoadTextureImage(const char* path)
 {
-	std::optional<Common::RGBA8Image> image;
+	std::optional<RGBA8Image> image;
 
 	std::optional<std::vector<u8>> data;
 	if (Path::IsAbsolute(path))
@@ -274,7 +274,7 @@ std::optional<Common::RGBA8Image> ImGuiFullscreen::LoadTextureImage(const char* 
 		data = FileSystem::ReadBinaryFile(Path::Combine(EmuFolders::Resources, path).c_str());
 	if (data.has_value())
 	{
-		image = Common::RGBA8Image();
+		image = RGBA8Image();
 		if (!image->LoadFromBuffer(path, data->data(), data->size()))
 		{
 			Console.Error("Failed to read texture resource '%s'", path);
@@ -289,7 +289,7 @@ std::optional<Common::RGBA8Image> ImGuiFullscreen::LoadTextureImage(const char* 
 	return image;
 }
 
-std::shared_ptr<GSTexture> ImGuiFullscreen::UploadTexture(const char* path, const Common::RGBA8Image& image)
+std::shared_ptr<GSTexture> ImGuiFullscreen::UploadTexture(const char* path, const RGBA8Image& image)
 {
 	GSTexture* texture = g_gs_device->CreateTexture(image.GetWidth(), image.GetHeight(), 1, GSTexture::Format::Color);
 	if (!texture)
@@ -298,7 +298,7 @@ std::shared_ptr<GSTexture> ImGuiFullscreen::UploadTexture(const char* path, cons
 		return {};
 	}
 
-	if (!texture->Update(GSVector4i(0, 0, image.GetWidth(), image.GetHeight()), image.GetPixels(), image.GetByteStride()))
+	if (!texture->Update(GSVector4i(0, 0, image.GetWidth(), image.GetHeight()), image.GetPixels(), image.GetPitch()))
 	{
 		Console.Error("Failed to upload %ux%u texture for resource", image.GetWidth(), image.GetHeight());
 		g_gs_device->Recycle(texture);
@@ -311,7 +311,7 @@ std::shared_ptr<GSTexture> ImGuiFullscreen::UploadTexture(const char* path, cons
 
 std::shared_ptr<GSTexture> ImGuiFullscreen::LoadTexture(const char* path)
 {
-	std::optional<Common::RGBA8Image> image(LoadTextureImage(path));
+	std::optional<RGBA8Image> image(LoadTextureImage(path));
 	if (image.has_value())
 	{
 		std::shared_ptr<GSTexture> ret(UploadTexture(path, image.value()));
@@ -361,7 +361,7 @@ void ImGuiFullscreen::UploadAsyncTextures()
 	std::unique_lock lock(s_texture_load_mutex);
 	while (!s_texture_upload_queue.empty())
 	{
-		std::pair<std::string, Common::RGBA8Image> it(std::move(s_texture_upload_queue.front()));
+		std::pair<std::string, RGBA8Image> it(std::move(s_texture_upload_queue.front()));
 		s_texture_upload_queue.pop_front();
 		lock.unlock();
 
@@ -393,7 +393,7 @@ void ImGuiFullscreen::TextureLoaderThread()
 			s_texture_load_queue.pop_front();
 
 			lock.unlock();
-			std::optional<Common::RGBA8Image> image(LoadTextureImage(path.c_str()));
+			std::optional<RGBA8Image> image(LoadTextureImage(path.c_str()));
 			lock.lock();
 
 			// don't bother queuing back if it doesn't exist
@@ -556,15 +556,15 @@ bool ImGuiFullscreen::WantsToCloseMenu()
 	// Wait for the Close button to be released, THEN pressed
 	if (s_close_button_state == 0)
 	{
-		if (ImGui::IsNavInputTest(ImGuiNavInput_Cancel, ImGuiNavReadMode_Pressed))
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
 			s_close_button_state = 1;
-	}
-	else if (s_close_button_state == 1)
-	{
-		if (ImGui::IsNavInputTest(ImGuiNavInput_Cancel, ImGuiNavReadMode_Released))
-		{
+		else if (ImGui::IsKeyPressed(ImGuiKey_NavGamepadCancel, false))
 			s_close_button_state = 2;
-		}
+	}
+	else if ((s_close_button_state == 1 && ImGui::IsKeyReleased(ImGuiKey_Escape)) ||
+			 (s_close_button_state == 2 && ImGui::IsKeyReleased(ImGuiKey_NavGamepadCancel)))
+	{
+		s_close_button_state = 3;
 	}
 	return s_close_button_state > 1;
 }
@@ -2578,9 +2578,9 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 		ImDrawList* dl = ImGui::GetForegroundDrawList();
 		dl->AddRectFilled(ImVec2(box_min.x + shadow_size, box_min.y + shadow_size),
 			ImVec2(box_max.x + shadow_size, box_max.y + shadow_size),
-			IM_COL32(20, 20, 20, (180 * opacity) / 255u), rounding, ImDrawCornerFlags_All);
-		dl->AddRectFilled(box_min, box_max, background_color, rounding, ImDrawCornerFlags_All);
-		dl->AddRect(box_min, box_max, border_color, rounding, ImDrawCornerFlags_All, ImGuiFullscreen::LayoutScale(1.0f));
+			IM_COL32(20, 20, 20, (180 * opacity) / 255u), rounding, ImDrawFlags_RoundCornersAll);
+		dl->AddRectFilled(box_min, box_max, background_color, rounding, ImDrawFlags_RoundCornersAll);
+		dl->AddRect(box_min, box_max, border_color, rounding, ImDrawFlags_RoundCornersAll, ImGuiFullscreen::LayoutScale(1.0f));
 
 		const ImVec2 badge_min(box_min.x + horizontal_padding, box_min.y + vertical_padding);
 		const ImVec2 badge_max(badge_min.x + badge_size, badge_min.y + badge_size);
