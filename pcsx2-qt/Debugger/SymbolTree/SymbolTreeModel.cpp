@@ -101,11 +101,19 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 	if (!node)
 		return QVariant();
 
-	// Gray out symbols that have been overwritten in memory.
-	if (role == Qt::ForegroundRole && index.column() == NAME && node->symbol.valid())
+	if (role == Qt::ForegroundRole)
 	{
-		bool matching = symbolMatchesMemory(node->symbol);
-		QPalette::ColorGroup group = matching ? QPalette::Active : QPalette::Disabled;
+		bool active = true;
+
+		// Gray out the names of symbols that have been overwritten in memory.
+		if (index.column() == NAME && node->symbol.valid())
+			active = symbolMatchesMemory(node->symbol);
+
+		// Gray out the values of variables that are dead.
+		if (index.column() == VALUE && node->liveness().has_value())
+			active = *node->liveness();
+
+		QPalette::ColorGroup group = active ? QPalette::Active : QPalette::Disabled;
 		return QBrush(QApplication::palette().color(group, QPalette::Text));
 	}
 
