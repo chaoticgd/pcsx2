@@ -308,7 +308,9 @@ namespace Sessions
 		windowSize.store(tcp->windowSize << windowScale);
 
 		const NumCheckResult Result = CheckNumbers(tcp);
+		//Check if we already have some of the data sent
 		const uint delta = GetDelta(expectedSeqNumber, tcp->sequenceNumber);
+		pxAssert(delta >= 0);
 		//if (Result == NumCheckResult::GotOldData)
 		//{
 		//	DevCon.WriteLn("[PS2] New Data Offset: %d bytes", delta);
@@ -361,7 +363,7 @@ namespace Sessions
 				//Done send
 			}
 			//ACK data
-			//DevCon.WriteLn("[SRV] ACK Data: %d", expectedSeqNumber);
+			//DevCon.WriteLn("[SRV] ACK Data: %u", expectedSeqNumber);
 			TCP_Packet* ret = CreateBasePacket();
 			ret->SetACK(true);
 
@@ -402,11 +404,11 @@ namespace Sessions
 	TCP_Session::NumCheckResult TCP_Session::CheckRepeatSYNNumbers(TCP_Packet* tcp)
 	{
 		//DevCon.WriteLn("DEV9: TCP: CHECK_REPEAT_SYN_NUMBERS");
-		//DevCon.WriteLn("DEV9: TCP: [SRV]CurrAckNumber = %d [PS2]Seq Number = %d", expectedSeqNumber, tcp->sequenceNumber);
+		//DevCon.WriteLn("DEV9: TCP: [SRV] CurrAckNumber = %u [PS2] Seq Number = %u", expectedSeqNumber, tcp->sequenceNumber);
 
 		if (tcp->sequenceNumber != expectedSeqNumber - 1)
 		{
-			Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From Repeated SYN Packet, Got %d Expected %d", tcp->sequenceNumber, (expectedSeqNumber - 1));
+			Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From Repeated SYN Packet, Got %u Expected %u", tcp->sequenceNumber, (expectedSeqNumber - 1));
 			return NumCheckResult::Bad;
 		}
 		return NumCheckResult::OK;
@@ -419,61 +421,52 @@ namespace Sessions
 		std::tie(seqNum, oldSeqNums) = GetAllMyNumbers();
 
 		//DevCon.WriteLn("DEV9: TCP: CHECK_NUMBERS");
-		//DevCon.WriteLn("DEV9: TCP: [SRV]CurrSeqNumber = %d [PS2]Ack Number = %d", seqNum, tcp->acknowledgementNumber);
-		//DevCon.WriteLn("DEV9: TCP: [SRV]CurrAckNumber = %d [PS2]Seq Number = %d", expectedSeqNumber, tcp->sequenceNumber);
-		//DevCon.WriteLn("DEV9: TCP: [PS2]Data Length = %d",  tcp->GetPayload()->GetLength());
+		//DevCon.WriteLn("DEV9: TCP: [SRV] CurrSeqNumber = %u [PS2] Ack Number = %u", seqNum, tcp->acknowledgementNumber);
+		//DevCon.WriteLn("DEV9: TCP: [SRV] CurrAckNumber = %u [PS2] Seq Number = %u", expectedSeqNumber, tcp->sequenceNumber);
+		//DevCon.WriteLn("DEV9: TCP: [PS2] Data Length = %u",  tcp->GetPayload()->GetLength());
 
 		if (tcp->acknowledgementNumber != seqNum)
 		{
-			//DevCon.WriteLn("DEV9: TCP: [PS2]Sent Outdated Acknowledgement Number, Got %d Expected %d", tcp->acknowledgementNumber, seqNum);
+			//DevCon.WriteLn("DEV9: TCP: [PS2] Sent Outdated Acknowledgement Number, Got %u Expected %u", tcp->acknowledgementNumber, seqNum);
 
 			//Check if oldSeqNums contains tcp->acknowledgementNumber
 			if (std::find(oldSeqNums.begin(), oldSeqNums.end(), tcp->acknowledgementNumber) == oldSeqNums.end())
 			{
-				Console.Error("DEV9: TCP: [PS2] Sent Unexpected Acknowledgement Number, did not Match Old Numbers, Got %d Expected %d", tcp->acknowledgementNumber, seqNum);
+				Console.Error("DEV9: TCP: [PS2] Sent Unexpected Acknowledgement Number, did not Match Old Numbers, Got %u Expected %u", tcp->acknowledgementNumber, seqNum);
 				return NumCheckResult::Bad;
 			}
 		}
 		else
 		{
-			//DevCon.WriteLn("[PS2]CurrSeqNumber Acknowleged By PS2");
+			//DevCon.WriteLn("[PS2] CurrSeqNumber Acknowleged By PS2");
 			myNumberACKed.store(true);
 		}
+
+		UpdateReceivedAckNumber(tcp->acknowledgementNumber);
 
 		if (tcp->sequenceNumber != expectedSeqNumber)
 		{
 			if (tcp->GetPayload()->GetLength() == 0)
 			{
-				Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From ACK Packet, Got %d Expected %d", tcp->sequenceNumber, expectedSeqNumber);
+				Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From ACK Packet, Got %u Expected %u", tcp->sequenceNumber, expectedSeqNumber);
 			}
 			else
 			{
 				//Check if receivedPS2SeqNumbers contains tcp->sequenceNumber
 				if (std::find(receivedPS2SeqNumbers.begin(), receivedPS2SeqNumbers.end(), tcp->sequenceNumber) == receivedPS2SeqNumbers.end())
 				{
-					Console.Error("DEV9: TCP: [PS2] Sent an Old Seq Number on an Data packet, Got %d Expected %d", tcp->sequenceNumber, expectedSeqNumber);
+					Console.Error("DEV9: TCP: [PS2] Sent an Old Seq Number on an Data packet, Got %u Expected %u", tcp->sequenceNumber, expectedSeqNumber);
 					return NumCheckResult::GotOldData;
 				}
 				else
 				{
-					Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From Data Packet, Got %d Expected %d", tcp->sequenceNumber, expectedSeqNumber);
+					Console.Error("DEV9: TCP: [PS2] Sent Unexpected Sequence Number From Data Packet, Got %u Expected %u", tcp->sequenceNumber, expectedSeqNumber);
 					return NumCheckResult::Bad;
 				}
 			}
 		}
 
 		return NumCheckResult::OK;
-	}
-	u32 TCP_Session::GetDelta(u32 parExpectedSeq, u32 parGotSeq)
-	{
-		u32 delta = parExpectedSeq - parGotSeq;
-		if (delta > 0.5 * UINT_MAX)
-		{
-			delta = UINT_MAX - parExpectedSeq + parGotSeq;
-			Console.Error("DEV9: TCP: [PS2] SequenceNumber Overflow Detected");
-			Console.Error("DEV9: TCP: [PS2] New Data Offset: %d bytes", delta);
-		}
-		return delta;
 	}
 	bool TCP_Session::ErrorOnNonEmptyPacket(TCP_Packet* tcp)
 	{

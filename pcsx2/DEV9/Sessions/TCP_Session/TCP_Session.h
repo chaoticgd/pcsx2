@@ -68,9 +68,10 @@ namespace Sessions
 		std::vector<u32> receivedPS2SeqNumbers; //Accesed By Out Thread Only
 
 		std::mutex myNumberSentry;
-		const int oldMyNumCount = 2;
+		const int oldMyNumCount = 64;
 		u32 _MySequenceNumber = 1;
 		std::vector<u32> _OldMyNumbers;
+		u32 _ReceivedAckNumber = 1;
 		std::atomic<bool> myNumberACKed{true};
 
 	public:
@@ -89,13 +90,16 @@ namespace Sessions
 		PacketReader::IP::TCP::TCP_Packet* PopRecvBuff();
 
 		void IncrementMyNumber(u32 amount);
+		void UpdateReceivedAckNumber(u32 ack);
 		u32 GetMyNumber();
+		u32 GetOutstandingSequenceLength();
+		bool ShouldWaitForAck();
 		std::tuple<u32, std::vector<u32>> GetAllMyNumbers();
 		void ResetMyNumbers();
 
 		NumCheckResult CheckRepeatSYNNumbers(PacketReader::IP::TCP::TCP_Packet* tcp);
 		NumCheckResult CheckNumbers(PacketReader::IP::TCP::TCP_Packet* tcp);
-		u32 GetDelta(u32 parExpectedSeq, u32 parGotSeq);
+		s32 GetDelta(u32 a, u32 b); //Returns a - b
 		//Returns true if errored
 		bool ErrorOnNonEmptyPacket(PacketReader::IP::TCP::TCP_Packet* tcp);
 

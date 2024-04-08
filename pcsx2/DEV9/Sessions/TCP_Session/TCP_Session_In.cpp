@@ -67,20 +67,28 @@ namespace Sessions
 				return nullptr;
 		}
 
-		uint maxSize = 0;
-		if (sendTimeStamps)
-			maxSize = std::min<uint>(maxSegmentSize - 12, windowSize.load());
-		else
-			maxSize = std::min<uint>(maxSegmentSize, windowSize.load());
+		if (ShouldWaitForAck())
+			return nullptr;
 
-		if (maxSize != 0 &&
-			myNumberACKed.load())
+		//Note, windowSize will be updated before _ReceivedAckNumber, potential race condition
+		//in practice, we just get a smaller or -ve maxSize
+		const u32 outstanding = GetOutstandingSequenceLength();
+
+		int maxSize = 0;
+		if (sendTimeStamps)
+			maxSize = std::min<int>(maxSegmentSize - 12, windowSize.load() - outstanding);
+		else
+			maxSize = std::min<int>(maxSegmentSize, windowSize.load() - outstanding);
+
+		if (maxSize > 0)
 		{
 			std::unique_ptr<u8[]> buffer;
 			int err = 0;
 			int recived;
 
-			unsigned long available;
+			//FIONREAD uses unsigned long on windows and int on linux
+			//Zero init so we don't have bad data on any unused bytes
+			unsigned long available = 0;
 #ifdef _WIN32
 			err = ioctlsocket(client, FIONREAD, &available);
 #elif defined(__POSIX__)
@@ -88,8 +96,8 @@ namespace Sessions
 #endif
 			if (err != SOCKET_ERROR)
 			{
-				if (available > maxSize)
-					Console.WriteLn("DEV9: TCP: Got a lot of data: %d Using: %d", available, maxSize);
+				if (available > static_cast<uint>(maxSize))
+					Console.WriteLn("DEV9: TCP: Got a lot of data: %lu Using: %d", available, maxSize);
 
 				buffer = std::make_unique<u8[]>(maxSize);
 				recived = recv(client, (char*)buffer.get(), maxSize, 0);

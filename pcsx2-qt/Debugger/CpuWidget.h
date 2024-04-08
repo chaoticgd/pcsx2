@@ -6,9 +6,6 @@
 #include "ui_CpuWidget.h"
 
 #include "DebugTools/DebugInterface.h"
-#include "DebugTools/Breakpoints.h"
-#include "DebugTools/BiosDebugData.h"
-#include "DebugTools/MipsStackWalk.h"
 
 #include "Models/BreakpointModel.h"
 #include "Models/ThreadModel.h"
@@ -46,6 +43,7 @@ public slots:
 	void updateBreakpoints();
 	void onBPListDoubleClicked(const QModelIndex& index);
 	void onBPListContextMenu(QPoint pos);
+	void onGotoInMemory(u32 address);
 
 	void contextBPListCopy();
 	void contextBPListDelete();
@@ -67,25 +65,7 @@ public slots:
 	void onStackListDoubleClick(const QModelIndex& index);
 
 	void refreshDebugger();
-	void reloadCPUWidgets()
-	{
-		if (!QtHost::IsOnUIThread())
-		{
-			QtHost::RunOnUIThread(CBreakPoints::GetUpdateHandler());
-			return;
-		}
-
-		updateBreakpoints();
-		updateThreads();
-		updateStackFrames();
-
-		m_ui.registerWidget->update();
-		m_ui.disassemblyWidget->update();
-		m_ui.memoryviewWidget->update();
-
-		m_local_variable_tree->reset();
-		m_parameter_variable_tree->reset();
-	}
+	void reloadCPUWidgets();
 
 	void saveBreakpointsToDebuggerSettings();
 	void saveSavedAddressesToDebuggerSettings();

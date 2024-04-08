@@ -39,10 +39,26 @@ namespace Sessions
 
 		_MySequenceNumber += amount;
 	}
+	void TCP_Session::UpdateReceivedAckNumber(u32 ack)
+	{
+		std::lock_guard numberlock(myNumberSentry);
+		if (GetDelta(ack, _ReceivedAckNumber) > 0)
+			_ReceivedAckNumber = ack;
+	}
 	u32 TCP_Session::GetMyNumber()
 	{
 		std::lock_guard numberlock(myNumberSentry);
 		return _MySequenceNumber;
+	}
+	u32 TCP_Session::GetOutstandingSequenceLength()
+	{
+		std::lock_guard numberlock(myNumberSentry);
+		return GetDelta(_MySequenceNumber, _ReceivedAckNumber);
+	}
+	bool TCP_Session::ShouldWaitForAck()
+	{
+		std::lock_guard numberlock(myNumberSentry);
+		return _OldMyNumbers[0] == _ReceivedAckNumber;
 	}
 	std::tuple<u32, std::vector<u32>> TCP_Session::GetAllMyNumbers()
 	{
@@ -68,6 +84,24 @@ namespace Sessions
 	{
 	}
 
+	s32 TCP_Session::GetDelta(u32 a, u32 b)
+	{
+		s64 delta = static_cast<s64>(a) - static_cast<s64>(b);
+		if (delta > 0.5 * UINT_MAX)
+		{
+			delta = -static_cast<s64>(UINT_MAX) + a - b - 1;
+			Console.Error("DEV9: TCP: [PS2] SequenceNumber Overflow Detected");
+			Console.Error("DEV9: TCP: [PS2] New Data Offset: %d bytes", delta);
+		}
+		if (delta < -0.5 * UINT_MAX)
+		{
+			delta = UINT_MAX - b + a + 1;
+			Console.Error("DEV9: TCP: [PS2] SequenceNumber Overflow Detected");
+			Console.Error("DEV9: TCP: [PS2] New Data Offset: %d bytes", delta);
+		}
+		return delta;
+	}
+
 	TCP_Packet* TCP_Session::CreateBasePacket(PayloadData* data)
 	{
 		//DevCon.WriteLn("Creating Base Packet");
@@ -81,9 +115,9 @@ namespace Sessions
 		ret->destinationPort = srcPort;
 
 		ret->sequenceNumber = GetMyNumber();
-		//DevCon.WriteLn("With MySeq: %d", ret->sequenceNumber);
+		//DevCon.WriteLn("With MySeq: %u", ret->sequenceNumber);
 		ret->acknowledgementNumber = expectedSeqNumber;
-		//DevCon.WriteLn("With MyAck: %d", ret->acknowledgementNumber);
+		//DevCon.WriteLn("With MyAck: %u", ret->acknowledgementNumber);
 
 		ret->windowSize = 2 * maxSegmentSize;
 

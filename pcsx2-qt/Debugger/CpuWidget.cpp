@@ -40,7 +40,7 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	m_ui.setupUi(this);
 
 	connect(g_emu_thread, &EmuThread::onVMPaused, this, &CpuWidget::onVMPaused);
-	connect(g_emu_thread, &EmuThread::onGameChanged, [this](const QString& title) {
+	connect(g_emu_thread, &EmuThread::onGameChanged, this, [this](const QString& title) {
 		if (title.isEmpty())
 			return;
 		// Don't overwrite users BPs/Saved Addresses unless they have a clean state.
@@ -54,12 +54,14 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 	connect(m_ui.memoryviewWidget, &MemoryViewWidget::gotoInDisasm, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddress);
 	connect(m_ui.memoryviewWidget, &MemoryViewWidget::addToSavedAddresses, this, &CpuWidget::addAddressToSavedAddressesList);
 
-	connect(m_ui.registerWidget, &RegisterWidget::gotoInMemory, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_ui.disassemblyWidget, &DisassemblyWidget::gotoInMemory, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_ui.registerWidget, &RegisterWidget::gotoInMemory, this, &CpuWidget::onGotoInMemory);
+	connect(m_ui.disassemblyWidget, &DisassemblyWidget::gotoInMemory, this, &CpuWidget::onGotoInMemory);
 
 	connect(m_ui.memoryviewWidget, &MemoryViewWidget::VMUpdate, this, &CpuWidget::reloadCPUWidgets);
 	connect(m_ui.registerWidget, &RegisterWidget::VMUpdate, this, &CpuWidget::reloadCPUWidgets);
 	connect(m_ui.disassemblyWidget, &DisassemblyWidget::VMUpdate, this, &CpuWidget::reloadCPUWidgets);
+
+	connect(m_ui.disassemblyWidget, &DisassemblyWidget::breakpointsChanged, this, &CpuWidget::updateBreakpoints);
 
 	connect(m_ui.breakpointList, &QTableView::customContextMenuRequested, this, &CpuWidget::onBPListContextMenu);
 	connect(m_ui.breakpointList, &QTableView::doubleClicked, this, &CpuWidget::onBPListDoubleClicked);
@@ -70,6 +72,8 @@ CpuWidget::CpuWidget(QWidget* parent, DebugInterface& cpu)
 		m_ui.breakpointList->horizontalHeader()->setSectionResizeMode(i, mode);
 		i++;
 	}
+
+	connect(&m_bpModel, &BreakpointModel::dataChanged, this, &CpuWidget::updateBreakpoints);
 
 	connect(m_ui.threadList, &QTableView::customContextMenuRequested, this, &CpuWidget::onThreadListContextMenu);
 	connect(m_ui.threadList, &QTableView::doubleClicked, this, &CpuWidget::onThreadListDoubleClick);
@@ -158,16 +162,17 @@ void CpuWidget::setupSymbolTrees()
 	connect(m_ui.tabWidgetRegFunc, &QTabWidget::currentChanged, m_function_tree, &SymbolTreeWidget::updateModel);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_global_variable_tree, &SymbolTreeWidget::updateModel);
 	connect(m_ui.tabWidget, &QTabWidget::currentChanged, m_local_variable_tree, &SymbolTreeWidget::updateModel);
+	m_ui.tabWidget->setCurrentWidget(m_ui.tab_memory);
 
 	connect(m_function_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_global_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_local_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInDisassembly, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 
-	connect(m_function_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_global_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_local_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
-	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInMemoryView, m_ui.memoryviewWidget, &MemoryViewWidget::gotoAddress);
+	connect(m_function_tree, &SymbolTreeWidget::goToInMemoryView, this, &CpuWidget::onGotoInMemory);
+	connect(m_global_variable_tree, &SymbolTreeWidget::goToInMemoryView, this, &CpuWidget::onGotoInMemory);
+	connect(m_local_variable_tree, &SymbolTreeWidget::goToInMemoryView, this, &CpuWidget::onGotoInMemory);
+	connect(m_parameter_variable_tree, &SymbolTreeWidget::goToInMemoryView, this, &CpuWidget::onGotoInMemory);
 
 	connect(m_function_tree, &SymbolTreeWidget::nameColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
 	connect(m_function_tree, &SymbolTreeWidget::locationColumnClicked, m_ui.disassemblyWidget, &DisassemblyWidget::gotoAddressAndSetFocus);
@@ -175,18 +180,31 @@ void CpuWidget::setupSymbolTrees()
 
 void CpuWidget::refreshDebugger()
 {
-	if (m_cpu.isAlive())
-	{
-		m_ui.registerWidget->update();
-		m_ui.disassemblyWidget->update();
-		m_ui.memoryviewWidget->update();
-		m_ui.memorySearchWidget->update();
+	if (!m_cpu.isAlive())
+		return;
 
-		m_function_tree->updateModel();
-		m_global_variable_tree->updateModel();
-		m_local_variable_tree->updateModel();
-		m_parameter_variable_tree->updateModel();
-	}
+	m_ui.registerWidget->update();
+	m_ui.disassemblyWidget->update();
+	m_ui.memoryviewWidget->update();
+	m_ui.memorySearchWidget->update();
+
+	m_function_tree->updateModel();
+	m_global_variable_tree->updateModel();
+	m_local_variable_tree->updateModel();
+	m_parameter_variable_tree->updateModel();
+}
+
+void CpuWidget::reloadCPUWidgets()
+{
+	updateThreads();
+	updateStackFrames();
+
+	m_ui.registerWidget->update();
+	m_ui.disassemblyWidget->update();
+	m_ui.memoryviewWidget->update();
+
+	m_local_variable_tree->reset();
+	m_parameter_variable_tree->reset();
 }
 
 void CpuWidget::paintEvent(QPaintEvent* event)
@@ -234,9 +252,9 @@ void CpuWidget::onStepInto()
 	if (info.isSyscall)
 		bpAddr = info.branchTarget; // Syscalls are always taken
 
-	Host::RunOnCPUThread([&] {
-		CBreakPoints::AddBreakPoint(m_cpu.getCpuType(), bpAddr, true);
-		m_cpu.resumeCpu();
+	Host::RunOnCPUThread([cpu = &m_cpu, bpAddr] {
+		CBreakPoints::AddBreakPoint(cpu->getCpuType(), bpAddr, true);
+		cpu->resumeCpu();
 	});
 
 	this->repaint();
@@ -253,9 +271,9 @@ void CpuWidget::onStepOut()
 	if (m_stackModel.rowCount() < 2)
 		return;
 
-	Host::RunOnCPUThread([&] {
-		CBreakPoints::AddBreakPoint(m_cpu.getCpuType(), m_stackModel.data(m_stackModel.index(1, StackModel::PC), Qt::UserRole).toUInt(), true);
-		m_cpu.resumeCpu();
+	Host::RunOnCPUThread([cpu = &m_cpu, stackModel = &m_stackModel] {
+		CBreakPoints::AddBreakPoint(cpu->getCpuType(), stackModel->data(stackModel->index(1, StackModel::PC), Qt::UserRole).toUInt(), true);
+		cpu->resumeCpu();
 	});
 
 	this->repaint();
@@ -299,9 +317,9 @@ void CpuWidget::onStepOver()
 		}
 	}
 
-	Host::RunOnCPUThread([&] {
-		CBreakPoints::AddBreakPoint(m_cpu.getCpuType(), bpAddr, true);
-		m_cpu.resumeCpu();
+	Host::RunOnCPUThread([cpu = &m_cpu, bpAddr] {
+		CBreakPoints::AddBreakPoint(cpu->getCpuType(), bpAddr, true);
+		cpu->resumeCpu();
 	});
 
 	this->repaint();
@@ -400,6 +418,12 @@ void CpuWidget::onBPListContextMenu(QPoint pos)
 	}
 
 	contextMenu->popup(m_ui.breakpointList->viewport()->mapToGlobal(pos));
+}
+
+void CpuWidget::onGotoInMemory(u32 address)
+{
+	m_ui.memoryviewWidget->gotoAddress(address);
+	m_ui.tabWidget->setCurrentWidget(m_ui.tab_memory);
 }
 
 void CpuWidget::contextBPListCopy()
