@@ -221,7 +221,12 @@ ccc::ModuleHandle SymbolGuardian::ImportSymbolTables(
 	demangler.cplus_demangle = cplus_demangle;
 	demangler.cplus_demangle_opname = cplus_demangle_opname;
 
-	u32 importer_flags = ccc::DEMANGLE_PARAMETERS | ccc::DEMANGLE_RETURN_TYPE | ccc::NO_MEMBER_FUNCTIONS;
+	u32 importer_flags =
+		ccc::DEMANGLE_PARAMETERS |
+		ccc::DEMANGLE_RETURN_TYPE |
+		ccc::NO_MEMBER_FUNCTIONS |
+		ccc::NO_OPTIMIZED_OUT_FUNCTIONS |
+		ccc::UNIQUE_FUNCTIONS;
 
 	ccc::Result<ccc::ModuleHandle> module_handle = ccc::import_symbol_tables(
 		database, symbol_file.name(), *symbol_tables, importer_flags, demangler, interrupt);

@@ -9,11 +9,6 @@ It includes additional resources that are not present in the PCSX2 repository.
 
 ## Documentation
 
-### Chaos Compiler Collection
-
-- [STABS Notes](https://github.com/chaoticgd/ccc/blob/main/docs/StabsNotes.md)
-- [Symbol Database](https://github.com/chaoticgd/ccc/blob/main/docs/SymbolDatabase.md)
-
 ### DWARF (.debug) Section
 
 - [DWARF Debugging Information Format](https://dwarfstd.org/doc/dwarf_1_1_0.pdf)

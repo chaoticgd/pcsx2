@@ -36,6 +36,9 @@ const std::vector<ImporterFlagInfo> IMPORTER_FLAGS = {
 	{NO_MEMBER_FUNCTIONS, "--no-member-functions", {
 		"Do not print member functions."
 	}},
+	{NO_OPTIMIZED_OUT_FUNCTIONS, "--no-optimized-out-functions", {
+		"Discard functions that were optimized out."
+	}},
 	{STRICT_PARSING, "--strict", {
 		"Make more types of errors fatal."
 	}},
@@ -53,6 +56,15 @@ const std::vector<ImporterFlagInfo> IMPORTER_FLAGS = {
 	{TYPEDEF_ALL_UNIONS, "--typedef-all-unions", {
 		"Force all emitted C++ union types to be defined",
 		"using a typedef."
+	}},
+	{UNIQUE_FUNCTIONS, "--unique-functions", {
+		" If multiple identical .mdebug function symbols",
+		"are present, find the one that seems to have",
+		"actually been included in the linked binary, and",
+		"remove the addresses from all the rest. Using",
+		"this importer flag in combination with",
+		"--no-optimized-out-functions will remove these",
+		"duplicate function symbols entirely."
 	}}
 };
 
