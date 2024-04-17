@@ -177,6 +177,7 @@ public:
 		~Palette();
 
 		__fi std::pair<u8, u8> GetAlphaMinMax() const { return m_alpha_minmax; }
+		std::pair<u8, u8> GetAlphaMinMax(u8 min_index, u8 max_index) const;
 
 		// Disable copy constructor and copy operator
 		Palette(const Palette&) = delete;
@@ -498,10 +499,12 @@ public:
 	/// Looks up a target in the cache, and only returns it if the BP/BW match exactly.
 	Target* GetExactTarget(u32 BP, u32 BW, int type, u32 end_bp);
 	Target* GetTargetWithSharedBits(u32 BP, u32 PSM) const;
+	Target* FindOverlappingTarget(GSTextureCache::Target* target) const;
 	Target* FindOverlappingTarget(u32 BP, u32 end_bp) const;
 	Target* FindOverlappingTarget(u32 BP, u32 BW, u32 PSM, GSVector4i rc) const;
 
 	GSVector2i GetTargetSize(u32 bp, u32 fbw, u32 psm, s32 min_width, s32 min_height);
+	bool HasTargetInHeightCache(u32 bp, u32 fbw, u32 psm, u32 max_age = std::numeric_limits<u32>::max(), bool move_front = true);
 	bool Has32BitTarget(u32 bp);
 
 	void InvalidateContainedTargets(u32 start_bp, u32 end_bp, u32 write_psm = PSMCT32);

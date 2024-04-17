@@ -2683,7 +2683,7 @@ void GSTextureCache::Target::RTACorrect()
 		{
 			const GSVector2i rtsize(m_texture->GetSize());
 			const GSVector4i valid_rect = GSVector4i(GSVector4(m_valid) * GSVector4(m_scale));
-			GL_PUSH("RTACorrect(valid=({},{}=>{},{}))", m_valid.x, m_valid.y, m_valid.z, m_valid.w);
+			GL_PUSH("RTACorrect(valid=(%dx%d %d,%d=>%d,%d))", m_valid.width(), m_valid.height(), m_valid.x, m_valid.y, m_valid.z, m_valid.w);
 
 			if (GSTexture* temp_rt = g_gs_device->CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::Color, !GSVector4i::loadh(rtsize).eq(valid_rect)))
 			{
@@ -2709,7 +2709,7 @@ void GSTextureCache::Target::RTADecorrect()
 		{
 			const GSVector2i rtsize(m_texture->GetSize());
 			const GSVector4i valid_rect = GSVector4i(GSVector4(m_valid) * GSVector4(m_scale));
-			GL_PUSH("RTADecorrect(valid=({},{}=>{},{}))", m_valid.x, m_valid.y, m_valid.z, m_valid.w);
+			GL_PUSH("RTADecorrect(valid=(%dx%d %d,%d=>%d,%d))", m_valid.width(), m_valid.height(), m_valid.x, m_valid.y, m_valid.z, m_valid.w);
 
 			if (GSTexture* temp_rt = g_gs_device->CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::Color, !GSVector4i::loadh(rtsize).eq(valid_rect)))
 			{
@@ -2943,7 +2943,7 @@ bool GSTextureCache::PrepareDownloadTexture(u32 width, u32 height, GSTexture::Fo
 	}
 
 #ifdef PCSX2_DEVBUILD
-	(*tex)->SetDebugName(TinyString::from_fmt("Texture Cache {}x{} {} Readback",
+	(*tex)->SetDebugName(TinyString::from_format("Texture Cache {}x{} {} Readback",
 		new_width, new_height, GSTexture::GetFormatName(format)));
 #endif
 
@@ -3648,8 +3648,9 @@ bool GSTextureCache::Move(u32 SBP, u32 SBW, u32 SPSM, int sx, int sy, u32 DBP, u
 
 	// Beware of the case where a game might create a larger texture by moving a bunch of chunks around.
 	// We use dx/dy == 0 and the TBW check as a safeguard to make sure these go through to local memory.
+	// We can also recreate the target if it's previously been created in the height cache with a valid size.
 	// Good test case for this is the Xenosaga I cutscene transitions, or Gradius V.
-	if (src && !dst && dx == 0 && dy == 0 && ((static_cast<u32>(w) + 63) / 64) <= DBW)
+	if (src && !dst && ((dx == 0 && dy == 0 && ((static_cast<u32>(w) + 63) / 64) <= DBW) || HasTargetInHeightCache(DBP, DBW, DPSM, 10)))
 	{
 		GIFRegTEX0 new_TEX0 = {};
 		new_TEX0.TBP0 = DBP;
@@ -4053,6 +4054,23 @@ GSTextureCache::Target* GSTextureCache::GetTargetWithSharedBits(u32 BP, u32 PSM)
 	return nullptr;
 }
 
+GSTextureCache::Target* GSTextureCache::FindOverlappingTarget(GSTextureCache::Target* target) const
+{
+	for (int i = 0; i < 2; i++)
+	{
+		for (Target* tgt : m_dst[i])
+		{
+			if (tgt == target)
+				continue;
+
+			if (CheckOverlap(tgt->m_TEX0.TBP0, tgt->m_end_block, target->m_TEX0.TBP0, target->m_end_block))
+				return tgt;
+		}
+	}
+
+	return nullptr;
+}
+
 GSTextureCache::Target* GSTextureCache::FindOverlappingTarget(u32 BP, u32 end_bp) const
 {
 	for (int i = 0; i < 2; i++)
@@ -4105,6 +4123,31 @@ GSVector2i GSTextureCache::GetTargetSize(u32 bp, u32 fbw, u32 psm, s32 min_width
 	DbgCon.WriteLn("New size at %x %u %u: %ux%u", bp, fbw, psm, min_width, min_height);
 	m_target_heights.push_front(search);
 	return GSVector2i(min_width, min_height);
+}
+
+bool GSTextureCache::HasTargetInHeightCache(u32 bp, u32 fbw, u32 psm, u32 max_age, bool move_front)
+{
+	TargetHeightElem search = {};
+	search.bp = bp;
+	search.fbw = fbw;
+	search.psm = psm;
+
+	for (auto it = m_target_heights.begin(); it != m_target_heights.end(); ++it)
+	{
+		TargetHeightElem& elem = const_cast<TargetHeightElem&>(*it);
+		if (elem.bits == search.bits)
+		{
+			if (elem.age > max_age)
+				return false;
+
+			if (move_front)
+				m_target_heights.MoveFront(it.Index());
+
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool GSTextureCache::Has32BitTarget(u32 bp)
@@ -4228,11 +4271,13 @@ void GSTextureCache::IncAge()
 
 	AgeHashCache();
 
-	// Clearing of Rendertargets causes flickering in many scene transitions.
-	// Sigh, this seems to be used to invalidate surfaces. So set a huge maxage to avoid flicker,
-	// but still invalidate surfaces. (Disgaea 2 fmv when booting the game through the BIOS)
+	// As of 04/15/2024 this is s et to 60 (just 1 second of targets), which should be fine now as it doesn't destroy targets which haven't been coevred.
+	// 
+	// For reference, here are some games sensitive to killing old targets:
 	// Original maxage was 4 here, Xenosaga 2 needs at least 240, else it flickers on scene transitions.
-	static constexpr int max_rt_age = 400; // ffx intro scene changes leave the old image untouched for a couple of frames and only then start using it
+	// ffx intro scene changes leave the old image untouched for a couple of frames and only then start using it
+	// Disgaea 2 fmv when booting the game through the BIOS
+	static constexpr int max_rt_age = 60;
 
 	// Toss and recompute sizes after 2 seconds of not being used. Should be sufficient for most loading screens.
 	static constexpr int max_size_age = 120;
@@ -4246,11 +4291,22 @@ void GSTextureCache::IncAge()
 
 			if (++t->m_age > max_rt_age)
 			{
-				i = list.erase(i);
-				GL_CACHE("TC: Remove Target(%s): (0x%x) due to age", to_string(type),
-					t->m_TEX0.TBP0);
+				const Target* overlapping_tgt = FindOverlappingTarget(t);
 
-				delete t;
+				if (!t->m_dirty.empty() || overlapping_tgt != nullptr)
+				{
+					i = list.erase(i);
+					GL_CACHE("TC: Remove Target(%s): (0x%x) due to age", to_string(type),
+						t->m_TEX0.TBP0);
+
+					delete t;
+				}
+				else
+				{
+					GL_CACHE("Extending life of target for %x", t->m_TEX0.TBP0);
+					t->m_age = 10;
+					++i;
+				}
 			}
 			else
 			{
@@ -4414,12 +4470,12 @@ GSTextureCache::Source* GSTextureCache::CreateSource(const GIFRegTEX0& TEX0, con
 		{
 			if (psm.pal > 0)
 			{
-				src->m_texture->SetDebugName(TinyString::from_fmt("Offset {},{} from 0x{:X} {} CBP 0x{:X}", x_offset, y_offset,
+				src->m_texture->SetDebugName(TinyString::from_format("Offset {},{} from 0x{:X} {} CBP 0x{:X}", x_offset, y_offset,
 					static_cast<u32>(TEX0.TBP0), psm_str(TEX0.PSM), static_cast<u32>(TEX0.CBP)));
 			}
 			else
 			{
-				src->m_texture->SetDebugName(TinyString::from_fmt("Offset {},{} from 0x{:X} {} ", x_offset, y_offset,
+				src->m_texture->SetDebugName(TinyString::from_format("Offset {},{} from 0x{:X} {} ", x_offset, y_offset,
 					static_cast<u32>(TEX0.TBP0), psm_str(TEX0.PSM), static_cast<u32>(TEX0.CBP)));
 			}
 		}
@@ -4664,7 +4720,7 @@ GSTextureCache::Source* GSTextureCache::CreateSource(const GIFRegTEX0& TEX0, con
 #ifdef PCSX2_DEVBUILD
 				if (GSConfig.UseDebugDevice)
 				{
-					src->m_texture->SetDebugName(TinyString::from_fmt("{}x{} copy of 0x{:X} {}", new_size.x, new_size.y,
+					src->m_texture->SetDebugName(TinyString::from_format("{}x{} copy of 0x{:X} {}", new_size.x, new_size.y,
 						static_cast<u32>(TEX0.TBP0), psm_str(TEX0.PSM)));
 				}
 #endif
@@ -4700,12 +4756,12 @@ GSTextureCache::Source* GSTextureCache::CreateSource(const GIFRegTEX0& TEX0, con
 				{
 					if (psm.pal > 0)
 					{
-						src->m_texture->SetDebugName(TinyString::from_fmt("Reinterpret 0x{:X} from {} to {} CBP 0x{:X}",
+						src->m_texture->SetDebugName(TinyString::from_format("Reinterpret 0x{:X} from {} to {} CBP 0x{:X}",
 							static_cast<u32>(TEX0.TBP0), psm_str(dst->m_TEX0.PSM), psm_str(TEX0.PSM), static_cast<u32>(TEX0.CBP)));
 					}
 					else
 					{
-						src->m_texture->SetDebugName(TinyString::from_fmt("Reinterpret 0x{:X} from {} to {}",
+						src->m_texture->SetDebugName(TinyString::from_format("Reinterpret 0x{:X} from {} to {}",
 							static_cast<u32>(TEX0.TBP0), psm_str(dst->m_TEX0.PSM), psm_str(TEX0.PSM)));
 					}
 				}
@@ -4795,13 +4851,13 @@ GSTextureCache::Source* GSTextureCache::CreateSource(const GIFRegTEX0& TEX0, con
 		{
 			if (psm.pal > 0)
 			{
-				src->m_texture->SetDebugName(TinyString::from_fmt("{}x{} {} @ 0x{:X} TBW={} CBP=0x{:X}",
+				src->m_texture->SetDebugName(TinyString::from_format("{}x{} {} @ 0x{:X} TBW={} CBP=0x{:X}",
 					tw, th, psm_str(TEX0.PSM), static_cast<u32>(TEX0.TBP0), static_cast<u32>(TEX0.TBW),
 					static_cast<u32>(TEX0.CBP)));
 			}
 			else
 			{
-				src->m_texture->SetDebugName(TinyString::from_fmt("{}x{} {} @ 0x{:X} TBW={}",
+				src->m_texture->SetDebugName(TinyString::from_format("{}x{} {} @ 0x{:X} TBW={}",
 					tw, th, psm_str(TEX0.PSM), static_cast<u32>(TEX0.TBP0), static_cast<u32>(TEX0.TBW)));
 			}
 		}
@@ -6373,7 +6429,7 @@ void GSTextureCache::Target::UpdateTextureDebugName()
 #ifdef PCSX2_DEVBUILD
 	if (GSConfig.UseDebugDevice)
 	{
-		m_texture->SetDebugName(SmallString::from_fmt("{} 0x{:X} {} BW={} {}x{}",
+		m_texture->SetDebugName(SmallString::from_format("{} 0x{:X} {} BW={} {}x{}",
 			m_type ? "DS" : "RT", static_cast<u32>(m_TEX0.TBP0), psm_str(m_TEX0.PSM), static_cast<u32>(m_TEX0.TBW),
 			m_unscaled_size.x, m_unscaled_size.y));
 	}
@@ -6454,6 +6510,12 @@ void GSTextureCache::AttachPaletteToSource(Source* s, u16 pal, bool need_gs_text
 	{
 		s->m_alpha_minmax = s->m_palette_obj->GetAlphaMinMax();
 		s->m_valid_alpha_minmax = true;
+
+		// Pretty unlikely, but if we know the RT's alpha, we can reduce the range of the palette to only the alpha's RT range.
+		if (s->m_TEX0.PSM == PSMT8H && s->m_from_target && s->m_from_target->HasValidAlpha())
+		{
+			s->m_alpha_minmax = s->m_palette_obj->GetAlphaMinMax(static_cast<u8>(s->m_from_target->m_alpha_min), static_cast<u8>(s->m_from_target->m_alpha_max));
+		}
 	}
 }
 
@@ -6721,6 +6783,12 @@ GSTextureCache::Palette::~Palette()
 	}
 
 	_aligned_free(m_clut);
+}
+
+std::pair<u8, u8> GSTextureCache::Palette::GetAlphaMinMax(u8 min_index, u8 max_index) const
+{
+	pxAssert(min_index <= max_index);
+	return GSGetRGBA8AlphaMinMax(m_clut + min_index, max_index - min_index + 1, 1, 0);
 }
 
 GSTexture* GSTextureCache::Palette::GetPaletteGSTexture()

@@ -381,6 +381,15 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		require_line_rasterization);
 	m_optional_extensions.vk_khr_driver_properties = SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
 
+	// glslang generates debug info instructions before phi nodes at the beginning of blocks when non-semantic debug info
+	// is enabled, triggering errors by spirv-val. Gate it by an environment variable if you want source debugging until
+	// this is fixed.
+	if (const char* val = std::getenv("USE_NON_SEMANTIC_DEBUG_INFO"); val && StringUtil::FromChars<bool>(val).value_or(false))
+	{
+		m_optional_extensions.vk_khr_shader_non_semantic_info =
+			SupportsExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, false);
+	}
+
 #ifdef _WIN32
 	m_optional_extensions.vk_ext_full_screen_exclusive =
 		enable_surface && SupportsExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, false);
@@ -5704,6 +5713,10 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		{
 			hdr_rt->SetState(GSTexture::State::Cleared);
 			hdr_rt->SetClearColor(draw_rt->GetClearColor());
+
+			// If depth is cleared, we need to commit it, because we're only going to draw to the active part of the FB.
+			if (draw_ds && draw_ds->GetState() == GSTexture::State::Cleared && !config.drawarea.eq(GSVector4i::loadh(rtsize)))
+				draw_ds->CommitClear(m_current_command_buffer);
 		}
 		else if (draw_rt->GetState() == GSTexture::State::Dirty)
 		{
@@ -5793,7 +5806,11 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 			config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil, pipe.IsRTFeedbackLoop(),
 			pipe.IsTestingAndSamplingDepth(), rt_op, ds_op);
 		const bool is_clearing_rt = (rt_op == VK_ATTACHMENT_LOAD_OP_CLEAR || ds_op == VK_ATTACHMENT_LOAD_OP_CLEAR);
-		const GSVector4i render_area = pipe.ps.hdr ? config.drawarea : GSVector4i::loadh(rtsize);
+
+		// Only draw to the active area of the HDR target. Except when depth is cleared, we need to use the full
+		// buffer size, otherwise it'll only clear the draw part of the depth buffer.
+		const GSVector4i render_area = (pipe.ps.hdr && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR) ? config.drawarea :
+																							   GSVector4i::loadh(rtsize);
 
 		if (is_clearing_rt)
 		{
