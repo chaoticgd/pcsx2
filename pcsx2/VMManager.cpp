@@ -1346,7 +1346,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	if (boot_params.disable_achievements_hardcore_mode)
 		Achievements::DisableHardcoreMode();
 	else
-		Achievements::ResetHardcoreMode();
+		Achievements::ResetHardcoreMode(true);
 	if (Achievements::IsHardcoreModeActive())
 	{
 		auto confirmHardcoreModeDisable = [&boot_params, &state_to_load](const char* trigger) mutable {
@@ -1622,7 +1622,7 @@ void VMManager::Reset()
 		return;
 
 	// Re-enforce hardcode mode constraints if we're now enabling it.
-	if (Achievements::ResetHardcoreMode())
+	if (Achievements::ResetHardcoreMode(false))
 		ApplySettings();
 
 	vu1Thread.WaitVU();
@@ -3143,6 +3143,11 @@ void VMManager::WarnAboutUnsafeSettings()
 	{
 		append(ICON_FA_EXCLAMATION_CIRCLE,
 			TRANSLATE_SV("VMManager", "Estimate texture region is enabled, this may reduce performance."));
+	}
+	if (EmuConfig.GS.DumpReplaceableTextures)
+	{
+		append(ICON_FA_EXCLAMATION_CIRCLE,
+			TRANSLATE_SV("VMManager", "Texture dumping is enabled, this will continually dump textures to disk."));
 	}
 
 	if (!messages.empty())

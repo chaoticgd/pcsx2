@@ -96,8 +96,8 @@ using ImGuiFullscreen::UIBackgroundColor;
 using ImGuiFullscreen::UIBackgroundHighlightColor;
 using ImGuiFullscreen::UIBackgroundLineColor;
 using ImGuiFullscreen::UIBackgroundTextColor;
-using ImGuiFullscreen::UIPopupBackgroundColor;
 using ImGuiFullscreen::UIDisabledColor;
+using ImGuiFullscreen::UIPopupBackgroundColor;
 using ImGuiFullscreen::UIPrimaryColor;
 using ImGuiFullscreen::UIPrimaryDarkColor;
 using ImGuiFullscreen::UIPrimaryLightColor;
@@ -3014,6 +3014,9 @@ void FullscreenUI::DrawInterfaceSettingsPage()
 		FSUI_CSTR("Automatically saves the emulator state when powering down or exiting. You can then resume directly from where you left "
 				  "off next time."),
 		"EmuCore", "SaveStateOnShutdown", false);
+	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_ARCHIVE, "Create Save State Backups"),
+		FSUI_CSTR("Creates a backup copy of a save state if it already exists when the save is created. The backup copy has a .backup suffix"),
+		"EmuCore", "BackupSavestate", true);
 	if (DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_LIGHTBULB, "Use Light Theme"),
 			FSUI_CSTR("Uses a light coloured theme instead of the default dark theme."), "UI", "UseLightFullscreenUITheme", false))
 	{
@@ -3215,8 +3218,6 @@ void FullscreenUI::DrawEmulationSettingsPage()
 		"TurboScalar", 2.00f, speed_entries, speed_values, std::size(speed_entries), true);
 	DrawFloatListSetting(bsi, FSUI_CSTR("Slow Motion Speed"), FSUI_CSTR("Sets the speed when using the slow motion hotkey."), "Framerate",
 		"SlomoScalar", 0.50f, speed_entries, speed_values, std::size(speed_entries), true);
-	DrawToggleSetting(bsi, FSUI_CSTR("Enable Speed Limiter"), FSUI_CSTR("When disabled, the game will run as fast as possible."),
-		"EmuCore/GS", "FrameLimitEnable", true);
 
 	MenuHeading(FSUI_CSTR("System Settings"));
 
@@ -6850,7 +6851,6 @@ TRANSLATE_NOOP("FullscreenUI", "Fast Forward Speed");
 TRANSLATE_NOOP("FullscreenUI", "Sets the speed when using the fast forward hotkey.");
 TRANSLATE_NOOP("FullscreenUI", "Slow Motion Speed");
 TRANSLATE_NOOP("FullscreenUI", "Sets the speed when using the slow motion hotkey.");
-TRANSLATE_NOOP("FullscreenUI", "Enable Speed Limiter");
 TRANSLATE_NOOP("FullscreenUI", "When disabled, the game will run as fast as possible.");
 TRANSLATE_NOOP("FullscreenUI", "System Settings");
 TRANSLATE_NOOP("FullscreenUI", "EE Cycle Rate");
@@ -7480,6 +7480,7 @@ TRANSLATE_NOOP("FullscreenUI", "Pause On Focus Loss");
 TRANSLATE_NOOP("FullscreenUI", "Pause On Menu");
 TRANSLATE_NOOP("FullscreenUI", "Confirm Shutdown");
 TRANSLATE_NOOP("FullscreenUI", "Save State On Shutdown");
+TRANSLATE_NOOP("FullscreenUI", "Create Save State Backups");
 TRANSLATE_NOOP("FullscreenUI", "Use Light Theme");
 TRANSLATE_NOOP("FullscreenUI", "Start Fullscreen");
 TRANSLATE_NOOP("FullscreenUI", "Double-Click Toggles Fullscreen");

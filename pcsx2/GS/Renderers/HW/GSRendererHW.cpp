@@ -2454,20 +2454,25 @@ void GSRendererHW::Draw()
 
 		GIFRegTEX0 FRAME_TEX0;
 		bool shuffle_target = false;
-		if (!no_rt && m_cached_ctx.FRAME.Block() != m_cached_ctx.TEX0.TBP0 && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].bpp == 16)
+		if (!no_rt && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].bpp == 16)
 		{
-			// FBW is going to be wrong for channel shuffling into a new target, so take it from the source.
-			FRAME_TEX0.U64 = 0;
-			FRAME_TEX0.TBP0 = m_cached_ctx.FRAME.Block();
-			FRAME_TEX0.TBW = m_cached_ctx.FRAME.FBW;
-			FRAME_TEX0.PSM = m_cached_ctx.FRAME.PSM;
+			if (m_cached_ctx.FRAME.Block() != m_cached_ctx.TEX0.TBP0)
+			{
+				// FBW is going to be wrong for channel shuffling into a new target, so take it from the source.
+				FRAME_TEX0.U64 = 0;
+				FRAME_TEX0.TBP0 = m_cached_ctx.FRAME.Block();
+				FRAME_TEX0.TBW = m_cached_ctx.FRAME.FBW;
+				FRAME_TEX0.PSM = m_cached_ctx.FRAME.PSM;
 
-			GSTextureCache::Target* tgt = g_texture_cache->LookupTarget(FRAME_TEX0, GSVector2i(m_vt.m_max.p.x, m_vt.m_max.p.y), GetTextureScaleFactor(), GSTextureCache::RenderTarget, false,
-				fm);
+				GSTextureCache::Target* tgt = g_texture_cache->LookupTarget(FRAME_TEX0, GSVector2i(m_vt.m_max.p.x, m_vt.m_max.p.y), GetTextureScaleFactor(), GSTextureCache::RenderTarget, false,
+					fm);
 
-			if (tgt)
-				shuffle_target = tgt->m_32_bits_fmt;
-			else
+				if (tgt)
+					shuffle_target = tgt->m_32_bits_fmt;
+
+				tgt = nullptr;
+			}
+			if (!shuffle_target && GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].bpp == 16)
 			{
 				const GSVertex* v = &m_vertex.buff[0];
 
@@ -2480,8 +2485,6 @@ void GSRendererHW::Draw()
 
 				shuffle_target = shuffle_coords && draw_width == 8 && draw_width == read_width;
 			}
-
-			tgt = nullptr;
 		}
 		const bool possible_shuffle = !no_rt && (((shuffle_target && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].bpp == 16) || (m_cached_ctx.FRAME.Block() == m_cached_ctx.TEX0.TBP0 && ((m_cached_ctx.TEX0.PSM & 0x6) || m_cached_ctx.FRAME.PSM != m_cached_ctx.TEX0.PSM))) || IsPossibleChannelShuffle());
 		const bool need_aem_color = GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].trbpp <= 24 && GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pal == 0 && m_context->ALPHA.C == 0 && m_env.TEXA.AEM;
@@ -3055,6 +3058,10 @@ void GSRendererHW::Draw()
 			ds->ResizeTexture(new_w, new_h);
 	}
 
+	bool skip_draw = false;
+	if (!GSConfig.UserHacks_DisableSafeFeatures && is_possible_mem_clear)
+		skip_draw = TryTargetClear(rt, ds, preserve_rt_color, preserve_depth);
+
 	if (rt)
 	{
 		if (m_texture_shuffle || m_channel_shuffle || (!rt->m_dirty.empty() && !rt->m_dirty.GetTotalRect(rt->m_TEX0, rt->m_unscaled_size).rintersect(m_r).rempty()))
@@ -3134,10 +3141,6 @@ void GSRendererHW::Draw()
 		CleanupDraw(true);
 		return;
 	}
-
-	bool skip_draw = false;
-	if (!GSConfig.UserHacks_DisableSafeFeatures && is_possible_mem_clear)
-		skip_draw = TryTargetClear(rt, ds, preserve_rt_color, preserve_depth);
 
 	// A couple of hack to avoid upscaling issue. So far it seems to impacts mostly sprite
 	// Note: first hack corrects both position and texture coordinate
@@ -4047,7 +4050,6 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	// HW blend can be done in multiple passes when there's no overlap.
 	// Blend second pass is only useful when texture barriers aren't supported.
 	// Speed wise Texture barriers > blend second pass > texture copies.
-	// TODO: 24bit and 32bit formats on clamp 1 can always prefer blend second pass depending on the blend equations.
 	const bool blend_second_pass_support = !features.texture_barrier && no_prim_overlap && is_basic_blend;
 	const bool bmix1_second_pass = blend_second_pass_support && blend_mix1 && (alpha_c0_high_max_one || alpha_c2_high_one) && m_conf.ps.blend_d == 2;
 	// We don't want to enable blend mix if we are doing a second pass, it's useless.
@@ -4122,6 +4124,9 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 	}
 	else
 	{
+		const bool ad_second_pass = blend_second_pass_support && alpha_c1_high_no_rta_correct && COLCLAMP.CLAMP &&
+									(blend_flag & (BLEND_HW3 | BLEND_HW5 | BLEND_HW6 | BLEND_HW7 | BLEND_HW9));
+
 		switch (GSConfig.AccurateBlendingUnit)
 		{
 			case AccBlendLevel::Maximum:
@@ -4141,8 +4146,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 				sw_blending |= (m_conf.ps.blend_a == m_conf.ps.blend_d == 1) && no_prim_overlap;
 				[[fallthrough]];
 			case AccBlendLevel::Medium:
-				// Enable sw blend on Ad cases where prims don't overlap, blend_ad_alpha_masked or rta correction isn't possible.
-				sw_blending |= !blend_ad_alpha_masked && (alpha_c1_high_max_one || alpha_c1_high_no_rta_correct) && no_prim_overlap;
+				// Enable sw blend on Ad cases where prims don't overlap, blend_ad_alpha_masked, rta correction or ad_second_pass isn't possible.
+				sw_blending |= !(blend_ad_alpha_masked || ad_second_pass) && (alpha_c1_high_max_one || alpha_c1_high_no_rta_correct) && no_prim_overlap;
 				[[fallthrough]];
 			case AccBlendLevel::Basic:
 				// Prefer sw blend if possible.
@@ -4461,9 +4466,52 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 				m_conf.blend_second_pass.blend_hw = 1;
 				m_conf.blend_second_pass.blend = {true, GSDevice::DST_COLOR, GSDevice::CONST_ONE, GSDevice::OP_ADD, GSDevice::CONST_ONE, GSDevice::CONST_ZERO, false, 0};
 			}
-
-			if (m_conf.ps.blend_c == 2 && m_conf.blend_second_pass.enable)
-				m_conf.cb_ps.TA_MaxDepth_Af.a = static_cast<float>(AFIX) / 128.0f;
+			else if (alpha_c1_high_no_rta_correct && (blend_flag & BLEND_HW6))
+			{
+				// Alpha = Ad.
+				// Cs + Cd*Alpha, Cs - Cd*Alpha.
+				// Render pass 1: Multiply Cs by 0.5, then do Cs + Cd*Alpha or Cs - Cd*Alpha.
+				m_conf.ps.blend_c = 2;
+				AFIX = 64;
+				blend.src = GSDevice::CONST_COLOR;
+				// Render pass 2: Take result (Cd) from render pass 1 and double it.
+				m_conf.blend_second_pass.enable = true;
+				m_conf.blend_second_pass.blend_hw = 1;
+				m_conf.blend_second_pass.blend = {true, GSDevice::DST_COLOR, GSDevice::CONST_ONE, GSDevice::OP_ADD, GSDevice::CONST_ONE, GSDevice::CONST_ZERO, false, 0};
+			}
+			else if (alpha_c1_high_no_rta_correct && (blend_flag & BLEND_HW7))
+			{
+				// Alpha = Ad.
+				// Cd*(1 - Alpha).
+				// Render pass 1: Multiply Cd by 0.5, then do Cd - Cd*Alpha.
+				m_conf.ps.blend_hw = 4;
+				blend.src = GSDevice::DST_COLOR;
+				blend.dst = GSDevice::DST_ALPHA;
+				blend.op = GSDevice::OP_SUBTRACT;
+				// Render pass 2: Take result (Cd) from render pass 1 and double it.
+				m_conf.blend_second_pass.enable = true;
+				m_conf.blend_second_pass.blend_hw = 1;
+				m_conf.blend_second_pass.blend = {true, GSDevice::DST_COLOR, GSDevice::CONST_ONE, GSDevice::OP_ADD, GSDevice::CONST_ONE, GSDevice::CONST_ZERO, false, 0};
+			}
+			else if (blend_flag & BLEND_HW8)
+			{
+				// Alpha = Ad.
+				// Cs*(1 + Alpha).
+				// Render pass 1: Do Cs.
+				// Render pass 2: Try to double Cs, then take result (Cd) from render pass 1 and add Cs*Alpha to it.
+				m_conf.blend_second_pass.enable = true;
+				m_conf.blend_second_pass.blend_hw = 3;
+				m_conf.blend_second_pass.blend = {true, GSDevice::DST_ALPHA, GSDevice::CONST_ONE, blend_second_pass.op, GSDevice::CONST_ONE, GSDevice::CONST_ZERO, false, 0};
+			}
+			else if (alpha_c1_high_no_rta_correct && (blend_flag & BLEND_HW9))
+			{
+				// Alpha = Ad.
+				// Cs*(1 - Alpha).
+				// Render pass 1: Do Cs*(1 - Alpha).
+				// Render pass 2: Take result (Cd) from render pass 1 and subtract Cs*Alpha from it.
+				m_conf.blend_second_pass.enable = true;
+				m_conf.blend_second_pass.blend = {true, GSDevice::DST_ALPHA, GSDevice::CONST_ONE, GSDevice::OP_REV_SUBTRACT, GSDevice::CONST_ONE, GSDevice::CONST_ZERO, false, 0};
+			}
 		}
 
 		if (blend_flag & BLEND_HW1)
@@ -4472,15 +4520,15 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, bool& DAT
 		}
 		else if (blend_flag & BLEND_HW2)
 		{
-			if (m_conf.ps.blend_c == 2)
-				m_conf.cb_ps.TA_MaxDepth_Af.a = static_cast<float>(AFIX) / 128.0f;
-
 			m_conf.ps.blend_hw = 2;
 		}
 		else if (!m_conf.blend_second_pass.enable && alpha_c1_high_no_rta_correct && (blend_flag & BLEND_HW3))
 		{
 			m_conf.ps.blend_hw = 3;
 		}
+
+		if (m_conf.ps.blend_c == 2 && (m_conf.ps.blend_hw == 2 || m_conf.blend_second_pass.blend_hw == 2))
+			m_conf.cb_ps.TA_MaxDepth_Af.a = static_cast<float>(AFIX) / 128.0f;
 
 		const GSDevice::BlendFactor src_factor_alpha = m_conf.blend_second_pass.enable ? GSDevice::CONST_ZERO : GSDevice::CONST_ONE;
 		const GSDevice::BlendFactor dst_factor_alpha = m_conf.blend_second_pass.enable ? GSDevice::CONST_ONE : GSDevice::CONST_ZERO;
@@ -5203,7 +5251,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 #endif
 
 	const GSDrawingEnvironment& env = *m_draw_env;
-	bool DATE = m_cached_ctx.TEST.DATE && m_cached_ctx.FRAME.PSM != PSMCT24;
+	bool DATE = rt && m_cached_ctx.TEST.DATE && m_cached_ctx.FRAME.PSM != PSMCT24;
 	bool DATE_PRIMID = false;
 	bool DATE_BARRIER = false;
 	bool DATE_one = false;
@@ -5240,29 +5288,24 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 
 	if (DATE)
 	{
-		// Should always be true, but sanity check...
-		if (rt)
+		const bool is_overlap_alpha = m_prim_overlap != PRIM_OVERLAP_NO && !(m_cached_ctx.FRAME.FBMSK & 0x80000000);
+		if (m_cached_ctx.TEST.DATM == 0)
 		{
-			const bool is_overlap_alpha = m_prim_overlap != PRIM_OVERLAP_NO && !(m_cached_ctx.FRAME.FBMSK & 0x80000000);
+			// Some pixles are >= 1 so some fail, or some pixels get written but the written alpha matches or exceeds 1 (so overlap doesn't always pass).
+			DATE = rt->m_alpha_max >= 128 || (is_overlap_alpha && rt->m_alpha_min < 128 && (GetAlphaMinMax().max >= 128 || (m_context->FBA.FBA || IsCoverageAlpha())));
 
-			if (m_cached_ctx.TEST.DATM == 0)
-			{
-				// Some pixles are >= 1 so some fail, or some pixels get written but the written alpha matches or exceeds 1 (so overlap doesn't always pass).
-				DATE = rt->m_alpha_max >= 128 || (is_overlap_alpha && rt->m_alpha_min < 128 && (GetAlphaMinMax().max >= 128 || (m_context->FBA.FBA || IsCoverageAlpha())));
+			// All pixels fail.
+			if (DATE && rt->m_alpha_min >= 128)
+				return;
+		}
+		else
+		{
+			// Some pixles are < 1 so some fail, or some pixels get written but the written alpha goes below 1 (so overlap doesn't always pass).
+			DATE = rt->m_alpha_min < 128 || (is_overlap_alpha && rt->m_alpha_max >= 128 && (GetAlphaMinMax().min < 128 && !(m_context->FBA.FBA || IsCoverageAlpha())));
 
-				// All pixels fail.
-				if (DATE && rt->m_alpha_min >= 128)
-					return;
-			}
-			else
-			{
-				// Some pixles are < 1 so some fail, or some pixels get written but the written alpha goes below 1 (so overlap doesn't always pass).
-				DATE = rt->m_alpha_min < 128 || (is_overlap_alpha && rt->m_alpha_max >= 128 && (GetAlphaMinMax().min < 128 && !(m_context->FBA.FBA || IsCoverageAlpha())));
-
-				// All pixels fail.
-				if (DATE && rt->m_alpha_max < 128)
-					return;
-			}
+			// All pixels fail.
+			if (DATE && rt->m_alpha_max < 128)
+				return;
 		}
 	}
 
@@ -5277,18 +5320,11 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	int rt_new_alpha_min = 0, rt_new_alpha_max = 255;
 	if (rt)
 	{
-		rt_new_alpha_min = rt->m_alpha_min;
-		rt_new_alpha_max = rt->m_alpha_max;
+		blend_alpha_min = rt_new_alpha_min = rt->m_alpha_min;
+		blend_alpha_max = rt_new_alpha_max = rt->m_alpha_max;
 
-		blend_alpha_min = rt_new_alpha_min;
-		blend_alpha_max = rt_new_alpha_max;
-
-		const bool is_24_bit = (GSLocalMemory::m_psm[rt->m_TEX0.PSM].trbpp == 24);
-		// On DX FBMask emulation can be missing on lower blend levels, so we'll do whatever the API does.
-		const u32 fb_mask = m_conf.colormask.wa ? (m_conf.ps.fbmask ? m_conf.cb_ps.FbMask.a : 0) : 0xFF;
-		const u32 alpha_mask = (GSLocalMemory::m_psm[rt->m_TEX0.PSM].fmsk & 0xFF000000) >> 24;
 		const int fba_value = m_draw_env->CTXT[m_draw_env->PRIM.CTXT].FBA.FBA * 128;
-
+		const bool is_24_bit = (GSLocalMemory::m_psm[rt->m_TEX0.PSM].trbpp == 24);
 		if (is_24_bit)
 		{
 			// C24/Z24 - alpha is 1.
@@ -5305,6 +5341,9 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 			const bool always_passing_alpha = !m_cached_ctx.TEST.ATE || afail_always_fb_alpha || (m_cached_ctx.TEST.ATE && m_cached_ctx.TEST.ATST == ATST_ALWAYS);
 			const bool full_cover = rt->m_valid.rintersect(m_r).eq(rt->m_valid) && PrimitiveCoversWithoutGaps() && !(DATE || !always_passing_alpha || !IsDepthAlwaysPassing());
 
+			// On DX FBMask emulation can be missing on lower blend levels, so we'll do whatever the API does.
+			const u32 fb_mask = m_conf.colormask.wa ? (m_conf.ps.fbmask ? m_conf.cb_ps.FbMask.a : 0) : 0xFF;
+			const u32 alpha_mask = (GSLocalMemory::m_psm[rt->m_TEX0.PSM].fmsk & 0xFF000000) >> 24;
 			if ((fb_mask & alpha_mask) == 0)
 			{
 				if (full_cover)
@@ -6183,6 +6222,14 @@ bool GSRendererHW::CanUseSwPrimRender(bool no_rt, bool no_ds, bool draw_sprite_t
 					if (!rc.GetDirtyRect(m_cached_ctx.TEX0, false).rintersect(tr).rempty())
 						return true;
 				}
+
+				// Make sure it actually makes sense to use this target as a source, given the formats, and it wouldn't just sample as garbage.
+				// We can't rely exclusively on the dirty rect check above, because sometimes the targets are from older frames and too large.
+				if (!GSUtil::HasSameSwizzleBits(m_cached_ctx.TEX0.PSM, src_target->m_TEX0.PSM) &&
+					(!src_target->m_32_bits_fmt || GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].bpp != 16))
+				{
+					return true;
+				}
 			}
 
 			return false;
@@ -6547,6 +6594,7 @@ bool GSRendererHW::TryTargetClear(GSTextureCache::Target* rt, GSTextureCache::Ta
 			}
 
 			g_gs_device->ClearRenderTarget(rt->m_texture, clear_c);
+			rt->m_dirty.clear();
 
 			if (has_alpha)
 			{
@@ -6576,6 +6624,7 @@ bool GSRendererHW::TryTargetClear(GSTextureCache::Target* rt, GSTextureCache::Ta
 			const float d = static_cast<float>(z) * 0x1p-32f;
 			GL_INS("TryTargetClear(): DS at %x <= %f", ds->m_TEX0.TBP0, d);
 			g_gs_device->ClearDepth(ds->m_texture, d);
+			ds->m_dirty.clear();
 			ds->m_alpha_max = z >> 24;
 			ds->m_alpha_min = z >> 24;
 
