@@ -276,10 +276,18 @@ namespace MIPSAnalyst
 				}
 			}
 
+			// Prevent functions from being generated that overlap with existing
+			// symbols. This is mainly a problem with symbols from SNDLL symbol
+			// tables are they will have a size of zero.
+			ccc::FunctionHandle next_symbol_handle = database.functions.first_handle_from_starting_address(addr+8);
+			const ccc::Function* next_symbol = database.functions.symbol_from_handle(next_symbol_handle);
+			end |= next_symbol != nullptr;
+
 			if (end) {
-				// most functions are aligned to 8 or 16 bytes
-				// add the padding to this one
-				while (((addr+8) % 16)  && r5900Debug.read32(addr+8) == 0)
+				// Most functions are aligned to 8 or 16 bytes, so add padding
+				// to this one unless a symbol exists implying a new function
+				// follows immediately.
+				while (next_symbol == nullptr && ((addr+8) % 16) && r5900Debug.read32(addr+8) == 0)
 					addr += 4;
 
 				currentFunction.end = addr + 4;
