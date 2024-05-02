@@ -381,7 +381,7 @@ void SymbolTreeWidget::setupMenu()
 	connect(m_m_go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
 	m_context_menu->addAction(m_m_go_to_in_memory_view);
 
-	m_show_size_column = new QAction(tr("Show size column"), this);
+	m_show_size_column = new QAction(tr("Show Size Column"), this);
 	m_show_size_column->setCheckable(true);
 	connect(m_show_size_column, &QAction::triggered, this, &SymbolTreeWidget::reset);
 	m_context_menu->addAction(m_show_size_column);
@@ -390,19 +390,19 @@ void SymbolTreeWidget::setupMenu()
 	{
 		m_context_menu->addSeparator();
 
-		m_group_by_module = new QAction(tr("Group by module"), this);
+		m_group_by_module = new QAction(tr("Group by Module"), this);
 		m_group_by_module->setCheckable(true);
 		if (m_cpu.getCpuType() == BREAKPOINT_IOP)
 			m_group_by_module->setChecked(true);
 		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		m_context_menu->addAction(m_group_by_module);
 
-		m_group_by_section = new QAction(tr("Group by section"), this);
+		m_group_by_section = new QAction(tr("Group by Section"), this);
 		m_group_by_section->setCheckable(true);
 		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		m_context_menu->addAction(m_group_by_section);
 
-		m_group_by_source_file = new QAction(tr("Group by source file"), this);
+		m_group_by_source_file = new QAction(tr("Group by Source File"), this);
 		m_group_by_source_file->setCheckable(true);
 		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		m_context_menu->addAction(m_group_by_source_file);
