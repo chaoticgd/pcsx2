@@ -137,6 +137,13 @@ QVariant SymbolTreeModel::data(const QModelIndex& index, int role) const
 		{
 			return node->location.toString(m_cpu).rightJustified(8);
 		}
+		case SIZE:
+		{
+			if (!node->size.has_value())
+				return QVariant();
+
+			return QString::number(*node->size);
+		}
 		case TYPE:
 		{
 			QVariant result;
@@ -267,6 +274,8 @@ QVariant SymbolTreeModel::headerData(int section, Qt::Orientation orientation, i
 			return tr("Value");
 		case LOCATION:
 			return tr("Location");
+		case SIZE:
+			return tr("Size");
 		case TYPE:
 			return tr("Type");
 		case LIVENESS:

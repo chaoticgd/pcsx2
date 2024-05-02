@@ -27,6 +27,7 @@ public:
 	QString name;
 	SymbolTreeLocation location;
 	bool is_location_editable = false;
+	std::optional<u32> size;
 	ccc::NodeHandle type;
 	std::unique_ptr<ccc::ast::Node> temporary_type;
 	ccc::AddressRange live_range;

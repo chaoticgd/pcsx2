@@ -23,9 +23,10 @@ public:
 		NAME = 0,
 		VALUE = 1,
 		LOCATION = 2,
-		TYPE = 3,
-		LIVENESS = 4,
-		COLUMN_COUNT = 5
+		SIZE = 3,
+		TYPE = 4,
+		LIVENESS = 5,
+		COLUMN_COUNT = 6
 	};
 
 	enum SetDataRole

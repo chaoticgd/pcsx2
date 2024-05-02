@@ -58,6 +58,8 @@ void SymbolTreeWidget::reset()
 	if (!m_model)
 		setupTree();
 
+	m_ui.treeView->setColumnHidden(SymbolTreeModel::SIZE, !m_show_size_column || !m_show_size_column->isChecked());
+
 	m_cpu.GetSymbolGuardian().UpdateFunctionHashes(m_cpu);
 
 	SymbolFilters filters;
@@ -379,6 +381,11 @@ void SymbolTreeWidget::setupMenu()
 	connect(m_m_go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
 	m_context_menu->addAction(m_m_go_to_in_memory_view);
 
+	m_show_size_column = new QAction(tr("Show size column"), this);
+	m_show_size_column->setCheckable(true);
+	connect(m_show_size_column, &QAction::triggered, this, &SymbolTreeWidget::reset);
+	m_context_menu->addAction(m_show_size_column);
+
 	if (m_flags & ALLOW_GROUPING)
 	{
 		m_context_menu->addSeparator();
@@ -387,19 +394,18 @@ void SymbolTreeWidget::setupMenu()
 		m_group_by_module->setCheckable(true);
 		if (m_cpu.getCpuType() == BREAKPOINT_IOP)
 			m_group_by_module->setChecked(true);
+		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		m_context_menu->addAction(m_group_by_module);
 
 		m_group_by_section = new QAction(tr("Group by section"), this);
 		m_group_by_section->setCheckable(true);
+		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		m_context_menu->addAction(m_group_by_section);
 
 		m_group_by_source_file = new QAction(tr("Group by source file"), this);
 		m_group_by_source_file->setCheckable(true);
-		m_context_menu->addAction(m_group_by_source_file);
-
-		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
-		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
 		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		m_context_menu->addAction(m_group_by_source_file);
 	}
 
 	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
@@ -646,6 +652,7 @@ std::unique_ptr<SymbolTreeNode> FunctionTreeWidget::buildNode(
 	std::unique_ptr<SymbolTreeNode> node = std::make_unique<SymbolTreeNode>();
 	node->name = std::move(work.name);
 	node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, function.address().value);
+	node->size = function.size();
 	node->symbol = ccc::MultiSymbolHandle(function);
 
 	for (auto address_handle : database.labels.handles_from_address_range(function.address_range()))
@@ -773,6 +780,7 @@ std::unique_ptr<SymbolTreeNode> GlobalVariableTreeWidget::buildNode(
 				node->type = ccc::NodeHandle(global_variable, global_variable.type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, global_variable.address().value);
 			node->is_location_editable = true;
+			node->size = global_variable.size();
 			node->symbol = ccc::MultiSymbolHandle(global_variable);
 
 			break;
@@ -785,6 +793,7 @@ std::unique_ptr<SymbolTreeNode> GlobalVariableTreeWidget::buildNode(
 				node->type = ccc::NodeHandle(local_variable, local_variable.type());
 			node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable.address().value);
 			node->is_location_editable = true;
+			node->size = local_variable.size();
 			node->symbol = ccc::MultiSymbolHandle(local_variable);
 
 			break;
@@ -885,6 +894,7 @@ std::unique_ptr<SymbolTreeNode> LocalVariableTreeWidget::buildNode(
 		node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 	else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
 		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, m_stack_pointer + storage->stack_pointer_offset);
+	node->size = local_variable.size();
 
 	return node;
 }
@@ -975,7 +985,7 @@ std::unique_ptr<SymbolTreeNode> ParameterVariableTreeWidget::buildNode(
 		node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 	else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&parameter_variable.storage))
 		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, m_stack_pointer + storage->stack_pointer_offset);
-
+	node->size = parameter_variable.size();
 
 	return node;
 }
