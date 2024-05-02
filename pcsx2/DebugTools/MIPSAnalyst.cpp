@@ -278,7 +278,7 @@ namespace MIPSAnalyst
 
 			// Prevent functions from being generated that overlap with existing
 			// symbols. This is mainly a problem with symbols from SNDLL symbol
-			// tables are they will have a size of zero.
+			// tables as they will have a size of zero.
 			ccc::FunctionHandle next_symbol_handle = database.functions.first_handle_from_starting_address(addr+8);
 			const ccc::Function* next_symbol = database.functions.symbol_from_handle(next_symbol_handle);
 			end |= next_symbol != nullptr;
