@@ -171,13 +171,16 @@ void SymbolGuardian::ImportElf(std::vector<u8> elf, std::string elf_file_name, c
 
 		// Wait for the ELF to be loaded into memory, otherwise the call to
 		// ScanForFunctions below won't work.
-		bool has_booted_elf = false;
-		while (!has_booted_elf)
+		while (true)
 		{
+			bool has_booted_elf = false;
 			Host::RunOnCPUThread([&]() {
 				has_booted_elf = VMManager::Internal::HasBootedELF();
 			},
 				true);
+
+			if (has_booted_elf)
+				break;
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
