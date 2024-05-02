@@ -90,27 +90,27 @@ namespace Sessions
 		if (delta > 0.5 * UINT_MAX)
 		{
 			delta = -static_cast<s64>(UINT_MAX) + a - b - 1;
-			Console.Error("DEV9: TCP: [PS2] SequenceNumber Overflow Detected");
-			Console.Error("DEV9: TCP: [PS2] New Data Offset: %d bytes", delta);
+			Console.Error("DEV9: TCP: [PS2] Sequence number overflow detected");
+			Console.Error("DEV9: TCP: [PS2] New data offset: %d bytes", delta);
 		}
 		if (delta < -0.5 * UINT_MAX)
 		{
 			delta = UINT_MAX - b + a + 1;
-			Console.Error("DEV9: TCP: [PS2] SequenceNumber Overflow Detected");
-			Console.Error("DEV9: TCP: [PS2] New Data Offset: %d bytes", delta);
+			Console.Error("DEV9: TCP: [PS2] Sequence number overflow detected");
+			Console.Error("DEV9: TCP: [PS2] New data offset: %d bytes", delta);
 		}
 		return delta;
 	}
 
 	TCP_Packet* TCP_Session::CreateBasePacket(PayloadData* data)
 	{
-		//DevCon.WriteLn("Creating Base Packet");
+		//DevCon.WriteLn("Creating base packet");
 		if (data == nullptr)
 			data = new PayloadData(0);
 
 		TCP_Packet* ret = new TCP_Packet(data);
 
-		//and now to setup THE ENTIRE THING
+		// Setup common packet infomation
 		ret->sourcePort = destPort;
 		ret->destinationPort = srcPort;
 
@@ -149,7 +149,6 @@ namespace Sessions
 
 	void TCP_Session::Reset()
 	{
-		//CloseSocket();
 		RaiseEventConnectionClosed();
 	}
 
@@ -157,7 +156,7 @@ namespace Sessions
 	{
 		CloseSocket();
 
-		//Clear out _recvBuff
+		// Clear out _recvBuff
 		while (!_recvBuff.IsQueueEmpty())
 		{
 			TCP_Packet* retPay;

@@ -495,7 +495,11 @@ void GSState::DumpVertices(const std::string& filename)
 			file << uv_U << DEL << uv_V;
 		}
 		else
-			file << v.ST.S << "(" << std::bit_cast<u32>(v.ST.S) << ")" << DEL << v.ST.T << "(" << std::bit_cast<u32>(v.ST.T) << ")" << DEL << v.RGBAQ.Q << "(" << std::bit_cast<u32>(v.RGBAQ.Q) << ")";
+		{
+			float x = (v.ST.S / v.RGBAQ.Q) * (1 << m_context->TEX0.TW);
+			float y = (v.ST.T / v.RGBAQ.Q) * (1 << m_context->TEX0.TH);
+			file << v.ST.S << "(" << std::hex << std::bit_cast<u32>(v.ST.S) << ")" << DEL << v.ST.T << "(" << std::hex << std::bit_cast<u32>(v.ST.T) << ")" << DEL << v.RGBAQ.Q << "(" << std::hex << std::bit_cast<u32>(v.RGBAQ.Q) << ") - " << x << "," << y;
+		}
 
 		file << std::endl;
 	}
@@ -2816,7 +2820,7 @@ void GSState::GrowVertexBuffer()
 	m_index.buff = index;
 }
 
-bool GSState::TrianglesAreQuads() const
+bool GSState::TrianglesAreQuads(bool shuffle_check) const
 {
 	// If this is a quad, there should only be two distinct values for both X and Y, which
 	// also happen to be the minimum/maximum bounds of the primitive.
@@ -2829,10 +2833,17 @@ bool GSState::TrianglesAreQuads() const
 		if (idx > 0)
 		{
 			const u16* const prev_tri= m_index.buff + (idx - 3);
-			const GSVertex& vert = v[i[0]];
-			const GSVertex& last_vert = v[i[2]];
-			if (vert.XYZ != m_vertex.buff[prev_tri[0]].XYZ && vert.XYZ != m_vertex.buff[prev_tri[1]].XYZ && vert.XYZ != m_vertex.buff[prev_tri[2]].XYZ &&
-				last_vert.XYZ != m_vertex.buff[prev_tri[0]].XYZ && last_vert.XYZ != m_vertex.buff[prev_tri[1]].XYZ && last_vert.XYZ != m_vertex.buff[prev_tri[2]].XYZ)
+			GIFRegXYZ vert = v[i[0]].XYZ;
+			GIFRegXYZ last_vert = v[i[2]].XYZ;
+
+			if (shuffle_check)
+			{
+				vert.X -= 8 << 4;
+				last_vert.X -= 8 << 4;
+			}
+
+			if (vert != m_vertex.buff[prev_tri[0]].XYZ && vert != m_vertex.buff[prev_tri[1]].XYZ && vert != m_vertex.buff[prev_tri[2]].XYZ &&
+				last_vert != m_vertex.buff[prev_tri[0]].XYZ && last_vert != m_vertex.buff[prev_tri[1]].XYZ && last_vert != m_vertex.buff[prev_tri[2]].XYZ)
 				return false;
 		}
 		// Degenerate triangles should've been culled already, so we can check indices.
@@ -3023,7 +3034,7 @@ bool GSState::PrimitiveCoversWithoutGaps()
 	const int first_dpX = v[1].XYZ.X - v[0].XYZ.X;
 
 	// Horizontal Match.
-	if ((first_dpX >> 4) == m_r_no_scissor.z)
+	if (((first_dpX + 8) >> 4) == m_r_no_scissor.z)
 	{
 		// Borrowed from MergeSprite() modified to calculate heights.
 		for (u32 i = 2; i < m_vertex.next; i += 2)
@@ -3042,7 +3053,7 @@ bool GSState::PrimitiveCoversWithoutGaps()
 	}
 
 	// Vertical Match.
-	if ((first_dpY >> 4) == m_r_no_scissor.w)
+	if (((first_dpY + 8) >> 4) == m_r_no_scissor.w)
 	{
 		// Borrowed from MergeSprite().
 		const int offset_X = m_context->XYOFFSET.OFX;
@@ -3084,6 +3095,10 @@ bool GSState::PrimitiveCoversWithoutGaps()
 __forceinline bool GSState::IsAutoFlushDraw(u32 prim)
 {
 	if (!PRIM->TME || (GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::SpritesOnly && prim != GS_SPRITE))
+		return false;
+
+	// Not using the same channels.
+	if (!(GSUtil::GetChannelMask(m_context->TEX0.PSM) & GSUtil::GetChannelMask(m_context->FRAME.PSM, m_context->FRAME.FBMSK | ~(GSLocalMemory::m_psm[m_context->FRAME.PSM].fmsk))))
 		return false;
 
 	const u32 frame_mask = GSLocalMemory::m_psm[m_context->FRAME.PSM].fmsk;
@@ -3268,8 +3283,9 @@ __forceinline void GSState::HandleAutoFlush()
 		if (tex_rect.y == tex_rect.w)
 			tex_rect += GSVector4i::cxpr(0, 0, 0, 1);
 
+		const bool swap_index = index_swap && GSUtil::GetPrimClass(m_prev_env.PRIM.PRIM) != GS_SPRITE_CLASS;
 		// Get the last texture position from the last draw.
-		const GSVertex* v = &m_vertex.buff[m_index.buff[m_index.tail - (index_swap ? n : 1)]];
+		const GSVertex* v = &m_vertex.buff[m_index.buff[m_index.tail - (swap_index ? n : 1)]];
 
 		if (PRIM->FST)
 		{
