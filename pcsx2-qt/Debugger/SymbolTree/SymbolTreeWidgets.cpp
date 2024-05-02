@@ -34,6 +34,7 @@ SymbolTreeWidget::SymbolTreeWidget(u32 flags, s32 symbol_address_alignment, Debu
 
 	m_ui.treeView->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_ui.treeView, &QTreeView::customContextMenuRequested, this, &SymbolTreeWidget::openMenu);
+	connect(m_ui.treeView, &QTreeView::expanded, this, &SymbolTreeWidget::updateVisibleNodes);
 }
 
 SymbolTreeWidget::~SymbolTreeWidget() = default;

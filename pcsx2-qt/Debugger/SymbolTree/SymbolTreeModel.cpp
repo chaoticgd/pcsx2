@@ -484,9 +484,6 @@ std::vector<std::unique_ptr<SymbolTreeNode>> SymbolTreeModel::populateChildren(
 		}
 	}
 
-	for (std::unique_ptr<SymbolTreeNode>& child : children)
-		child->readFromVM(cpu, database);
-
 	return children;
 }
 
