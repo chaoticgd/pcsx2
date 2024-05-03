@@ -63,7 +63,7 @@ static void parseDisasm(SymbolGuardian& guardian, const char* disasm, char* opco
 			u32 branchTarget;
 			sscanf(disasm+3,"0x%08x",&branchTarget);
 
-			const std::string addressSymbol = guardian.FunctionStartingAtAddress(branchTarget).name;
+			const std::string addressSymbol = guardian.SymbolStartingAtAddress(branchTarget).name;
 			if (!addressSymbol.empty() && insertSymbols)
 			{
 				arguments += std::snprintf(arguments, arguments_size, "%s",addressSymbol.c_str());
