@@ -411,7 +411,7 @@ bool DisassemblyFunction::disassemble(u32 address, DisassemblyLineInfo& dest, bo
 	if (it == entries.end())
 		return false;
 
-	return it->second->disassemble(address,dest,simplify, simplify);
+	return it->second->disassemble(address,dest,insertSymbols,simplify);
 }
 
 void DisassemblyFunction::getBranchLines(u32 start, u32 size, std::vector<BranchLine>& dest)
