@@ -438,6 +438,7 @@ SymbolInfo SymbolGuardian::SymbolStartingAtAddress(
 
 		info.descriptor = descriptor;
 		info.handle = symbol->raw_handle();
+		info.name = symbol->name();
 		info.address = symbol->address();
 		info.size = symbol->size();
 	});
@@ -456,6 +457,7 @@ SymbolInfo SymbolGuardian::SymbolAfterAddress(
 
 		info.descriptor = descriptor;
 		info.handle = symbol->raw_handle();
+		info.name = symbol->name();
 		info.address = symbol->address();
 		info.size = symbol->size();
 	});
@@ -474,6 +476,7 @@ SymbolInfo SymbolGuardian::SymbolOverlappingAddress(
 
 		info.descriptor = descriptor;
 		info.handle = symbol->raw_handle();
+		info.name = symbol->name();
 		info.address = symbol->address();
 		info.size = symbol->size();
 	});
@@ -492,6 +495,7 @@ SymbolInfo SymbolGuardian::SymbolWithName(
 
 		info.descriptor = descriptor;
 		info.handle = symbol->raw_handle();
+		info.name = symbol->name();
 		info.address = symbol->address();
 		info.size = symbol->size();
 	});
