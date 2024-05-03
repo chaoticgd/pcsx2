@@ -699,6 +699,7 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 	const bool isCurrentPC = m_cpu->getPC() == address;
 
 	FunctionInfo function = m_cpu->GetSymbolGuardian().FunctionStartingAtAddress(address);
+	SymbolInfo symbol = m_cpu->GetSymbolGuardian().SymbolStartingAtAddress(address);
 	const bool showOpcode = m_showInstructionOpcode && m_cpu->isAlive();
 
 	QString lineString;
@@ -720,13 +721,12 @@ inline QString DisassemblyWidget::DisassemblyStringFromAddress(u32 address, QFon
 		lineString = lineString.arg("  ");
 	}
 
-	if (function.name.empty()) // The address wont have symbol text if it's the start of a function for example
+	if (symbol.name.empty())
 		lineString = lineString.arg(address, 8, 16, QChar('0')).toUpper();
 	else
 	{
-		// We want this text elided
 		QFontMetrics metric(font);
-		QString symbolString = QString::fromStdString(function.name);
+		QString symbolString = QString::fromStdString(symbol.name);
 
 		lineString = lineString.arg(metric.elidedText(symbolString, Qt::ElideRight, (selected ? 32 : 7) * font.pointSize()));
 	}
