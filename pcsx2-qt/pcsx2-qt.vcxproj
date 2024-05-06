@@ -452,6 +452,12 @@
     </QtUi>
     <None Include="Debugger\SymbolTree\NewSymbolDialog.ui" />
     <None Include="Debugger\SymbolTree\SymbolTreeWidget.ui" />
+    <QtUi Include="Settings\AudioExpansionSettingsDialog.ui">
+      <FileType>Document</FileType>
+    </QtUi>
+    <QtUi Include="Settings\AudioStretchSettingsDialog.ui">
+      <FileType>Document</FileType>
+    </QtUi>
     <None Include="Settings\ControllerBindingWidget_Popn.ui" />
     <None Include="Settings\ControllerMappingSettingsDialog.ui" />
     <None Include="Settings\FolderSettingsWidget.ui" />

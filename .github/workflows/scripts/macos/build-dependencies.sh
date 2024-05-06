@@ -22,7 +22,7 @@ fi
 
 FREETYPE=2.13.2
 HARFBUZZ=8.3.1
-SDL=SDL2-2.30.2
+SDL=SDL2-2.30.3
 ZSTD=1.5.5
 LZ4=b8fd2d15309dd4e605070bd4486e26b6ef814e29
 LIBPNG=1.6.43
@@ -46,6 +46,7 @@ export CFLAGS="-I$INSTALLDIR/include $CFLAGS"
 export CXXFLAGS="-I$INSTALLDIR/include $CXXFLAGS"
 CMAKE_COMMON=(
 	-DCMAKE_BUILD_TYPE=Release
+	-DCMAKE_SHARED_LINKER_FLAGS="-dead_strip -dead_strip_dylibs"
 	-DCMAKE_PREFIX_PATH="$INSTALLDIR"
 	-DCMAKE_INSTALL_PREFIX="$INSTALLDIR"
 	-DCMAKE_OSX_ARCHITECTURES="x86_64"
@@ -55,7 +56,7 @@ CMAKE_COMMON=(
 cat > SHASUMS <<EOF
 12991c4e55c506dd7f9b765933e62fd2be2e06d421505d7950a132e4f1bb484d  freetype-$FREETYPE.tar.xz
 19a54fe9596f7a47c502549fce8e8a10978c697203774008cc173f8360b19a9a  harfbuzz-$HARFBUZZ.tar.gz
-891d66ac8cae51361d3229e3336ebec1c407a8a2a063b61df14f5fdf3ab5ac31  $SDL.tar.gz
+820440072f8f5b50188c1dae104f2ad25984de268785be40c41a099a510f0aec  $SDL.tar.gz
 9c4396cc829cfae319a6e2615202e82aad41372073482fce286fac78646d3ee4  zstd-$ZSTD.tar.gz
 0728800155f3ed0a0c87e03addbd30ecbe374f7b080678bbca1506051d50dec3  $LZ4.tar.gz
 6a5ca0652392a2d7c9db2ae5b40210843c0bbc081cbd410825ab00cc59f14a6c  libpng-$LIBPNG.tar.xz
@@ -147,7 +148,7 @@ echo "Installing libpng..."
 rm -fr "libpng-$LIBPNG"
 tar xf "libpng-$LIBPNG.tar.xz"
 cd "libpng-$LIBPNG"
-cmake "${CMAKE_COMMON[@]}" -DBUILD_SHARED_LIBS=ON -DPNG_TESTS=OFF -B build
+cmake "${CMAKE_COMMON[@]}" -DBUILD_SHARED_LIBS=ON -DPNG_TESTS=OFF -DPNG_FRAMEWORK=OFF -B build
 make -C build "-j$NPROCS"
 make -C build install
 cd ..
@@ -206,8 +207,10 @@ echo "Installing MoltenVK..."
 rm -fr "MoltenVK-${MOLTENVK}"
 tar xf "v$MOLTENVK.tar.gz"
 cd "MoltenVK-${MOLTENVK}"
-./fetchDependencies --macos
-make macos
+sed -i '' 's/xcodebuild "$@"/xcodebuild $XCODEBUILD_EXTRA_ARGS "$@"/g' fetchDependencies
+sed -i '' 's/XCODEBUILD :=/XCODEBUILD ?=/g' Makefile
+XCODEBUILD_EXTRA_ARGS="VALID_ARCHS=x86_64" ./fetchDependencies --macos
+XCODEBUILD="set -o pipefail && xcodebuild VALID_ARCHS=x86_64" make macos
 cp Package/Latest/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib "$INSTALLDIR/lib/"
 cd ..
 

@@ -112,6 +112,8 @@ public Q_SLOTS:
 	void queueSnapshot(quint32 gsdump_frames);
 	void beginCapture(const QString& path);
 	void endCapture();
+	void setAudioOutputVolume(int volume, int fast_forward_volume);
+	void setAudioOutputMuted(bool muted);
 
 Q_SIGNALS:
 	bool messageConfirmed(const QString& title, const QString& message);
@@ -280,6 +282,9 @@ namespace QtHost
 
 	/// Returns the URL to a runtime-downloaded resource.
 	std::string GetRuntimeDownloadedResourceURL(std::string_view name);
+
+	/// Saves a game settings interface.
+	bool SaveGameSettings(SettingsInterface* sif, bool delete_if_empty);
 
 	/// Downloads the specified URL to the provided path.
 	bool DownloadFile(QWidget* parent, const QString& title, std::string url, const std::string& path);

@@ -19,7 +19,7 @@ LIBJPEG=9f
 LIBPNG=1.6.43
 LIBWEBP=1.3.2
 LZ4=b8fd2d15309dd4e605070bd4486e26b6ef814e29
-SDL=SDL2-2.30.2
+SDL=SDL2-2.30.3
 QT=6.7.0
 ZSTD=1.5.5
 
@@ -37,7 +37,7 @@ fd6f417fe9e3a071cf1424a5152d926a34c4a3c5070745470be6cf12a404ed79  $LIBBACKTRACE.
 6a5ca0652392a2d7c9db2ae5b40210843c0bbc081cbd410825ab00cc59f14a6c  libpng-$LIBPNG.tar.xz
 2a499607df669e40258e53d0ade8035ba4ec0175244869d1025d460562aa09b4  libwebp-$LIBWEBP.tar.gz
 0728800155f3ed0a0c87e03addbd30ecbe374f7b080678bbca1506051d50dec3  $LZ4.tar.gz
-891d66ac8cae51361d3229e3336ebec1c407a8a2a063b61df14f5fdf3ab5ac31  $SDL.tar.gz
+820440072f8f5b50188c1dae104f2ad25984de268785be40c41a099a510f0aec  $SDL.tar.gz
 9c4396cc829cfae319a6e2615202e82aad41372073482fce286fac78646d3ee4  zstd-$ZSTD.tar.gz
 11b2e29e2e52fb0e3b453ea13bbe51a10fdff36e1c192d8868c5a40233b8b254  qtbase-everywhere-src-$QT.tar.xz
 516ce07ec8dd5a11c59816fe33ddb71d4f691d0ebbc1798ac338f23b86c029a7  qtimageformats-everywhere-src-$QT.tar.xz
@@ -52,15 +52,12 @@ c0d01e758a543b3a358cb97af02c6817ebd3f5ff13a2edf9fb220646a3d67999  shaderc-spirv-
 EOF
 
 curl -C - -L \
-	-O "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE.tar.xz" \
-	-o "harfbuzz-$HARFBUZZ.tar.gz" "https://github.com/harfbuzz/harfbuzz/archive/refs/tags/$HARFBUZZ.tar.gz" \
 	-O "https://github.com/ianlancetaylor/libbacktrace/archive/$LIBBACKTRACE.zip" \
 	-O "https://ijg.org/files/jpegsrc.v$LIBJPEG.tar.gz" \
 	-O "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG/libpng-$LIBPNG.tar.xz" \
 	-O "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$LIBWEBP.tar.gz" \
 	-O "https://github.com/lz4/lz4/archive/$LZ4.tar.gz" \
 	-O "https://libsdl.org/release/$SDL.tar.gz" \
-	-O "http://zlib.net/zlib-$ZLIB.tar.gz" \
 	-O "https://github.com/facebook/zstd/releases/download/v$ZSTD/zstd-$ZSTD.tar.gz" \
 	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtbase-everywhere-src-$QT.tar.xz" \
 	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtimageformats-everywhere-src-$QT.tar.xz" \

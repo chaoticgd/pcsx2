@@ -29,6 +29,7 @@
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
 #include "pcsx2/PerformanceMetrics.h"
+#include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
 
 #include "common/Assertions.h"
@@ -889,6 +890,38 @@ void EmuThread::endCapture()
 	MTGS::RunOnGSThread(&GSEndCapture);
 }
 
+void EmuThread::setAudioOutputVolume(int volume, int fast_forward_volume)
+{
+	if (!isOnEmuThread())
+	{
+		QMetaObject::invokeMethod(this, "setAudioOutputVolume", Qt::QueuedConnection, Q_ARG(int, volume),
+			Q_ARG(int, fast_forward_volume));
+		return;
+	}
+
+	if (!VMManager::HasValidVM())
+		return;
+
+	EmuConfig.SPU2.OutputVolume = static_cast<u32>(volume);
+	EmuConfig.SPU2.FastForwardVolume = static_cast<u32>(fast_forward_volume);
+	SPU2::SetOutputVolume(SPU2::GetResetVolume());
+}
+
+void EmuThread::setAudioOutputMuted(bool muted)
+{
+	if (!isOnEmuThread())
+	{
+		QMetaObject::invokeMethod(this, "setAudioOutputMuted", Qt::QueuedConnection, Q_ARG(bool, muted));
+		return;
+	}
+
+	if (!VMManager::HasValidVM())
+		return;
+
+	EmuConfig.SPU2.OutputMuted = muted;
+	SPU2::SetOutputVolume(SPU2::GetResetVolume());
+}
+
 std::optional<WindowInfo> EmuThread::acquireRenderWindow(bool recreate_window)
 {
 	// Check if we're wanting to get exclusive fullscreen. This should be safe to read, since we're going to be calling from the GS thread.
@@ -1408,6 +1441,42 @@ QString QtHost::GetResourcesBasePath()
 std::string QtHost::GetRuntimeDownloadedResourceURL(std::string_view name)
 {
 	return fmt::format("{}/{}", RUNTIME_RESOURCES_URL, Path::URLEncode(name));
+}
+
+bool QtHost::SaveGameSettings(SettingsInterface* sif, bool delete_if_empty)
+{
+	INISettingsInterface* ini = static_cast<INISettingsInterface*>(sif);
+	Error error;
+
+	// if there's no keys, just toss the whole thing out
+	if (delete_if_empty && ini->IsEmpty())
+	{
+		INFO_LOG("Removing empty gamesettings ini {}", Path::GetFileName(ini->GetFileName()));
+		if (FileSystem::FileExists(ini->GetFileName().c_str()) &&
+			!FileSystem::DeleteFilePath(ini->GetFileName().c_str(), &error))
+		{
+			Host::ReportErrorAsync(
+				TRANSLATE_SV("QtHost", "Error"),
+				fmt::format(TRANSLATE_FS("QtHost", "An error occurred while deleting empty game settings:\n{}"),
+					error.GetDescription()));
+			return false;
+		}
+
+		return true;
+	}
+
+	// clean unused sections, stops the file being bloated
+	sif->RemoveEmptySections();
+
+	if (!sif->Save(&error))
+	{
+		Host::ReportErrorAsync(
+			TRANSLATE_SV("QtHost", "Error"),
+			fmt::format(TRANSLATE_FS("QtHost", "An error occurred while saving game settings:\n{}"), error.GetDescription()));
+		return false;
+	}
+
+	return true;
 }
 
 std::optional<bool> QtHost::DownloadFile(QWidget* parent, const QString& title, std::string url, std::vector<u8>* data)
