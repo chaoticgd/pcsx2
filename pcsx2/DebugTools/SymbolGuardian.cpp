@@ -262,6 +262,9 @@ bool SymbolGuardian::ImportNocashSymbols(ccc::SymbolDatabase& database, const st
 		if (p == NULL)
 			break;
 
+		if (char* end = strchr(line, '\n'))
+			*end = '\0';
+
 		u32 address;
 		if (sscanf(line, "%08x %255s", &address, value) != 2)
 			continue;
