@@ -27,9 +27,9 @@ namespace MipsStackWalk
 	static u32 GuessEntry(DebugInterface* cpu, u32 pc)
 	{
 		FunctionInfo function = cpu->GetSymbolGuardian().FunctionOverlappingAddress(pc);
-		if(!function.address.valid())
+		if (!function.address.valid())
 			return INVALIDTARGET;
-		
+
 		return function.address.value;
 	}
 
