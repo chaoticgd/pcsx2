@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for text editor detection
 
@@ -44,6 +44,7 @@ layout(std140, binding = 0) uniform cb21
 	vec4 HalfTexel;
 
 	vec4 MinMax;
+	vec4 LODParams;
 	vec4 STRange;
 
 	ivec4 ChannelShuffle;
@@ -131,15 +132,6 @@ vec4 sample_c(vec2 uv)
 	return texelFetch(TextureSampler, ivec2(uv), 0);
 #else
 
-#if PS_POINT_SAMPLER
-	// Weird issue with ATI/AMD cards,
-	// it looks like they add 127/128 of a texel to sampling coordinates
-	// occasionally causing point sampling to erroneously round up.
-	// I'm manually adjusting coordinates to the centre of texels here,
-	// though the centre is just paranoia, the top left corner works fine.
-	// As of 2018 this issue is still present.
-	uv = (trunc(uv * WH.zw) + vec2(0.5, 0.5)) / WH.zw;
-#endif
 #if !PS_ADJS && !PS_ADJT
 	uv *= STScale;
 #else
@@ -159,10 +151,10 @@ vec4 sample_c(vec2 uv)
 	return texture(TextureSampler, uv);
 #elif PS_MANUAL_LOD == 1
 	// FIXME add LOD: K - ( LOG2(Q) * (1 << L))
-	float K = MinMax.x;
-	float L = MinMax.y;
-	float bias = MinMax.z;
-	float max_lod = MinMax.w;
+	float K = LODParams.x;
+	float L = LODParams.y;
+	float bias = LODParams.z;
+	float max_lod = LODParams.w;
 
 	float gs_lod = K - log2(abs(PSin.t_float.w)) * L;
 	// FIXME max useful ?
@@ -686,19 +678,21 @@ vec4 ps_color()
 	vec4 T = sample_color(st);
 #endif
 
-	#if (SW_BLEND || PS_TFX != 1) && PS_SHUFFLE && !PS_SHUFFLE_SAME && !PS_READ16_SRC && (PS_SHUFFLE_ACROSS || PS_PROCESS_BA == SHUFFLE_READWRITE || PS_PROCESS_RG == SHUFFLE_READWRITE)
+	#if PS_SHUFFLE && !PS_READ16_SRC && !PS_SHUFFLE_SAME
 		uvec4 denorm_c_before = uvec4(T);
 		#if (PS_PROCESS_BA & SHUFFLE_READ)
-			T.r = float((denorm_c_before.b << 3) & 0xF8);
-			T.g = float(((denorm_c_before.b >> 2) & 0x38) | ((denorm_c_before.a << 6) & 0xC0));
-			T.b = float((denorm_c_before.a << 1) & 0xF8);
-			T.a = float(denorm_c_before.a & 0x80);
+			T.r = float((denorm_c_before.b << 3) & 0xF8u);
+			T.g = float(((denorm_c_before.b >> 2) & 0x38u) | ((denorm_c_before.a << 6) & 0xC0u));
+			T.b = float((denorm_c_before.a << 1) & 0xF8u);
+			T.a = float(denorm_c_before.a & 0x80u);
 		#else
-			T.r = float((denorm_c_before.r << 3) & 0xF8);
-			T.g = float(((denorm_c_before.r >> 2) & 0x38) | ((denorm_c_before.g << 6) & 0xC0));
-			T.b = float((denorm_c_before.g << 1) & 0xF8);
-			T.a = float(denorm_c_before.g & 0x80);
+			T.r = float((denorm_c_before.r << 3) & 0xF8u);
+			T.g = float(((denorm_c_before.r >> 2) & 0x38u) | ((denorm_c_before.g << 6) & 0xC0u));
+			T.b = float((denorm_c_before.g << 1) & 0xF8u);
+			T.a = float(denorm_c_before.g & 0x80u);
 		#endif
+		
+		T.a = ((T.a >= 127.5f) ? TA.y : ((PS_AEM == 0 || any(bvec3(ivec3(T.rgb) & ivec3(0xF8)))) ? TA.x : 0.0f)) * 255.0f;
 	#endif
 	
 	vec4 C = tfx(T, PSin.c);
@@ -721,7 +715,7 @@ void ps_fbmask(inout vec4 C)
 
 void ps_dither(inout vec3 C, float As)
 {
-#if PS_DITHER
+#if PS_DITHER > 0 && PS_DITHER < 3
 	#if PS_DITHER == 2
 		ivec2 fpos = ivec2(gl_FragCoord.xy);
 	#else
@@ -753,7 +747,7 @@ void ps_color_clamp_wrap(inout vec3 C)
 {
 	// When dithering the bottom 3 bits become meaningless and cause lines in the picture
 	// so we need to limit the color depth on dithered items
-#if SW_BLEND || PS_DITHER || PS_FBMASK
+#if SW_BLEND || (PS_DITHER > 0 && PS_DITHER < 3) || PS_FBMASK
 
 #if PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0 && PS_ROUND_INV
 	C += 7.0f; // Need to round up, not down since the shader will invert
@@ -771,7 +765,7 @@ void ps_color_clamp_wrap(inout vec3 C)
 	// Warning: normally blending equation is mult(A, B) = A * B >> 7. GPU have the full accuracy
 	// GS: Color = 1, Alpha = 255 => output 1
 	// GPU: Color = 1/255, Alpha = 255/255 * 255/128 => output 1.9921875
-#if PS_DST_FMT == FMT_16 && (PS_BLEND_MIX == 0 || PS_DITHER)
+#if PS_DST_FMT == FMT_16 && PS_DITHER < 3 && (PS_BLEND_MIX == 0 || PS_DITHER)
 	// In 16 bits format, only 5 bits of colors are used. It impacts shadows computation of Castlevania
 	C = vec3(ivec3(C) & ivec3(0xF8));
 #elif PS_COLCLIP == 1 || PS_HDR == 1
@@ -810,15 +804,15 @@ float As = As_rgba.a;
 	#if PS_SHUFFLE && SW_BLEND_NEEDS_RT
 		uvec4 denorm_rt = uvec4(RT);
 		#if (PS_PROCESS_BA & SHUFFLE_WRITE)
-			RT.r = float((denorm_rt.b << 3) & 0xF8);
-			RT.g = float(((denorm_rt.b >> 2) & 0x38) | ((denorm_rt.a << 6) & 0xC0));
-			RT.b = float((denorm_rt.a << 1) & 0xF8);
-			RT.a = float(denorm_rt.a & 0x80);
+			RT.r = float((denorm_rt.b << 3) & 0xF8u);
+			RT.g = float(((denorm_rt.b >> 2) & 0x38u) | ((denorm_rt.a << 6) & 0xC0u));
+			RT.b = float((denorm_rt.a << 1) & 0xF8u);
+			RT.a = float(denorm_rt.a & 0x80u);
 		#else
-			RT.r = float((denorm_rt.r << 3) & 0xF8);
-			RT.g = float(((denorm_rt.r >> 2) & 0x38) | ((denorm_rt.g << 6) & 0xC0));
-			RT.b = float((denorm_rt.g << 1) & 0xF8);
-			RT.a = float(denorm_rt.g & 0x80);
+			RT.r = float((denorm_rt.r << 3) & 0xF8u);
+			RT.g = float(((denorm_rt.r >> 2) & 0x38u) | ((denorm_rt.g << 6) & 0xC0u));
+			RT.b = float((denorm_rt.g << 1) & 0xF8u);
+			RT.a = float(denorm_rt.g & 0x80u);
 		#endif
 	#endif
 		
@@ -934,8 +928,15 @@ float As = As_rgba.a;
 	float color_compensate = 255.0f / max(128.0f, max_color);
 	Color.rgb *= vec3(color_compensate);
 #elif PS_BLEND_HW == 4
-	// Needed for Cd * (1 - Ad)
-	Color.rgb = vec3(128.0f);
+	// Needed for Cd * (1 - Ad) and Cd*(1 + Alpha)
+
+#if PS_BLEND_C == 2
+	float Alpha = Af;
+#else
+	float Alpha = As;
+#endif
+	As_rgba.rgb = vec3(Alpha) * vec3(128.0f / 255.0f);
+	Color.rgb = vec3(127.5f);
 #endif
 
 #endif
@@ -1042,70 +1043,50 @@ void ps_main()
 
 
 #if PS_SHUFFLE
-	#if (SW_BLEND || PS_TFX != 1) &&  PS_SHUFFLE && !PS_SHUFFLE_SAME && !PS_READ16_SRC && (PS_SHUFFLE_ACROSS || PS_PROCESS_BA == SHUFFLE_READWRITE || PS_PROCESS_RG == SHUFFLE_READWRITE)
+	#if !PS_READ16_SRC && !PS_SHUFFLE_SAME
 		uvec4 denorm_c_after = uvec4(C);
 		#if (PS_PROCESS_BA & SHUFFLE_READ)
-			C.b = float(((denorm_c_after.r >> 3) & 0x1F) | ((denorm_c_after.g << 2) & 0xE0));
-			C.a = float(((denorm_c_after.g >> 6) & 0x3) | ((denorm_c_after.b >> 1) & 0x7C) | (denorm_c_after.a & 0x80));
+			C.b = float(((denorm_c_after.r >> 3) & 0x1Fu) | ((denorm_c_after.g << 2) & 0xE0u));
+			C.a = float(((denorm_c_after.g >> 6) & 0x3u) | ((denorm_c_after.b >> 1) & 0x7Cu) | (denorm_c_after.a & 0x80u));
 		#else
-			C.r = float(((denorm_c_after.r >> 3) & 0x1F) | ((denorm_c_after.g << 2) & 0xE0));
-			C.g = float(((denorm_c_after.g >> 6) & 0x3) | ((denorm_c_after.b >> 1) & 0x7C) | (denorm_c_after.a & 0x80));
+			C.r = float(((denorm_c_after.r >> 3) & 0x1Fu) | ((denorm_c_after.g << 2) & 0xE0u));
+			C.g = float(((denorm_c_after.g >> 6) & 0x3u) | ((denorm_c_after.b >> 1) & 0x7Cu) | (denorm_c_after.a & 0x80u));
 		#endif
 	#endif
-	
-	uvec4 denorm_c = uvec4(C);
-	uvec2 denorm_TA = uvec2(vec2(TA.xy) * 255.0f + 0.5f);
 
-// Special case for 32bit input and 16bit output, shuffle used by The Godfather
-#if PS_SHUFFLE_SAME
-#if (PS_PROCESS_BA & SHUFFLE_READ)
-	C = vec4(float((denorm_c.b & 0x7Fu) | (denorm_c.a & 0x80u)));
-#else
-	C.ga = C.rg;
-#endif
-// Copy of a 16bit source in to this target
-#elif PS_READ16_SRC
-	C.rb = vec2(float((denorm_c.r >> 3) | (((denorm_c.g >> 3) & 0x7u) << 5)));
-	if (bool(denorm_c.a & 0x80u))
-		C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.y & 0x80u)));
-	else
-		C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.x & 0x80u)));
-#elif PS_SHUFFLE_ACROSS
-	#if(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE)
-		C.rb = C.br;
-		if ((denorm_c.a & 0x80u) != 0u)
-			C.g = float((denorm_c.a & 0x7Fu) | (denorm_TA.y & 0x80u));
-		else
-			C.g = float((denorm_c.a & 0x7Fu) | (denorm_TA.x & 0x80u));
-			
-		if ((denorm_c.g & 0x80u) != 0u)
-			C.a = float((denorm_c.g & 0x7Fu) | (denorm_TA.y & 0x80u));
-		else
-			C.a = float((denorm_c.g & 0x7Fu) | (denorm_TA.x & 0x80u));
-		
-	#elif(PS_PROCESS_BA & SHUFFLE_READ)
-		C.rb = C.bb;
-		if ((denorm_c.a & 0x80u) != 0u)
-			C.ga = vec2(float((denorm_c.a & 0x7Fu) | (denorm_TA.y & 0x80u)));
-		else
-			C.ga = vec2(float((denorm_c.a & 0x7Fu) | (denorm_TA.x & 0x80u)));
+	// Special case for 32bit input and 16bit output, shuffle used by The Godfather
+	#if PS_SHUFFLE_SAME
+		uvec4 denorm_c = uvec4(C);
+	#if (PS_PROCESS_BA & SHUFFLE_READ)
+		C = vec4(float((denorm_c.b & 0x7Fu) | (denorm_c.a & 0x80u)));
 	#else
-		C.rb = C.rr;
-		if ((denorm_c.g & 0x80u) != 0u)
-			C.ga = vec2(float((denorm_c.g & 0x7Fu) | (denorm_TA.y & 0x80u)));
+		C.ga = C.rg;
+	#endif
+	// Copy of a 16bit source in to this target
+	#elif PS_READ16_SRC
+		uvec4 denorm_c = uvec4(C);
+		uvec2 denorm_TA = uvec2(vec2(TA.xy) * 255.0f + 0.5f);
+		
+		C.rb = vec2(float((denorm_c.r >> 3) | (((denorm_c.g >> 3) & 0x7u) << 5)));
+		if (bool(denorm_c.a & 0x80u))
+			C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.y & 0x80u)));
 		else
-			C.ga = vec2(float((denorm_c.g & 0x7Fu) | (denorm_TA.x & 0x80u)));
-	#endif // PS_PROCESS_BA
-#else // PS_SHUFFLE_ACROSS
-	if ((denorm_c.g & 0x80u) != 0u)
-		C.g = float((denorm_c.g & 0x7Fu) | (denorm_TA.y & 0x80u));
-	else
-		C.g = float((denorm_c.g & 0x7Fu) | (denorm_TA.x & 0x80u));
-	if ((denorm_c.a & 0x80u) != 0u)
-		C.a = float((denorm_c.a & 0x7Fu) | (denorm_TA.y & 0x80u));
-	else
-		C.a = float((denorm_c.a & 0x7Fu) | (denorm_TA.x & 0x80u));
-#endif // PS_SHUFFLE_ACROSS
+			C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.x & 0x80u)));
+	#elif PS_SHUFFLE_ACROSS
+		#if(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE)
+			C.rb = C.br;
+			float g_temp = C.g;
+			
+			C.g = C.a;
+			C.a = g_temp;
+		#elif(PS_PROCESS_BA & SHUFFLE_READ)
+			C.rb = C.bb;
+			C.ga = C.aa;
+		#else
+			C.rb = C.rr;
+			C.ga = C.gg;
+		#endif // PS_PROCESS_BA
+	#endif // PS_SHUFFLE_ACROSS
 #endif // PS_SHUFFLE
 
 	ps_dither(C.rgb, alpha_blend.a);

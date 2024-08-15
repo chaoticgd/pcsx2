@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 #include "ui_SettingsWindow.h"
@@ -45,7 +45,7 @@ public:
 		u32 disc_crc, QString filename = QString());
 	~SettingsWindow();
 
-	static void openGamePropertiesDialog(const GameList::Entry* game, const std::string_view& title, std::string serial, u32 disc_crc);
+	static void openGamePropertiesDialog(const GameList::Entry* game, const std::string_view title, std::string serial, u32 disc_crc);
 	static void closeGamePropertiesDialogs();
 
 	SettingsInterface* getSettingsInterface() const;
@@ -119,7 +119,7 @@ private:
 	void addWidget(QWidget* widget, QString title, QString icon, QString help_text);
 	bool handleWheelEvent(QWheelEvent* event);
 
-	SettingsWindow* reopen();
+	void reopen(const QString& message);
 
 	std::unique_ptr<INISettingsInterface> m_sif;
 

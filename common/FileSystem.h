@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 
 class Error;
+class ProgressCallback;
 
 #ifdef _WIN32
 #define FS_OSPATH_SEPARATOR_CHARACTER '\\'
@@ -130,7 +131,9 @@ namespace FileSystem
 	std::optional<std::string> ReadFileToString(const char* filename);
 	std::optional<std::string> ReadFileToString(std::FILE* fp);
 	bool WriteBinaryFile(const char* filename, const void* data, size_t data_length);
-	bool WriteStringToFile(const char* filename, const std::string_view& sv);
+	bool WriteStringToFile(const char* filename, const std::string_view sv);
+	size_t ReadFileWithProgress(std::FILE* fp, void* dst, size_t length, ProgressCallback* progress,
+		Error* error = nullptr, size_t chunk_size = 16 * 1024 * 1024);
 
 	/// creates a directory in the local filesystem
 	/// if the directory already exists, the return value will be true.

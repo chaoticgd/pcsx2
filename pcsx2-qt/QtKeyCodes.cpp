@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "QtUtils.h"
 
@@ -460,7 +460,7 @@ static constexpr const KeyCodeName s_qt_key_names[] = {
 	{Qt::Key_Camera, "Camera", nullptr},
 	{Qt::Key_CameraFocus, "CameraFocus", nullptr}};
 
-std::optional<u32> InputManager::ConvertHostKeyboardStringToCode(const std::string_view& str)
+std::optional<u32> InputManager::ConvertHostKeyboardStringToCode(const std::string_view str)
 {
 	std::string_view compare_name = str;
 	u32 modifier_bits = 0;

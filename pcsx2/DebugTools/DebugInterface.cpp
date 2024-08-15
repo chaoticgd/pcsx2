@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "DebugInterface.h"
 #include "Memory.h"
@@ -54,10 +54,16 @@ public:
 		{
 			char reg[8];
 			std::snprintf(reg, std::size(reg), "r%d", i);
-
 			if (StringUtil::Strcasecmp(str, reg) == 0 || StringUtil::Strcasecmp(str, cpu->getRegisterName(0, i)) == 0)
 			{
 				referenceIndex = i;
+				return true;
+			}
+
+			std::snprintf(reg, std::size(reg), "f%d", i);
+			if (StringUtil::Strcasecmp(str, reg) == 0)
+			{
+				referenceIndex = i | REF_INDEX_FPU;
 				return true;
 			}
 		}
@@ -145,6 +151,10 @@ public:
 				}
 			}
 			return 0;
+		}
+		if (referenceIndex & REF_INDEX_FPU)
+		{
+			return cpu->getRegister(EECAT_FPR, referenceIndex & 0x1F)._u64[0];
 		}
 		return -1;
 	}
@@ -694,7 +704,7 @@ bool R5900DebugInterface::isValidAddress(u32 addr)
 			// [ 0000_8000 - 01FF_FFFF ] RAM
 			// [ 2000_8000 - 21FF_FFFF ] RAM MIRROR
 			// [ 3000_8000 - 31FF_FFFF ] RAM MIRROR
-			if (lopart >= 0x80000 && lopart <= 0x1ffFFff)
+			if (lopart >= 0x80000 && lopart < Ps2MemSize::ExposedRam)
 				return !!vtlb_GetPhyPtr(lopart);
 			break;
 		case 1:

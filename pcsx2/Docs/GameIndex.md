@@ -174,11 +174,12 @@ The clamp modes are also numerically based.
 
 * alignSprite                [`0` or `1`]                               {Off or On}                        Default: Off (`0`)
 * mergeSprite                [`0` or `1`]                               {Off or On}                        Default: Off (`0`)
-* wildArmsHack               [`0` or `1`]                               {Off or On}                        Default: Off (`0`)
+* forceEvenSpritePosition    [`0` or `1`]                               {Off or On}                        Default: Off (`0`)
 * bilinearUpscale            [`0` or `1` or `2`]                        {Automatic, Force Bilinear, Force Nearest}     Default: Automatic
 * skipDrawStart              [Value between `0` to `10000`]             {0-10000}                          Default: Off (`0`)
 * skipDrawEnd                [Value between `0` to `10000`]             {0-10000}                          Default: Off (`0`)
 * halfPixelOffset            [`0` or `1` or `2` or `3` or `4`] {Off, Normal Vertex, Special (Texture), Special (Texture Aggressive), Align to Native} Default: Off (`0`)
+* nativeScaling              [`0` or `1` or `2`]    {Normal, Aggressive or Off}             Default: Normal (`0`)
 * nativePaletteDraw          [`0` or `1`]           {Off, On}                               Default: Off (`0`)
 * roundSprite                [`0` or `1` or `2`]    {Off, Half or Full}                     Default: Off (`0`)
 

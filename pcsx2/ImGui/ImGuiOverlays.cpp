@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "Config.h"
 #include "Counters.h"
@@ -24,6 +24,8 @@
 #include "SIO/Pad/PadBase.h"
 #include "USB/USB.h"
 #include "VMManager.h"
+#include "svnrev.h"
+#include "cpuinfo.h"
 
 #include "common/BitUtils.h"
 #include "common/FileSystem.h"
@@ -103,14 +105,17 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 	SmallString text;
 	ImVec2 text_size;
 
+	if (GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft)
+		margin = -margin;
+
 #define DRAW_LINE(font, text, color) \
 	do \
 	{ \
 		text_size = font->CalcTextSizeA(font->FontSize, std::numeric_limits<float>::max(), -1.0f, (text), nullptr, nullptr); \
 		dl->AddText(font, font->FontSize, \
-			ImVec2(GetWindowWidth() - margin - text_size.x + shadow_offset, position_y + shadow_offset), \
+			ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 0 : GetWindowWidth() - text_size.x) - margin + shadow_offset, position_y + shadow_offset), \
 			IM_COL32(0, 0, 0, 100), (text)); \
-		dl->AddText(font, font->FontSize, ImVec2(GetWindowWidth() - margin - text_size.x, position_y), color, (text)); \
+		dl->AddText(font, font->FontSize, ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 0 : GetWindowWidth() - text_size.x) - margin, position_y), color, (text)); \
 		position_y += text_size.y + spacing; \
 	} while (0)
 
@@ -121,6 +126,7 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 	{
 		bool first = true;
 		const float speed = PerformanceMetrics::GetSpeed();
+
 		if (GSConfig.OsdShowFPS)
 		{
 			switch (PerformanceMetrics::GetInternalFPSMethod())
@@ -142,6 +148,7 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 			}
 			first = false;
 		}
+
 		if (GSConfig.OsdShowSpeed)
 		{
 			text.append_format("{}{}%", first ? "" : " | ", static_cast<u32>(std::round(speed)));
@@ -152,6 +159,16 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 			else
 				text.append_format(" ({:.0f}%)", target_speed * 100.0f);
 		}
+
+		if (GSConfig.OsdShowVersion)
+		{
+			if (GSConfig.OsdShowFPS || GSConfig.OsdShowSpeed)
+			{
+				text.append_format(" | ");
+			}
+			text.append_format("PCSX2 {}", GIT_REV);
+		}
+
 		if (!text.empty())
 		{
 			ImU32 color;
@@ -175,6 +192,13 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 			GSgetMemoryStats(text);
 			if (!text.empty())
 				DRAW_LINE(fixed_font, text.c_str(), IM_COL32(255, 255, 255, 255));
+
+			text.clear();
+			text.append_format("{} QF | {:.2f}ms | {:.2f}ms | {:.2f}ms",
+				MTGS::GetCurrentVsyncQueueSize() - 1, // we subtract one for the current frame
+				PerformanceMetrics::GetMinimumFrameTime(), PerformanceMetrics::GetAverageFrameTime(),
+				PerformanceMetrics::GetMaximumFrameTime());
+			DRAW_LINE(fixed_font, text.c_str(), IM_COL32(255, 255, 255, 255));
 		}
 
 		if (GSConfig.OsdShowResolution)
@@ -187,13 +211,18 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 			DRAW_LINE(fixed_font, text.c_str(), IM_COL32(255, 255, 255, 255));
 		}
 
-		if (GSConfig.OsdShowCPU)
+		if (GSConfig.OsdShowHardwareInfo)
 		{
 			text.clear();
-			text.append_format("{:.2f}ms | {:.2f}ms | {:.2f}ms", PerformanceMetrics::GetMinimumFrameTime(),
-				PerformanceMetrics::GetAverageFrameTime(), PerformanceMetrics::GetMaximumFrameTime());
+			text.append_format("CPU: {} ({}C/{}T)",
+				cpuinfo_get_package(0)->name,
+				cpuinfo_get_cores_count(),
+				cpuinfo_get_processors_count());
 			DRAW_LINE(fixed_font, text.c_str(), IM_COL32(255, 255, 255, 255));
+		}
 
+		if (GSConfig.OsdShowCPU)
+		{
 			text.clear();
 			if (EmuConfig.Speedhacks.EECycleRate != 0 || EmuConfig.Speedhacks.EECycleSkip != 0)
 				text.append_format("EE[{}/{}]: ", EmuConfig.Speedhacks.EECycleRate, EmuConfig.Speedhacks.EECycleSkip);
@@ -257,7 +286,7 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 		{
 			const ImVec2 history_size(200.0f * scale, 50.0f * scale);
 			ImGui::SetNextWindowSize(ImVec2(history_size.x, history_size.y));
-			ImGui::SetNextWindowPos(ImVec2(GetWindowWidth() - margin - history_size.x, position_y));
+			ImGui::SetNextWindowPos(ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 0 : GetWindowWidth() - history_size.x) - margin, position_y));
 			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.25f));
 			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 			ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -294,18 +323,20 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 				text.clear();
 				text.append_format("{:.1f} ms", max);
 				text_size = fixed_font->CalcTextSizeA(fixed_font->FontSize, FLT_MAX, 0.0f, text.c_str(), text.c_str() + text.length());
-				win_dl->AddText(ImVec2(wpos.x + history_size.x - text_size.x - spacing + shadow_offset, wpos.y + shadow_offset),
+				win_dl->AddText(ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 2.0f * spacing : wpos.x + history_size.x - text_size.x - spacing) + shadow_offset,
+									wpos.y + shadow_offset),
 					IM_COL32(0, 0, 0, 100), text.c_str(), text.c_str() + text.length());
-				win_dl->AddText(ImVec2(wpos.x + history_size.x - text_size.x - spacing, wpos.y), IM_COL32(255, 255, 255, 255), text.c_str(),
-					text.c_str() + text.length());
+				win_dl->AddText(ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 2.0f * spacing : wpos.x + history_size.x - text_size.x - spacing), wpos.y),
+					IM_COL32(255, 255, 255, 255), text.c_str(), text.c_str() + text.length());
 
 				text.clear();
 				text.append_format("{:.1f} ms", min);
 				text_size = fixed_font->CalcTextSizeA(fixed_font->FontSize, FLT_MAX, 0.0f, text.c_str(), text.c_str() + text.length());
-				win_dl->AddText(ImVec2(wpos.x + history_size.x - text_size.x - spacing + shadow_offset,
+				win_dl->AddText(ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 2.0f * spacing : wpos.x + history_size.x - text_size.x - spacing) + shadow_offset,
 									wpos.y + history_size.y - fixed_font->FontSize + shadow_offset),
 					IM_COL32(0, 0, 0, 100), text.c_str(), text.c_str() + text.length());
-				win_dl->AddText(ImVec2(wpos.x + history_size.x - text_size.x - spacing, wpos.y + history_size.y - fixed_font->FontSize),
+				win_dl->AddText(ImVec2((GSConfig.OsdPerformancePos == OsdOverlayPos::TopLeft ? 2.0f * spacing : wpos.x + history_size.x - text_size.x - spacing),
+									wpos.y + history_size.y - fixed_font->FontSize),
 					IM_COL32(255, 255, 255, 255), text.c_str(), text.c_str() + text.length());
 			}
 			ImGui::End();
@@ -327,7 +358,8 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 
 __ri void ImGuiManager::DrawSettingsOverlay(float scale, float margin, float spacing)
 {
-	if (!GSConfig.OsdShowSettings || VMManager::GetState() != VMState::Running)
+	if (!GSConfig.OsdShowSettings ||
+		FullscreenUI::HasActiveWindow())
 		return;
 
 	std::string text;
@@ -374,8 +406,8 @@ __ri void ImGuiManager::DrawSettingsOverlay(float scale, float margin, float spa
 		if (GSConfig.HWDownloadMode != GSHardwareDownloadMode::Enabled)
 			APPEND("DL={} ", static_cast<unsigned>(GSConfig.HWDownloadMode));
 
-		if (GSConfig.HWMipmap != HWMipmapLevel::Automatic)
-			APPEND("MM={} ", static_cast<unsigned>(GSConfig.HWMipmap));
+		if (GSConfig.HWMipmap)
+			APPEND("MM ");
 
 		// deliberately test global and print local here for auto values
 		if (EmuConfig.GS.TextureFiltering != BiFiltering::PS2)
@@ -390,6 +422,8 @@ __ri void ImGuiManager::DrawSettingsOverlay(float scale, float margin, float spa
 			APPEND("HPO={} ", static_cast<u32>(GSConfig.UserHacks_HalfPixelOffset));
 		if (GSConfig.UserHacks_RoundSprite > 0)
 			APPEND("RS={} ", GSConfig.UserHacks_RoundSprite);
+		if (GSConfig.UserHacks_NativeScaling > GSNativeScaling::Off)
+			APPEND("NS={} ", static_cast<unsigned>(GSConfig.UserHacks_NativeScaling));
 		if (GSConfig.UserHacks_TCOffsetX != 0 || GSConfig.UserHacks_TCOffsetY != 0)
 			APPEND("TCO={}/{} ", GSConfig.UserHacks_TCOffsetX, GSConfig.UserHacks_TCOffsetY);
 		if (GSConfig.UserHacks_CPUSpriteRenderBW != 0)
@@ -404,8 +438,8 @@ __ri void ImGuiManager::DrawSettingsOverlay(float scale, float margin, float spa
 			APPEND("TexRT={} ", static_cast<unsigned>(GSConfig.UserHacks_TextureInsideRt));
 		if (GSConfig.UserHacks_BilinearHack != GSBilinearDirtyMode::Automatic)
 			APPEND("BLU={} ", static_cast<unsigned>(GSConfig.UserHacks_BilinearHack));
-		if (GSConfig.UserHacks_WildHack)
-			APPEND("WA ");
+		if (GSConfig.UserHacks_ForceEvenSpritePosition)
+			APPEND("FESP ");
 		if (GSConfig.UserHacks_NativePaletteDraw)
 			APPEND("NPD ");
 		if (GSConfig.UserHacks_MergePPSprite)
@@ -460,7 +494,8 @@ __ri void ImGuiManager::DrawSettingsOverlay(float scale, float margin, float spa
 __ri void ImGuiManager::DrawInputsOverlay(float scale, float margin, float spacing)
 {
 	// Technically this is racing the CPU thread.. but it doesn't really matter, at worst, the inputs get displayed onscreen late.
-	if (!GSConfig.OsdShowInputs || VMManager::GetState() != VMState::Running)
+	if (!GSConfig.OsdShowInputs ||
+		FullscreenUI::HasActiveWindow())
 		return;
 
 	const float shadow_offset = std::ceil(scale);
@@ -608,7 +643,9 @@ __ri void ImGuiManager::DrawInputsOverlay(float scale, float margin, float spaci
 
 __ri void ImGuiManager::DrawInputRecordingOverlay(float& position_y, float scale, float margin, float spacing)
 {
-	if (!g_InputRecording.isActive() || FullscreenUI::HasActiveWindow())
+	if (!GSConfig.OsdShowInputRec ||
+		!g_InputRecording.isActive() ||
+		FullscreenUI::HasActiveWindow())
 		return;
 
 	const float shadow_offset = std::ceil(scale);
@@ -652,7 +689,9 @@ __ri void ImGuiManager::DrawInputRecordingOverlay(float& position_y, float scale
 
 __ri void ImGuiManager::DrawVideoCaptureOverlay(float& position_y, float scale, float margin, float spacing)
 {
-	if (!GSCapture::IsCapturing() || FullscreenUI::HasActiveWindow())
+	if (!GSConfig.OsdShowVideoCapture ||
+		!GSCapture::IsCapturing() ||
+		FullscreenUI::HasActiveWindow())
 		return;
 
 	const float shadow_offset = std::ceil(scale);
@@ -1073,13 +1112,18 @@ void SaveStateSelectorUI::ShowSlotOSDMessage()
 
 void ImGuiManager::RenderOverlays()
 {
+	if (VMManager::GetState() != VMState::Running)
+		return;
+
 	const float scale = ImGuiManager::GetGlobalScale();
 	const float margin = std::ceil(10.0f * scale);
 	const float spacing = std::ceil(5.0f * scale);
 	float position_y = margin;
+
 	DrawVideoCaptureOverlay(position_y, scale, margin, spacing);
 	DrawInputRecordingOverlay(position_y, scale, margin, spacing);
-	DrawPerformanceOverlay(position_y, scale, margin, spacing);
+	if (GSConfig.OsdPerformancePos != OsdOverlayPos::None)
+		DrawPerformanceOverlay(position_y, scale, margin, spacing);
 	DrawSettingsOverlay(scale, margin, spacing);
 	DrawInputsOverlay(scale, margin, spacing);
 	if (SaveStateSelectorUI::s_open)

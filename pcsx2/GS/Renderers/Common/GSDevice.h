@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -39,7 +39,9 @@ enum class ShaderConvert
 	RGBA8_TO_FLOAT24_BILN,
 	RGBA8_TO_FLOAT16_BILN,
 	RGB5A1_TO_FLOAT16_BILN,
+	FLOAT32_TO_FLOAT24,
 	DEPTH_COPY,
+	DOWNSAMPLE_COPY,
 	RGBA_TO_8I,
 	CLUT_4,
 	CLUT_8,
@@ -77,6 +79,7 @@ static inline bool HasDepthOutput(ShaderConvert shader)
 		case ShaderConvert::RGBA8_TO_FLOAT24_BILN:
 		case ShaderConvert::RGBA8_TO_FLOAT16_BILN:
 		case ShaderConvert::RGB5A1_TO_FLOAT16_BILN:
+		case ShaderConvert::FLOAT32_TO_FLOAT24:
 		case ShaderConvert::DEPTH_COPY:
 			return true;
 		default:
@@ -165,6 +168,18 @@ enum ChannelFetch
 	ChannelFetch_ALPHA = 4,
 	ChannelFetch_RGB   = 5,
 	ChannelFetch_GXBY  = 6,
+};
+
+enum class HWBlendType
+{
+	SRC_ONE_DST_FACTOR      = 1, // Use the dest color as blend factor, Cs is set to 1.
+	SRC_ALPHA_DST_FACTOR    = 2, // Use the dest color as blend factor, Cs is set to (Alpha - 1).
+	SRC_DOUBLE              = 3, // Double source color.
+	SRC_HALF_ONE_DST_FACTOR = 4, // Use the dest color as blend factor, Cs is set to 0.5, additionally divide As or Af by 2.
+
+	BMIX1_ALPHA_HIGH_ONE    = 1, // Blend formula is replaced when alpha is higher than 1.
+	BMIX1_SRC_HALF          = 2, // Impossible blend will always be wrong on hw, divide Cs by 2.
+	BMIX2_OVERFLOW          = 3, // Blending Cs might overflow, try to compensate.
 };
 
 struct alignas(16) DisplayConstantBuffer
@@ -387,7 +402,7 @@ struct alignas(16) GSHWDrawConfig
 		__fi bool IsFeedbackLoop() const
 		{
 			const u32 sw_blend_bits = blend_a | blend_b | blend_d;
-			const bool sw_blend_needs_rt = sw_blend_bits != 0 && ((sw_blend_bits | blend_c) & 1u);
+			const bool sw_blend_needs_rt = (sw_blend_bits != 0 && ((sw_blend_bits | blend_c) & 1u)) || ((a_masked & blend_c) != 0);
 			return tex_is_fb || fbmask || (date > 0 && date != 3) || sw_blend_needs_rt;
 		}
 
@@ -573,6 +588,7 @@ struct alignas(16) GSHWDrawConfig
 
 		GSVector4 HalfTexel;
 		GSVector4 MinMax;
+		GSVector4 LODParams;
 		GSVector4 STRange;
 		GSVector4i ChannelShuffle;
 		GSVector2 TCOffsetHack;
@@ -688,7 +704,9 @@ struct alignas(16) GSHWDrawConfig
 	struct AlphaPass
 	{
 		alignas(8) PSSelector ps;
-		bool enable;
+		bool enable : 1;
+		bool require_one_barrier : 1;
+		bool require_full_barrier : 1;
 		ColorMaskSelector colormask;
 		DepthStencilSelector depth;
 		float ps_aref;
@@ -697,16 +715,16 @@ struct alignas(16) GSHWDrawConfig
 
 	AlphaPass alpha_second_pass;
 
-	struct BlendPass
+	struct BlendMultiPass
 	{
 		BlendState blend;
 		u8 blend_hw;
 		u8 dither;
 		bool enable;
 	};
-	static_assert(sizeof(BlendPass) == 8, "blend pass is 8 bytes");
+	static_assert(sizeof(BlendMultiPass) == 8, "blend multi pass is 8 bytes");
 
-	BlendPass blend_second_pass;
+	BlendMultiPass blend_multi_pass;
 
 	VSConstantBuffer cb_vs;
 	PSConstantBuffer cb_ps;
@@ -763,6 +781,12 @@ public:
 		GSHWDrawConfig::ColorMaskSelector wmask; // 0xf for all channels by default
 	};
 
+	struct TextureRecycleDeleter
+	{
+		void operator()(GSTexture* const tex);
+	};
+	using RecycledTexture = std::unique_ptr<GSTexture, TextureRecycleDeleter>;
+
 	enum BlendFactor : u8
 	{
 		// HW blend factors
@@ -777,6 +801,21 @@ public:
 		OP_ADD, OP_SUBTRACT, OP_REV_SUBTRACT
 	};
 	// clang-format on
+
+protected:
+	FeatureSupport m_features;
+	u32 m_max_texture_size = 0;
+
+	struct
+	{
+		u32 start, count;
+	} m_vertex = {};
+	struct
+	{
+		u32 start, count;
+	} m_index = {};
+
+	u32 m_frame = 0; // for ageing the pool
 
 private:
 	std::array<FastList<GSTexture*>, 2> m_pool; // [texture, target]
@@ -795,7 +834,9 @@ protected:
 	static constexpr u32 EXPAND_BUFFER_SIZE = sizeof(u16) * 16383 * 6;
 
 	WindowInfo m_window_info;
-	VsyncMode m_vsync_mode = VsyncMode::Off;
+	GSVSyncMode m_vsync_mode = GSVSyncMode::Disabled;
+	bool m_allow_present_throttle = false;
+	u64 m_last_frame_displayed_time = 0;
 
 	GSTexture* m_imgui_font = nullptr;
 
@@ -806,18 +847,6 @@ protected:
 	GSTexture* m_target_tmp = nullptr;
 	GSTexture* m_current = nullptr;
 	GSTexture* m_cas = nullptr;
-
-	struct
-	{
-		u32 start, count;
-	} m_vertex = {};
-	struct
-	{
-		u32 start, count;
-	} m_index = {};
-	unsigned int m_frame = 0; // for ageing the pool
-	bool m_rbswapped = false;
-	FeatureSupport m_features;
 
 	bool AcquireWindow(bool recreate_window);
 
@@ -860,13 +889,15 @@ public:
 	__fi u64 GetPoolMemoryUsage() const { return m_pool_memory_usage; }
 
 	__fi FeatureSupport Features() const { return m_features; }
+	__fi u32 GetMaxTextureSize() const { return m_max_texture_size; }
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }
 	__fi s32 GetWindowHeight() const { return static_cast<s32>(m_window_info.surface_height); }
 	__fi GSVector2i GetWindowSize() const { return GSVector2i(static_cast<s32>(m_window_info.surface_width), static_cast<s32>(m_window_info.surface_height)); }
 	__fi float GetWindowScale() const { return m_window_info.surface_scale; }
-	__fi VsyncMode GetVsyncMode() const { return m_vsync_mode; }
+	__fi GSVSyncMode GetVSyncMode() const { return m_vsync_mode; }
+	__fi bool IsPresentThrottleAllowed() const { return m_allow_present_throttle; }
 
 	__fi GSTexture* GetCurrent() const { return m_current; }
 
@@ -878,7 +909,7 @@ public:
 	/// Recreates the font, call when the window scaling changes.
 	bool UpdateImGuiFontTexture();
 
-	virtual bool Create();
+	virtual bool Create(GSVSyncMode vsync_mode, bool allow_present_throttle);
 	virtual void Destroy();
 
 	/// Returns the graphics API used by this device.
@@ -907,10 +938,7 @@ public:
 	virtual void EndPresent() = 0;
 
 	/// Changes vsync mode for this display.
-	virtual void SetVSync(VsyncMode mode) = 0;
-
-	/// Returns the effective refresh rate of this display.
-	virtual bool GetHostRefreshRate(float* refresh_rate);
+	virtual void SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle) = 0;
 
 	/// Returns a string of information about the graphics driver being used.
 	virtual std::string GetDriverInfo() const = 0;
@@ -920,6 +948,12 @@ public:
 
 	/// Returns the amount of GPU time utilized since the last time this method was called.
 	virtual float GetAndResetAccumulatedGPUTime() = 0;
+
+	/// Returns true if not enough time has passed for present to not block.
+	bool ShouldSkipPresentingFrame();
+
+	/// Sleeps to the time the next frame can be displayed.
+	void ThrottlePresentation();
 
 	void ClearRenderTarget(GSTexture* t, u32 c);
 	void ClearDepth(GSTexture* t, float d);
@@ -957,6 +991,9 @@ public:
 	/// Converts a colour format to an indexed format texture.
 	virtual void ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM) = 0;
 
+	/// Uses box downsampling to resize a texture.
+	virtual void FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect) = 0;
+
 	virtual void RenderHW(GSHWDrawConfig& config) = 0;
 
 	virtual void ClearSamplerCache() = 0;
@@ -971,8 +1008,6 @@ public:
 	void CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect, bool sharpen_only);
 
 	bool ResizeRenderTarget(GSTexture** t, int w, int h, bool preserve_contents, bool recycle);
-
-	bool IsRBSwapped() { return m_rbswapped; }
 
 	void AgePool();
 	void PurgePool();

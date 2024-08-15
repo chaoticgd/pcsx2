@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "ExpressionParser.h"
 
@@ -539,10 +539,16 @@ bool parsePostfixExpression(PostfixExpression& exp, IExpressionFunctions* funcs,
 					valueStack.push_back(arg[1]<arg[0]);
 				break;
 			case EXOP_EQUAL:		// a == b
-				valueStack.push_back(arg[1]==arg[0]);
+				if (useFloat)
+					valueStack.push_back(fArg[1] == fArg[0]);
+				else
+					valueStack.push_back(arg[1]==arg[0]);
 				break;
 			case EXOP_NOTEQUAL:			// a != b
-				valueStack.push_back(arg[1]!=arg[0]);
+				if (useFloat)
+					valueStack.push_back(fArg[1] != fArg[0]);
+				else
+					valueStack.push_back(arg[1]!=arg[0]);
 				break;
 			case EXOP_BITAND:			// a&b
 				valueStack.push_back(arg[1]&arg[0]);

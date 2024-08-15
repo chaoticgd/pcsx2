@@ -148,10 +148,10 @@
     <ClCompile Include="Settings\ControllerSettingsWindow.cpp">
       <Filter>Settings</Filter>
     </ClCompile>
-    <ClCompile Include="Settings\ControllerBindingWidgets.cpp">
+    <ClCompile Include="Settings\ControllerBindingWidget.cpp">
       <Filter>Settings</Filter>
     </ClCompile>
-    <ClCompile Include="$(IntDir)Settings\moc_ControllerBindingWidgets.cpp">
+    <ClCompile Include="$(IntDir)Settings\moc_ControllerBindingWidget.cpp">
       <Filter>moc</Filter>
     </ClCompile>
     <ClCompile Include="Settings\ControllerGlobalSettingsWidget.cpp">
@@ -379,6 +379,7 @@
     <ClCompile Include="Debugger\SymbolTree\TypeString.cpp">
       <Filter>Debugger\SymbolTree</Filter>
     </ClCompile>
+    <ClCompile Include="VCRuntimeChecker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="..\pcsx2\windows\PCSX2.manifest">
@@ -472,7 +473,7 @@
     <QtMoc Include="Settings\ControllerSettingsWindow.h">
       <Filter>Settings</Filter>
     </QtMoc>
-    <QtMoc Include="Settings\ControllerBindingWidgets.h">
+    <QtMoc Include="Settings\ControllerBindingWidget.h">
       <Filter>Settings</Filter>
     </QtMoc>
     <QtMoc Include="Settings\ControllerGlobalSettingsWidget.h">
@@ -701,13 +702,25 @@
       <Filter>Settings</Filter>
     </QtUi>
     <QtUi Include="SetupWizardDialog.ui" />
+    <QtUi Include="Settings\USBBindingWidget_Buzz.ui">
+      <Filter>Settings</Filter>
+    </QtUi>
     <QtUi Include="Settings\USBBindingWidget_DrivingForce.ui">
+      <Filter>Settings</Filter>
+    </QtUi>
+    <QtUi Include="Settings\USBBindingWidget_Gametrak.ui">
       <Filter>Settings</Filter>
     </QtUi>
     <QtUi Include="Settings\USBBindingWidget_GTForce.ui">
       <Filter>Settings</Filter>
     </QtUi>
     <QtUi Include="Settings\USBBindingWidget_GunCon2.ui">
+      <Filter>Settings</Filter>
+    </QtUi>
+    <QtUi Include="Settings\USBBindingWidget_RealPlay.ui">
+      <Filter>Settings</Filter>
+    </QtUi>
+    <QtUi Include="Settings\USBBindingWidget_TranceVibrator.ui">
       <Filter>Settings</Filter>
     </QtUi>
     <QtUi Include="Settings\AudioExpansionSettingsDialog.ui">

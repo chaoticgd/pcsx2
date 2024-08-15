@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
 
@@ -953,6 +953,12 @@ void SYSCALL()
 			}
 		}
 		break;
+		case Syscall::RFU060:
+			if (CHECK_EXTRAMEM && cpuRegs.GPR.n.a1.UL[0] == 0xFFFFFFFF)
+			{
+				cpuRegs.GPR.n.a1.UL[0] = Ps2MemSize::ExposedRam - cpuRegs.GPR.n.a2.SL[0];
+			}
+			break;
 		case Syscall::SetOsdConfigParam:
 			// The whole thing gets written back to BIOS memory, so it'll be in the right place, no need to continue HLEing
 			AllowParams1 = true;
@@ -1062,7 +1068,6 @@ void SYSCALL()
 			// The only thing this code is used for is the one log message, so don't execute it if we aren't logging bios messages.
 			if (SysTraceActive(EE.Bios))
 			{
-				t_sif_dma_transfer *dmat;
 				//struct t_sif_cmd_header	*hdr;
 				//struct t_sif_rpc_bind *bind;
 				//struct t_rpc_server_data *server;
@@ -1074,7 +1079,7 @@ void SYSCALL()
 				if (n_transfer >= 0)
 				{
 					addr = cpuRegs.GPR.n.a0.UL[0] + n_transfer * sizeof(t_sif_dma_transfer);
-					dmat = (t_sif_dma_transfer*)PSM(addr);
+					t_sif_dma_transfer* dmat = (t_sif_dma_transfer*)PSM(addr);
 
 					BIOS_LOG("bios_%s: n_transfer=%d, size=%x, attr=%x, dest=%x, src=%x",
 							R5900::bios[cpuRegs.GPR.n.v1.UC[0]], n_transfer,
@@ -1148,6 +1153,13 @@ void SYSCALL()
 			}
 			break;
 		}
+		case Syscall::GetMemorySize:
+			if (CHECK_EXTRAMEM)
+			{
+				cpuRegs.GPR.n.v0.UL[0] = Ps2MemSize::ExposedRam;
+				return;
+			}
+			break;
 
 
 		default:

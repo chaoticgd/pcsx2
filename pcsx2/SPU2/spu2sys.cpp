@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 // ======================================================================================
 //  spu2sys.cpp -- Emulation module for the SPU2 'virtual machine'
@@ -349,15 +349,15 @@ __forceinline void TimeUpdate(u32 cClocks)
 		}
 		else
 		{
-			if (((psxCounters[6].sCycleT + psxCounters[6].CycleT) - psxRegs.cycle) > (u32)Cores[0].DMAICounter)
+			if (((psxCounters[6].startCycle + psxCounters[6].deltaCycles) - psxRegs.cycle) > (u32)Cores[0].DMAICounter)
 			{
-				psxCounters[6].sCycleT = psxRegs.cycle;
-				psxCounters[6].CycleT = Cores[0].DMAICounter;
+				psxCounters[6].startCycle = psxRegs.cycle;
+				psxCounters[6].deltaCycles = Cores[0].DMAICounter;
 
-				psxNextCounter -= (psxRegs.cycle - psxNextsCounter);
-				psxNextsCounter = psxRegs.cycle;
-				if (psxCounters[6].CycleT < psxNextCounter)
-					psxNextCounter = psxCounters[6].CycleT;
+				psxNextDeltaCounter -= (psxRegs.cycle - psxNextStartCounter);
+				psxNextStartCounter = psxRegs.cycle;
+				if (psxCounters[6].deltaCycles < psxNextDeltaCounter)
+					psxNextDeltaCounter = psxCounters[6].deltaCycles;
 			}
 		}
 	}
@@ -402,15 +402,15 @@ __forceinline void TimeUpdate(u32 cClocks)
 		}
 		else
 		{
-			if (((psxCounters[6].sCycleT + psxCounters[6].CycleT) - psxRegs.cycle) > (u32)Cores[1].DMAICounter)
+			if (((psxCounters[6].startCycle + psxCounters[6].deltaCycles) - psxRegs.cycle) > (u32)Cores[1].DMAICounter)
 			{
-				psxCounters[6].sCycleT = psxRegs.cycle;
-				psxCounters[6].CycleT = Cores[1].DMAICounter;
+				psxCounters[6].startCycle = psxRegs.cycle;
+				psxCounters[6].deltaCycles = Cores[1].DMAICounter;
 
-				psxNextCounter -= (psxRegs.cycle - psxNextsCounter);
-				psxNextsCounter = psxRegs.cycle;
-				if (psxCounters[6].CycleT < psxNextCounter)
-					psxNextCounter = psxCounters[6].CycleT;
+				psxNextDeltaCounter -= (psxRegs.cycle - psxNextStartCounter);
+				psxNextStartCounter = psxRegs.cycle;
+				if (psxCounters[6].deltaCycles < psxNextDeltaCounter)
+					psxNextDeltaCounter = psxCounters[6].deltaCycles;
 			}
 		}
 	}

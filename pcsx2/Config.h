@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -190,13 +190,6 @@ enum class SpeedHack
 	MaxCount,
 };
 
-enum class VsyncMode
-{
-	Off,
-	On,
-	Adaptive,
-};
-
 enum class AspectRatioType : u8
 {
 	Stretch,
@@ -254,6 +247,14 @@ enum class GSRendererType : s8
 	DX12 = 15,
 };
 
+enum class GSVSyncMode : u8
+{
+	Disabled,
+	FIFO,
+	Mailbox,
+	Count
+};
+
 enum class GSInterlaceMode : u8
 {
 	Automatic,
@@ -293,14 +294,6 @@ enum class TriFiltering : s8
 	Forced,
 };
 
-enum class HWMipmapLevel : s8
-{
-	Automatic = -1,
-	Off,
-	Basic,
-	Full
-};
-
 enum class AccBlendLevel : u8
 {
 	Minimum,
@@ -309,6 +302,13 @@ enum class AccBlendLevel : u8
 	High,
 	Full,
 	Maximum,
+};
+
+enum class OsdOverlayPos : u8
+{
+	None,
+	TopLeft,
+	TopRight,
 };
 
 enum class TexturePreloadingLevel : u8
@@ -391,6 +391,14 @@ enum class GSHalfPixelOffset : u8
 	Special,
 	SpecialAggressive,
 	Native,
+	MaxCount
+};
+
+enum class GSNativeScaling : u8
+{
+	Off,
+	Normal,
+	Aggressive,
 	MaxCount
 };
 
@@ -540,14 +548,17 @@ struct Pcsx2Config
 	// ------------------------------------------------------------------------
 	struct CpuOptions
 	{
+		BITFIELD32()
+		bool
+			ExtraMemory : 1;
+		BITFIELD_END
+
 		RecompilerOptions Recompiler;
 
 		FPControlRegister FPUFPCR;
 		FPControlRegister FPUDivFPCR;
 		FPControlRegister VU0FPCR;
 		FPControlRegister VU1FPCR;
-
-		u32 AffinityControlMode;
 
 		CpuOptions();
 		void LoadSave(SettingsWrapper& wrap);
@@ -591,6 +602,10 @@ struct Pcsx2Config
 			struct
 			{
 				bool
+					SynchronousMTGS : 1,
+					VsyncEnable : 1,
+					DisableMailboxPresentation : 1,
+					ExtendedUpscalingMultipliers : 1,
 					PCRTCAntiBlur : 1,
 					DisableInterlaceOffset : 1,
 					PCRTCOffsets : 1,
@@ -601,9 +616,7 @@ struct Pcsx2Config
 					DisableShaderCache : 1,
 					DisableFramebufferFetch : 1,
 					DisableVertexShaderExpand : 1,
-					DisableThreadedPresentation : 1,
 					SkipDuplicateFrames : 1,
-					OsdShowMessages : 1,
 					OsdShowSpeed : 1,
 					OsdShowFPS : 1,
 					OsdShowCPU : 1,
@@ -613,15 +626,18 @@ struct Pcsx2Config
 					OsdShowIndicators : 1,
 					OsdShowSettings : 1,
 					OsdShowInputs : 1,
-					OsdShowFrameTimes : 1;
-
-				bool
+					OsdShowFrameTimes : 1,
+					OsdShowVersion : 1,
+					OsdShowVideoCapture: 1,
+					OsdShowInputRec : 1,
+					OsdShowHardwareInfo : 1,
 					HWSpinGPUForReadbacks : 1,
 					HWSpinCPUForReadbacks : 1,
 					GPUPaletteConversion : 1,
 					AutoFlushSW : 1,
 					PreloadFrameWithGSData : 1,
 					Mipmap : 1,
+					HWMipmap : 1,
 					ManualUserHacks : 1,
 					UserHacks_AlignSpriteX : 1,
 					UserHacks_CPUFBConversion : 1,
@@ -631,7 +647,7 @@ struct Pcsx2Config
 					UserHacks_DisableSafeFeatures : 1,
 					UserHacks_DisableRenderFixes : 1,
 					UserHacks_MergePPSprite : 1,
-					UserHacks_WildHack : 1,
+					UserHacks_ForceEvenSpritePosition : 1,
 					UserHacks_NativePaletteDraw : 1,
 					UserHacks_EstimateTextureRegion : 1,
 					FXAA : 1,
@@ -659,12 +675,6 @@ struct Pcsx2Config
 
 		int VsyncQueueSize = 2;
 
-		// forces the MTGS to execute tags/tasks in fully blocking/synchronous
-		// style. Useful for debugging potential bugs in the MTGS pipeline.
-		bool SynchronousMTGS = false;
-
-		VsyncMode VsyncEnable = VsyncMode::Off;
-
 		float FramerateNTSC = DEFAULT_FRAME_RATE_NTSC;
 		float FrameratePAL = DEFAULT_FRAME_RATE_PAL;
 
@@ -676,12 +686,13 @@ struct Pcsx2Config
 		float StretchY = 100.0f;
 		int Crop[4] = {};
 
-		float OsdScale = 100.0;
+		float OsdScale = 100.0f;
+		OsdOverlayPos OsdMessagesPos = OsdOverlayPos::TopLeft;
+		OsdOverlayPos OsdPerformancePos = OsdOverlayPos::TopRight;
 
 		GSRendererType Renderer = GSRendererType::Auto;
 		float UpscaleMultiplier = 1.0f;
 
-		HWMipmapLevel HWMipmap = HWMipmapLevel::Automatic;
 		AccBlendLevel AccurateBlendingUnit = AccBlendLevel::Basic;
 		BiFiltering TextureFiltering = BiFiltering::PS2;
 		TexturePreloadingLevel TexturePreloading = TexturePreloadingLevel::Full;
@@ -700,6 +711,7 @@ struct Pcsx2Config
 		GSHWAutoFlushLevel UserHacks_AutoFlush = GSHWAutoFlushLevel::Disabled;
 		GSHalfPixelOffset UserHacks_HalfPixelOffset = GSHalfPixelOffset::Off;
 		s8 UserHacks_RoundSprite = 0;
+		GSNativeScaling UserHacks_NativeScaling = GSNativeScaling::Off;
 		s32 UserHacks_TCOffsetX = 0;
 		s32 UserHacks_TCOffsetY = 0;
 		u8 UserHacks_CPUSpriteRenderBW = 0;
@@ -730,6 +742,7 @@ struct Pcsx2Config
 
 		std::string CaptureContainer = DEFAULT_CAPTURE_CONTAINER;
 		std::string VideoCaptureCodec;
+		std::string VideoCaptureFormat;
 		std::string VideoCaptureParameters;
 		std::string AudioCaptureCodec;
 		std::string AudioCaptureParameters;
@@ -856,6 +869,7 @@ struct Pcsx2Config
 		bool EthEnable{false};
 		NetApi EthApi{NetApi::Unset};
 		std::string EthDevice;
+		bool EthLogDHCP{false};
 		bool EthLogDNS{false};
 
 		bool InterceptDHCP{false};
@@ -956,7 +970,7 @@ struct Pcsx2Config
 		bool operator!=(const SpeedhackOptions& right) const;
 
 		static const char* GetSpeedHackName(SpeedHack id);
-		static std::optional<SpeedHack> ParseSpeedHackName(const std::string_view& name);
+		static std::optional<SpeedHack> ParseSpeedHackName(const std::string_view name);
 	};
 
 	struct DebugOptions
@@ -986,6 +1000,7 @@ struct Pcsx2Config
 	{
 		BITFIELD32()
 		bool SyncToHostRefreshRate : 1;
+		bool UseVSyncForTiming : 1;
 		BITFIELD_END
 
 		float NominalScalar{1.0f};
@@ -1117,7 +1132,7 @@ struct Pcsx2Config
 	bool
 		CdvdVerboseReads : 1, // enables cdvd read activity verbosely dumped to the console
 		CdvdDumpBlocks : 1, // enables cdvd block dumping
-		CdvdShareWrite : 1, // allows the iso to be modified while it's loaded
+		CdvdPrecache : 1, // enables cdvd precaching of compressed images
 		EnablePatches : 1, // enables patch detection and application
 		EnableCheats : 1, // enables cheat detection and application
 		EnablePINE : 1, // enables inter-process communication
@@ -1125,6 +1140,7 @@ struct Pcsx2Config
 		EnableNoInterlacingPatches : 1,
 		EnableFastBoot : 1,
 		EnableFastBootFastForward : 1,
+		EnableThreadPinning : 1,
 		// TODO - Vaser - where are these settings exposed in the Qt UI?
 		EnableRecordingTools : 1,
 		EnableGameFixes : 1, // enables automatic game fixes
@@ -1193,6 +1209,9 @@ struct Pcsx2Config
 
 	/// Clears all core keys from the specified interface.
 	static void ClearConfiguration(SettingsInterface* dest_si);
+
+	/// Removes keys that are not valid for per-game settings.
+	static void ClearInvalidPerGameConfiguration(SettingsInterface* si);
 };
 
 extern Pcsx2Config EmuConfig;
@@ -1242,12 +1261,17 @@ namespace EmuFolders
 
 // ------------ CPU / Recompiler Options ---------------
 
+#ifdef _M_X86 // TODO(Stenzek): Remove me once EE/VU/IOP recs are added.
 #define THREAD_VU1 (EmuConfig.Cpu.Recompiler.EnableVU1 && EmuConfig.Speedhacks.vuThread)
+#else
+#define THREAD_VU1 false
+#endif
 #define INSTANT_VU1 (EmuConfig.Speedhacks.vu1Instant)
 #define CHECK_EEREC (EmuConfig.Cpu.Recompiler.EnableEE)
 #define CHECK_CACHE (EmuConfig.Cpu.Recompiler.EnableEECache)
 #define CHECK_IOPREC (EmuConfig.Cpu.Recompiler.EnableIOP)
 #define CHECK_FASTMEM (EmuConfig.Cpu.Recompiler.EnableEE && EmuConfig.Cpu.Recompiler.EnableFastmem)
+#define CHECK_EXTRAMEM (memGetExtraMemMode())
 
 //------------ SPECIAL GAME FIXES!!! ---------------
 #define CHECK_VUADDSUBHACK (EmuConfig.Gamefixes.VuAddSubHack) // Special Fix for Tri-ace games, they use an encryption algorithm that requires VU addi opcode to be bit-accurate.

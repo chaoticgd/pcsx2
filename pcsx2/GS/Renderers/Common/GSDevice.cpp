@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/GSGL.h"
@@ -9,9 +9,11 @@
 #include "common/Console.h"
 #include "common/BitUtils.h"
 #include "common/FileSystem.h"
+#include "common/HostSys.h"
 #include "common/Path.h"
 #include "common/SmallString.h"
 #include "common/StringUtil.h"
+#include "common/Threading.h"
 
 #include "imgui.h"
 
@@ -62,7 +64,9 @@ const char* shaderName(ShaderConvert value)
 		case ShaderConvert::RGBA8_TO_FLOAT24_BILN:  return "ps_convert_rgba8_float24_biln";
 		case ShaderConvert::RGBA8_TO_FLOAT16_BILN:  return "ps_convert_rgba8_float16_biln";
 		case ShaderConvert::RGB5A1_TO_FLOAT16_BILN: return "ps_convert_rgb5a1_float16_biln";
+		case ShaderConvert::FLOAT32_TO_FLOAT24:     return "ps_convert_float32_float24";
 		case ShaderConvert::DEPTH_COPY:             return "ps_depth_copy";
+		case ShaderConvert::DOWNSAMPLE_COPY:        return "ps_downsample_copy";
 		case ShaderConvert::RGBA_TO_8I:             return "ps_convert_rgba_8i";
 		case ShaderConvert::CLUT_4:                 return "ps_convert_clut_4";
 		case ShaderConvert::CLUT_8:                 return "ps_convert_clut_8";
@@ -305,9 +309,10 @@ int GSDevice::GetMipmapLevelsForSize(int width, int height)
 	return std::min(static_cast<int>(std::log2(std::max(width, height))) + 1, MAXIMUM_TEXTURE_MIPMAP_LEVELS);
 }
 
-bool GSDevice::Create()
+bool GSDevice::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 {
-	m_vsync_mode = Host::GetEffectiveVSyncMode();
+	m_vsync_mode = vsync_mode;
+	m_allow_present_throttle = allow_present_throttle;
 	return true;
 }
 
@@ -337,15 +342,42 @@ bool GSDevice::AcquireWindow(bool recreate_window)
 	return true;
 }
 
-bool GSDevice::GetHostRefreshRate(float* refresh_rate)
+bool GSDevice::ShouldSkipPresentingFrame()
 {
-	if (m_window_info.surface_refresh_rate > 0.0f)
-	{
-		*refresh_rate = m_window_info.surface_refresh_rate;
-		return true;
-	}
+	// Only needed with FIFO.
+	if (!m_allow_present_throttle || m_vsync_mode != GSVSyncMode::FIFO)
+		return false;
 
-	return WindowInfo::QueryRefreshRateForWindow(m_window_info, refresh_rate);
+	const float throttle_rate = (m_window_info.surface_refresh_rate > 0.0f) ? m_window_info.surface_refresh_rate : 60.0f;
+	const u64 throttle_period = static_cast<u64>(static_cast<double>(GetTickFrequency()) / static_cast<double>(throttle_rate));
+
+	const u64 now = GetCPUTicks();
+	const double diff = now - m_last_frame_displayed_time;
+	if (diff < throttle_period)
+		return true;
+
+	m_last_frame_displayed_time = now;
+	return false;
+}
+
+void GSDevice::ThrottlePresentation()
+{
+	// Manually throttle presentation when vsync isn't enabled, so we don't try to render the
+	// fullscreen UI at thousands of FPS and make the gpu go brrrrrrrr.
+	const float throttle_rate = (m_window_info.surface_refresh_rate > 0.0f) ? m_window_info.surface_refresh_rate : 60.0f;
+
+	const u64 sleep_period = static_cast<u64>(static_cast<double>(GetTickFrequency()) / static_cast<double>(throttle_rate));
+	const u64 current_ts = GetCPUTicks();
+
+	// Allow it to fall behind/run ahead up to 2*period. Sleep isn't that precise, plus we need to
+	// allow time for the actual rendering.
+	const u64 max_variance = sleep_period * 2;
+	if (static_cast<u64>(std::abs(static_cast<s64>(current_ts - m_last_frame_displayed_time))) > max_variance)
+		m_last_frame_displayed_time = current_ts + sleep_period;
+	else
+		m_last_frame_displayed_time += sleep_period;
+
+	Threading::SleepUntil(m_last_frame_displayed_time);
 }
 
 void GSDevice::ClearRenderTarget(GSTexture* t, u32 c)
@@ -396,9 +428,15 @@ bool GSDevice::UpdateImGuiFontTexture()
 	return true;
 }
 
+void GSDevice::TextureRecycleDeleter::operator()(GSTexture* const tex)
+{
+	g_gs_device->Recycle(tex);
+}
+
 GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format, bool clear, bool prefer_unused_texture)
 {
-	const GSVector2i size(width, height);
+	const GSVector2i size(std::clamp(width, 1, static_cast<int>(g_gs_device->GetMaxTextureSize())),
+		std::clamp(height, 1, static_cast<int>(g_gs_device->GetMaxTextureSize())));
 	FastList<GSTexture*>& pool = m_pool[type != GSTexture::Type::Texture];
 
 	GSTexture* t = nullptr;
@@ -438,14 +476,14 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, i
 		}
 		else
 		{
-			t = CreateSurface(type, width, height, levels, format);
+			t = CreateSurface(type, size.x, size.y, levels, format);
 			if (!t)
 			{
-				Console.Error("GS: Memory allocation failure for %dx%d texture. Purging pool and retrying.", width, height);
+				ERROR_LOG("GS: Memory allocation failure for {}x{} texture. Purging pool and retrying.", size.x, size.y);
 				PurgePool();
 				if (!t)
 				{
-					Console.Error("GS: Memory allocation failure for %dx%d texture after purging pool.", width, height);
+					ERROR_LOG("GS: Memory allocation failure for {}x{} texture after purging pool.", size.x, size.y);
 					return nullptr;
 				}
 			}

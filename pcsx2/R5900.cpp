@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
 
@@ -34,8 +34,7 @@ using namespace R5900;	// for R5900 disasm tools
 s32 EEsCycle;		// used to sync the IOP to the EE
 u32 EEoCycle;
 
-alignas(16) cpuRegisters cpuRegs;
-alignas(16) fpuRegisters fpuRegs;
+alignas(16) cpuRegistersPack _cpuRegistersPack;
 alignas(16) tlbs tlb[48];
 R5900cpu *Cpu = NULL;
 
@@ -398,7 +397,7 @@ __fi void _cpuEventTest_Shared()
 
 	iopEventTest();
 
-	if (cpuTestCycle(nextsCounter, nextCounter))
+	if (cpuTestCycle(nextStartCounter, nextDeltaCounter))
 	{
 		rcntUpdate();
 		_cpuTestPERF();
@@ -432,8 +431,8 @@ __fi void _cpuEventTest_Shared()
 	CpuVU1->ExecuteBlock();
 
 	// ---- Schedule Next Event Test --------------
-
-	const int nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * 8);
+	const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
+	const int nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);
 	// 8 or more cycles behind and there's an event scheduled
 	if (EEsCycle >= nextIopEventDeta)
 	{
@@ -446,11 +445,11 @@ __fi void _cpuEventTest_Shared()
 	else
 	{
 		// Otherwise IOP is caught up/not doing anything so we can wait for the next event.
-		cpuSetNextEventDelta(((psxRegs.iopNextEventCycle - psxRegs.cycle) * 8) - EEsCycle);
+		cpuSetNextEventDelta(((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier) - EEsCycle);
 	}
 
 	// Apply vsync and other counter nextCycles
-	cpuSetNextEvent(nextsCounter, nextCounter);
+	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
 
 	eeEventTestIsActive = false;
 }
@@ -711,6 +710,16 @@ void eeloadHook()
 	}
 
 	VMManager::Internal::ELFLoadingOnCPUThread(std::move(elfname));
+
+	if (CHECK_EXTRAMEM)
+	{
+		// Map extra memory.
+		vtlb_VMap(Ps2MemSize::MainRam, Ps2MemSize::MainRam, Ps2MemSize::ExtraRam);
+
+		// Map RAM mirrors for extra memory.
+		vtlb_VMap(0x20000000 | Ps2MemSize::MainRam, Ps2MemSize::MainRam, Ps2MemSize::ExtraRam);
+		vtlb_VMap(0x30000000 | Ps2MemSize::MainRam, Ps2MemSize::MainRam, Ps2MemSize::ExtraRam);
+	}
 }
 
 // Called from recompilers; define is mandatory.

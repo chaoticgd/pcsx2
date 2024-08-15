@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
 #include "CDVD/CDVD.h"
@@ -164,7 +164,7 @@ bool SaveStateBase::FreezeBios()
 	return IsOkay();
 }
 
-bool SaveStateBase::FreezeInternals()
+bool SaveStateBase::FreezeInternals(Error* error)
 {
 	// Print this until the MTVU problem in gifPathFreeze is taken care of (rama)
 	if (THREAD_VU1)
@@ -192,10 +192,10 @@ bool SaveStateBase::FreezeInternals()
 
 	Freeze(EEsCycle);
 	Freeze(EEoCycle);
-	Freeze(nextCounter);
-	Freeze(nextsCounter);
-	Freeze(psxNextsCounter);
-	Freeze(psxNextCounter);
+	Freeze(nextDeltaCounter);
+	Freeze(nextStartCounter);
+	Freeze(psxNextStartCounter);
+	Freeze(psxNextDeltaCounter);
 
 	// Fourth Block - EE-related systems
 	// ---------------------------------
@@ -203,7 +203,7 @@ bool SaveStateBase::FreezeInternals()
 		return false;
 
 	bool okay = rcntFreeze();
-	okay = okay && memFreeze();
+	okay = okay && memFreeze(error);
 	okay = okay && gsFreeze();
 	okay = okay && vuMicroFreeze();
 	okay = okay && vuJITFreeze();
@@ -510,7 +510,7 @@ public:
 
 	const char* GetFilename() const override { return "eeMemory.bin"; }
 	u8* GetDataPtr() const override { return eeMem->Main; }
-	uint GetDataSize() const override { return sizeof(eeMem->Main); }
+	uint GetDataSize() const override { return Ps2MemSize::ExposedRam; }
 
 	virtual bool FreezeIn(zip_file_t* zf) const override
 	{
@@ -656,10 +656,10 @@ class SaveStateEntry_Achievements final : public BaseSavestateEntry
 		if (zf)
 			data = ReadBinaryFileInZip(zf);
 
-		if (data.has_value() && !data->empty())
-			Achievements::LoadState(data->data(), data->size());
+		if (data.has_value())
+			Achievements::LoadState(data.value());
 		else
-			Achievements::LoadState(nullptr, 0);
+			Achievements::LoadState(std::span<const u8>());
 
 		return true;
 	}
@@ -669,14 +669,7 @@ class SaveStateEntry_Achievements final : public BaseSavestateEntry
 		if (!Achievements::IsActive())
 			return true;
 
-		std::vector<u8> data(Achievements::SaveState());
-		if (!data.empty())
-		{
-			writer.PrepBlock(static_cast<int>(data.size()));
-			std::memcpy(writer.GetBlockPtr(), data.data(), data.size());
-			writer.CommitBlock(static_cast<int>(data.size()));
-		}
-
+		Achievements::SaveState(writer);
 		return writer.IsOkay();
 	}
 
@@ -720,9 +713,11 @@ std::unique_ptr<ArchiveEntryList> SaveState_DownloadState(Error* error)
 		return nullptr;
 	}
 
-	if (!saveme.FreezeInternals())
+	if (!saveme.FreezeInternals(error))
 	{
-		Error::SetString(error, "FreezeInternals() failed");
+		if (!error->IsValid())
+			Error::SetString(error, "FreezeInternals() failed");
+
 		return nullptr;
 	}
 
@@ -1050,9 +1045,10 @@ static bool CheckVersion(const std::string& filename, zip_t* zf, Error* error)
 	// than the emulator recognizes.  99% chance that trying to load it will just corrupt emulation or crash.
 	if (savever > g_SaveVersion || (savever >> 16) != (g_SaveVersion >> 16))
 	{
-		Error::SetString(error, fmt::format(TRANSLATE_FS("SaveState","This savestate is an unsupported version and cannot be used.\n\n"
-											"You can download PCSX2 {} from pcsx2.net and make a normal memory card save.\n"
-											"Otherwise delete the savestate and do a fresh boot."),
+		Error::SetString(error, fmt::format(TRANSLATE_FS("SaveState","This save state is outdated and is no longer compatible "
+											"with the current version of PCSX2.\n\n"
+											"If you have any unsaved progress on this save state, you can download the compatible version (PCSX2 {}) "
+											"from pcsx2.net, load the save state, and save your progress to the memory card."),
 											version_string));
 		return false;
 	}
@@ -1077,7 +1073,7 @@ static zip_int64_t CheckFileExistsInState(zip_t* zf, const char* name, bool requ
 	return index;
 }
 
-static bool LoadInternalStructuresState(zip_t* zf, s64 index)
+static bool LoadInternalStructuresState(zip_t* zf, s64 index, Error* error)
 {
 	zip_stat_t zst;
 	if (zip_stat_index(zf, index, 0, &zst) != 0 || zst.size > std::numeric_limits<int>::max())
@@ -1096,7 +1092,7 @@ static bool LoadInternalStructuresState(zip_t* zf, s64 index)
 	if (!state.FreezeBios())
 		return false;
 	
-	if (!state.FreezeInternals())
+	if (!state.FreezeInternals(error))
 		return false;
 
 	return true;
@@ -1145,9 +1141,12 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 
 	PreLoadPrep();
 
-	if (!LoadInternalStructuresState(zf.get(), internal_index))
+	if (!LoadInternalStructuresState(zf.get(), internal_index, error))
 	{
-		Error::SetString(error, "Save state corruption in internal structures.");
+		if (!error->IsValid())
+			Error::SetString(error, "Save state corruption in internal structures.");
+
+		VMManager::Reset();
 		return false;
 	}
 
@@ -1163,6 +1162,7 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 		if (!zff || !SavestateEntries[i]->FreezeIn(zff.get()))
 		{
 			Error::SetString(error, fmt::format("Save state corruption in {}.", SavestateEntries[i]->GetFilename()));
+			VMManager::Reset();
 			return false;
 		}
 	}

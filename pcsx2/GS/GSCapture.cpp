@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GSCapture.h"
 #include "GS/GSPng.h"
@@ -27,10 +27,10 @@
 
 // We're using deprecated fields because we're targeting multiple ffmpeg versions.
 #if defined(_MSC_VER)
-#pragma warning(disable:4996) // warning C4996: 'AVCodecContext::channels': was declared deprecated
-#elif defined (__clang__)
+#pragma warning(disable : 4996) // warning C4996: 'AVCodecContext::channels': was declared deprecated
+#elif defined(__clang__)
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif defined (__GNUC__)
+#elif defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
@@ -42,6 +42,8 @@ extern "C" {
 #include "libavutil/dict.h"
 #include "libavutil/opt.h"
 #include "libavutil/version.h"
+#include "libavutil/channel_layout.h"
+#include "libavutil/pixdesc.h"
 #include "libswscale/swscale.h"
 #include "libswscale/version.h"
 #include "libswresample/swresample.h"
@@ -88,7 +90,8 @@ extern "C" {
 #else
 #define AVUTIL_57_IMPORTS(X) \
 	X(av_channel_layout_default) \
-	X(av_channel_layout_copy)
+	X(av_channel_layout_copy) \
+	X(av_opt_set_chlayout)
 #endif
 
 #define VISIT_AVUTIL_IMPORTS(X) \
@@ -115,7 +118,8 @@ extern "C" {
 	X(av_hwframe_transfer_data) \
 	X(av_hwframe_get_buffer) \
 	X(av_buffer_ref) \
-	X(av_buffer_unref)
+	X(av_buffer_unref) \
+	X(av_get_pix_fmt_name)
 
 #define VISIT_SWSCALE_IMPORTS(X) \
 	X(sws_getCachedContext) \
@@ -211,7 +215,7 @@ namespace GSCapture
 	static std::unique_ptr<s16[]> s_audio_buffer;
 	static std::atomic<u32> s_audio_buffer_size{0};
 	static u32 s_audio_buffer_write_pos = 0;
-	alignas(64) static u32 s_audio_buffer_read_pos = 0;
+	alignas(__cachelinesize) static u32 s_audio_buffer_read_pos = 0;
 } // namespace GSCapture
 
 #ifndef USE_LINKED_FFMPEG
@@ -289,13 +293,15 @@ bool GSCapture::LoadFFmpeg(bool report_errors)
 
 	if (report_errors)
 	{
-		Host::ReportErrorAsync(TRANSLATE_SV("GSCapture","Failed to load FFmpeg"),
-			fmt::format(TRANSLATE_FS("GSCapture","You may be missing one or more files, or are using the incorrect version. This build of PCSX2 requires:\n"
-						"  libavcodec: {}\n"
-						"  libavformat: {}\n"
-						"  libavutil: {}\n"
-						"  libswscale: {}\n"
-				"  libswresample: {}\n"), LIBAVCODEC_VERSION_MAJOR, LIBAVFORMAT_VERSION_MAJOR, LIBAVUTIL_VERSION_MAJOR,
+		Host::ReportErrorAsync(TRANSLATE_SV("GSCapture", "Failed to load FFmpeg"),
+			fmt::format(TRANSLATE_FS("GSCapture", "You may be missing one or more files, or are using the incorrect version. This build of PCSX2 requires:\n"
+												  "  libavcodec: {}\n"
+												  "  libavformat: {}\n"
+												  "  libavutil: {}\n"
+												  "  libswscale: {}\n"
+												  "  libswresample: {}\n\n"
+												  "Please see our official documentation for more information."),
+				LIBAVCODEC_VERSION_MAJOR, LIBAVFORMAT_VERSION_MAJOR, LIBAVUTIL_VERSION_MAJOR,
 				LIBSWSCALE_VERSION_MAJOR, LIBSWRESAMPLE_VERSION_MAJOR));
 	}
 
@@ -357,7 +363,7 @@ void GSCapture::LogAVError(int errnum, const char* format, ...)
 
 std::string GSCapture::GetCaptureTypeForMessage(bool capture_video, bool capture_audio)
 {
-	return capture_video ? (capture_audio ? "capturing audio and video" : "capturing video") : "capturing audio";
+	return capture_video ? capture_audio ? TRANSLATE("GSCapture", "capturing audio and video") : TRANSLATE("GSCapture", "capturing video") : TRANSLATE("GSCapture", "capturing audio");
 }
 
 bool GSCapture::IsUsingHardwareVideoEncoding()
@@ -445,22 +451,29 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 		wrap_av_reduce(&s_video_codec_context->time_base.num, &s_video_codec_context->time_base.den, 10000,
 			static_cast<s64>(static_cast<double>(fps) * 10000.0), std::numeric_limits<s32>::max());
 
-		// Default to YUV 4:2:0 if the codec doesn't specify a pixel format.
-		AVPixelFormat sw_pix_fmt = AV_PIX_FMT_YUV420P;
+		// Default to NV12 if not overridden by the user
+		const AVPixelFormat preferred_sw_pix_fmt = GSConfig.VideoCaptureFormat.empty() ? AV_PIX_FMT_NV12 : static_cast<AVPixelFormat>(std::stoi(GSConfig.VideoCaptureFormat));
+		AVPixelFormat sw_pix_fmt = preferred_sw_pix_fmt;
 		if (vcodec->pix_fmts)
 		{
-			// Prefer YUV420 given the choice, but otherwise fall back to whatever it supports.
 			sw_pix_fmt = vcodec->pix_fmts[0];
 			for (u32 i = 0; vcodec->pix_fmts[i] != AV_PIX_FMT_NONE; i++)
 			{
-				if (vcodec->pix_fmts[i] == AV_PIX_FMT_YUV420P)
+				if (vcodec->pix_fmts[i] == preferred_sw_pix_fmt)
 				{
 					sw_pix_fmt = vcodec->pix_fmts[i];
 					break;
 				}
 			}
 		}
+
+		if (sw_pix_fmt == AV_PIX_FMT_VAAPI)
+			sw_pix_fmt = AV_PIX_FMT_NV12;
+
 		s_video_codec_context->pix_fmt = sw_pix_fmt;
+
+		if (preferred_sw_pix_fmt != sw_pix_fmt)
+			Console.Warning("GSCapture: preferred pixel format (%d) was unsupported by the codec. Using (%d) instead.", preferred_sw_pix_fmt, sw_pix_fmt);
 
 		// Can we use hardware encoding?
 		const AVCodecHWConfig* hwconfig = wrap_avcodec_get_hw_config(vcodec, 0);
@@ -688,9 +701,16 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 				return false;
 			}
 
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+			const AVChannelLayout layout = AV_CHANNEL_LAYOUT_STEREO;
+			wrap_av_opt_set_chlayout(s_swr_context, "in_chlayout", &layout, 0);
+			wrap_av_opt_set_chlayout(s_swr_context, "out_chlayout", &layout, 0);
+#endif
+
 			wrap_av_opt_set_int(s_swr_context, "in_channel_count", AUDIO_CHANNELS, 0);
 			wrap_av_opt_set_int(s_swr_context, "in_sample_rate", sample_rate, 0);
 			wrap_av_opt_set_sample_fmt(s_swr_context, "in_sample_fmt", AV_SAMPLE_FMT_S16, 0);
+
 			wrap_av_opt_set_int(s_swr_context, "out_channel_count", AUDIO_CHANNELS, 0);
 			wrap_av_opt_set_int(s_swr_context, "out_sample_rate", sample_rate, 0);
 			wrap_av_opt_set_sample_fmt(s_swr_context, "out_sample_fmt", s_audio_codec_context->sample_fmt, 0);
@@ -811,8 +831,8 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 		return false;
 	}
 
-	Host::AddIconOSDMessage("GSCapture", ICON_FA_CAMERA,
-		fmt::format("Starting {} to '{}'.", GetCaptureTypeForMessage(capture_video, capture_audio), Path::GetFileName(s_filename)),
+	Host::AddIconOSDMessage("GSCapture", ICON_FA_VIDEO,
+		fmt::format(TRANSLATE_FS("GSCapture", "Starting {} to '{}'."), GetCaptureTypeForMessage(capture_video, capture_audio), Path::GetFileName(s_filename)),
 		Host::OSD_INFO_DURATION);
 
 	if (capture_audio)
@@ -971,7 +991,7 @@ void GSCapture::StopEncoderThread(std::unique_lock<std::mutex>& lock)
 
 bool GSCapture::SendFrame(const PendingFrame& pf)
 {
-	const AVPixelFormat source_format = g_gs_device->IsRBSwapped() ? AV_PIX_FMT_BGRA : AV_PIX_FMT_RGBA;
+	const AVPixelFormat source_format = AV_PIX_FMT_RGBA;
 	const u8* source_ptr = pf.tex->GetMapPointer();
 	const int source_width = static_cast<int>(pf.tex->GetWidth());
 	const int source_height = static_cast<int>(pf.tex->GetHeight());
@@ -1227,15 +1247,15 @@ void GSCapture::InternalEndCapture(std::unique_lock<std::mutex>& lock)
 		if (!s_encoding_error)
 		{
 			ProcessAllInFlightFrames(lock);
-			Host::AddIconOSDMessage("GSCapture", ICON_FA_CAMERA,
+			Host::AddIconOSDMessage("GSCapture", ICON_FA_VIDEO_SLASH,
 				fmt::format(
-					"Stopped {} to '{}'.", GetCaptureTypeForMessage(IsCapturingVideo(), IsCapturingAudio()), Path::GetFileName(s_filename)),
+					TRANSLATE_FS("GSCapture", "Stopped {} to '{}'."), GetCaptureTypeForMessage(IsCapturingVideo(), IsCapturingAudio()), Path::GetFileName(s_filename)),
 				Host::OSD_INFO_DURATION);
 		}
 		else
 		{
-			Host::AddIconOSDMessage("GSCapture", ICON_FA_CAMERA,
-				fmt::format("Aborted {} due to encoding error in '{}'.", GetCaptureTypeForMessage(IsCapturingVideo(), IsCapturingAudio()),
+			Host::AddIconOSDMessage("GSCapture", ICON_FA_VIDEO_SLASH,
+				fmt::format(TRANSLATE_FS("GSCapture", "Aborted {} due to encoding error in '{}'."), GetCaptureTypeForMessage(IsCapturingVideo(), IsCapturingAudio()),
 					Path::GetFileName(s_filename)),
 				Host::OSD_INFO_DURATION);
 		}
@@ -1490,4 +1510,34 @@ GSCapture::CodecList GSCapture::GetVideoCodecList(const char* container)
 GSCapture::CodecList GSCapture::GetAudioCodecList(const char* container)
 {
 	return GetCodecListForContainer(container, AVMEDIA_TYPE_AUDIO);
+}
+
+GSCapture::FormatList GSCapture::GetVideoFormatList(const char* codec)
+{
+	FormatList ret;
+
+	if (!LoadFFmpeg(false))
+		return ret;
+
+	const AVCodec* v_codec = wrap_avcodec_find_encoder_by_name(codec);
+
+	if (!v_codec)
+	{
+		Console.Error("(GetVideoFormatList) avcodec_find_encoder_by_name() failed");
+		return ret;
+	}
+
+	// rawvideo doesn't have a list of formats.
+	if (v_codec->pix_fmts == nullptr)
+	{
+		Console.Error("(GetVideoFormatList) v_codec->pix_fmts is null.");
+		return ret;
+	}
+
+	for (int i = 0; v_codec->pix_fmts[i] != AVPixelFormat::AV_PIX_FMT_NONE; i++)
+	{
+		ret.emplace_back(v_codec->pix_fmts[i], wrap_av_get_pix_fmt_name(v_codec->pix_fmts[i]));
+	}
+
+	return ret;
 }

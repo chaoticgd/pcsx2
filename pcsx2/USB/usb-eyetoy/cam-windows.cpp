@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "common/Console.h"
 #include "common/StringUtil.h"
@@ -392,7 +392,7 @@ namespace usb_eyetoy
 				{
 					const size_t comprLen = jo_write_mpeg(
 						comprBuf.data(), data, frame_width, frame_height, JO_BGR24, mirroring_enabled ? JO_FLIP_X : JO_NONE, JO_FLIP_Y);
-					comprBuf.resize(comprBufSize);
+					comprBuf.resize(comprLen);
 				}
 				else if (frame_format == format_jpeg)
 				{
@@ -472,7 +472,7 @@ namespace usb_eyetoy
 			if (frame_format == format_mpeg)
 			{
 				const size_t comprLen = jo_write_mpeg(comprBuf.data(), rgbData, frame_width, frame_height, JO_RGB24, JO_NONE, JO_NONE);
-				comprBuf.resize(comprBufSize);
+				comprBuf.resize(comprLen);
 			}
 			else if (frame_format == format_jpeg)
 			{

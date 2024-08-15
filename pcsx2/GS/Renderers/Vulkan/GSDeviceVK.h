@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -41,8 +41,10 @@ public:
 		bool vk_ext_rasterization_order_attachment_access : 1;
 		bool vk_ext_full_screen_exclusive : 1;
 		bool vk_ext_line_rasterization : 1;
+		bool vk_ext_swapchain_maintenance1 : 1;
 		bool vk_khr_driver_properties : 1;
 		bool vk_khr_shader_non_semantic_info : 1;
+		bool vk_ext_attachment_feedback_loop_layout : 1;
 	};
 
 	// Global state accessors
@@ -54,6 +56,13 @@ public:
 	__fi u32 GetPresentQueueFamilyIndex() const { return m_present_queue_family_index; }
 	__fi const VkPhysicalDeviceProperties& GetDeviceProperties() const { return m_device_properties; }
 	__fi const OptionalExtensions& GetOptionalExtensions() const { return m_optional_extensions; }
+
+	// The interaction between raster order attachment access and fbfetch is unclear.
+	__fi bool UseFeedbackLoopLayout() const
+	{
+		return (m_optional_extensions.vk_ext_attachment_feedback_loop_layout &&
+				!m_optional_extensions.vk_ext_rasterization_order_attachment_access);
+	}
 
 	// Helpers for getting constants
 	__fi u32 GetBufferCopyOffsetAlignment() const
@@ -67,6 +76,9 @@ public:
 
 	/// Returns true if running on an NVIDIA GPU.
 	__fi bool IsDeviceNVIDIA() const { return (m_device_properties.vendorID == 0x10DE); }
+
+	/// Returns true if running on an AMD GPU.
+	__fi bool IsDeviceAMD() const { return (m_device_properties.vendorID == 0x1002); }
 
 	// Creates a simple render pass.
 	VkRenderPass GetRenderPass(VkFormat color_format, VkFormat depth_format,
@@ -122,18 +134,14 @@ public:
 
 private:
 	// Helper method to create a Vulkan instance.
-	static VkInstance CreateVulkanInstance(const WindowInfo& wi, bool enable_debug_utils, bool enable_validation_layer);
-
-	// Returns a list of Vulkan-compatible GPUs.
-	using GPUList = std::vector<std::pair<VkPhysicalDevice, std::string>>;
-	static GPUList EnumerateGPUs(VkInstance instance);
-	static void GPUListToAdapterNames(std::vector<std::string>* dest, VkInstance instance);
+	static VkInstance CreateVulkanInstance(const WindowInfo& wi, OptionalExtensions* oe, bool enable_debug_utils,
+		bool enable_validation_layer);
 
 	// Enable/disable debug message runtime.
 	bool EnableDebugUtils();
 	void DisableDebugUtils();
 
-	void SubmitCommandBuffer(VKSwapChain* present_swap_chain = nullptr, bool submit_on_thread = false);
+	void SubmitCommandBuffer(VKSwapChain* present_swap_chain);
 	void MoveToNextCommandBuffer();
 
 	enum class WaitType
@@ -145,11 +153,6 @@ private:
 
 	static WaitType GetWaitType(bool wait, bool spin);
 	void ExecuteCommandBuffer(WaitType wait_for_completion);
-	void WaitForPresentComplete();
-
-	// Was the last present submitted to the queue a failure? If so, we must recreate our swapchain.
-	bool CheckLastPresentFail();
-	bool CheckLastSubmitFail();
 
 	// Allocates a temporary CPU staging buffer, fires the callback with it to populate, then copies to a GPU buffer.
 	bool AllocatePreinitializedGPUBuffer(u32 size, VkBuffer* gpu_buffer, VmaAllocation* gpu_allocation,
@@ -175,7 +178,8 @@ private:
 	};
 
 	using ExtensionList = std::vector<const char*>;
-	static bool SelectInstanceExtensions(ExtensionList* extension_list, const WindowInfo& wi, bool enable_debug_utils);
+	static bool SelectInstanceExtensions(ExtensionList* extension_list, const WindowInfo& wi, OptionalExtensions* oe,
+		bool enable_debug_utils);
 	bool SelectDeviceExtensions(ExtensionList* extension_list, bool enable_surface);
 	bool SelectDeviceFeatures();
 	bool CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer);
@@ -191,13 +195,6 @@ private:
 	void ActivateCommandBuffer(u32 index);
 	void ScanForCommandBufferCompletion();
 	void WaitForCommandBufferCompletion(u32 index);
-
-	void DoSubmitCommandBuffer(u32 index, VKSwapChain* present_swap_chain, u32 spin_cycles);
-	void DoPresent(VKSwapChain* present_swap_chain);
-	void WaitForPresentComplete(std::unique_lock<std::mutex>& lock);
-	void PresentThread();
-	void StartPresentThread();
-	void StopPresentThread();
 
 	bool InitSpinResources();
 	void DestroySpinResources();
@@ -280,23 +277,8 @@ private:
 	u64 m_completed_fence_counter = 0;
 	u32 m_current_frame = 0;
 
-	std::atomic_bool m_last_submit_failed{false};
-	std::atomic_bool m_last_present_failed{false};
-	std::atomic_bool m_present_done{true};
-	std::mutex m_present_mutex;
-	std::condition_variable m_present_queued_cv;
-	std::condition_variable m_present_done_cv;
-	std::thread m_present_thread;
-	std::atomic_bool m_present_thread_done{false};
-
-	struct QueuedPresent
-	{
-		VKSwapChain* swap_chain;
-		u32 command_buffer_index;
-		u32 spin_cycles;
-	};
-
-	QueuedPresent m_queued_present = {nullptr, 0xFFFFFFFFu, 0};
+	bool m_last_submit_failed = false;
+	bool m_last_present_failed = false;
 
 	std::map<u32, VkRenderPass> m_render_pass_cache;
 
@@ -495,8 +477,11 @@ public:
 
 	__fi static GSDeviceVK* GetInstance() { return static_cast<GSDeviceVK*>(g_gs_device.get()); }
 
-	static void GetAdaptersAndFullscreenModes(
-		std::vector<std::string>* adapters, std::vector<std::string>* fullscreen_modes);
+	// Returns a list of Vulkan-compatible GPUs.
+	using GPUList = std::vector<std::pair<VkPhysicalDevice, GSAdapterInfo>>;
+	static GPUList EnumerateGPUs();
+	static GPUList EnumerateGPUs(VkInstance instance);
+	static std::vector<GSAdapterInfo> GetAdapterInfo();
 
 	/// Returns true if Vulkan is suitable as a default for the devices in the system.
 	static bool IsSuitableDefaultRenderer();
@@ -512,7 +497,7 @@ public:
 	RenderAPI GetRenderAPI() const override;
 	bool HasSurface() const override;
 
-	bool Create() override;
+	bool Create(GSVSyncMode vsync_mode, bool allow_present_throttle) override;
 	void Destroy() override;
 
 	bool UpdateWindow() override;
@@ -521,7 +506,7 @@ public:
 	void DestroySurface() override;
 	std::string GetDriverInfo() const override;
 
-	void SetVSync(VsyncMode mode) override;
+	void SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle) override;
 
 	PresentResult BeginPresent(bool frame_skip) override;
 	void EndPresent() override;
@@ -564,6 +549,7 @@ public:
 		GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize) override;
 	void ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM,
 		GSTexture* dTex, u32 DBW, u32 DPSM) override;
+	void FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect) override;
 
 	void SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox);
 	GSTextureVK* SetupPrimitiveTrackingDATE(GSHWDrawConfig& config);
@@ -585,7 +571,9 @@ public:
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe);
 	void UploadHWDrawVerticesAndIndices(const GSHWDrawConfig& config);
 	VkImageMemoryBarrier GetColorBufferBarrier(GSTextureVK* rt) const;
-	void SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, bool skip_first_barrier);
+	VkDependencyFlags GetColorBufferBarrierFlags() const;
+	void SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt,
+		bool one_barrier, bool full_barrier, bool skip_first_barrier);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vulkan State

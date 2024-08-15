@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -68,7 +68,7 @@ namespace QtUtils
 	void OpenURL(QWidget* parent, const QString& url);
 
 	/// Converts a std::string_view to a QString safely.
-	QString StringViewToQString(const std::string_view& str);
+	QString StringViewToQString(const std::string_view str);
 
 	/// Sets a widget to italics if the setting value is inherited.
 	void SetWidgetFontForInheritedSetting(QWidget* widget, bool inherited);

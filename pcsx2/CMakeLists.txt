@@ -91,7 +91,6 @@ set(pcsx2Sources
 	MMI.cpp
 	MTGS.cpp
 	MTVU.cpp
-	MultipartFileReader.cpp
 	Patch.cpp
 	Pcsx2Config.cpp
 	PerformanceMetrics.cpp
@@ -141,7 +140,6 @@ set(pcsx2Sources
 # Main pcsx2 header
 set(pcsx2Headers
 	Achievements.h
-	AsyncFileReader.h
 	Cache.h
 	Common.h
 	Config.h
@@ -212,12 +210,11 @@ set(pcsx2CDVDSources
 	CDVD/CDVDdiscReader.cpp
 	CDVD/CDVDisoReader.cpp
 	CDVD/CDVDdiscThread.cpp
+	CDVD/FlatFileReader.cpp
 	CDVD/InputIsoFile.cpp
 	CDVD/IsoHasher.cpp
 	CDVD/IsoReader.cpp
 	CDVD/OutputIsoFile.cpp
-	CDVD/ChunksCache.cpp
-	CDVD/CompressedFileReader.cpp
 	CDVD/ChdFileReader.cpp
 	CDVD/CsoFileReader.cpp
 	CDVD/GzippedFileReader.cpp
@@ -226,15 +223,15 @@ set(pcsx2CDVDSources
 
 # CDVD headers
 set(pcsx2CDVDHeaders
+	CDVD/BlockdumpFileReader.h
 	CDVD/Ps1CD.h
 	CDVD/CDVDcommon.h
 	CDVD/CDVD.h
 	CDVD/CDVD_internal.h
 	CDVD/CDVDdiscReader.h
-	CDVD/ChunksCache.h
-	CDVD/CompressedFileReader.h
 	CDVD/ChdFileReader.h
 	CDVD/CsoFileReader.h
+	CDVD/FlatFileReader.h
 	CDVD/GzippedFileReader.h
 	CDVD/ThreadedFileReader.h
 	CDVD/IsoFileFormats.h
@@ -287,6 +284,7 @@ set(pcsx2DEV9Sources
 	DEV9/ATA/ATA_State.cpp
 	DEV9/ATA/ATA_Transfer.cpp
 	DEV9/ATA/HddCreate.cpp
+	DEV9/InternalServers/DHCP_Logger.cpp
 	DEV9/InternalServers/DHCP_Server.cpp
 	DEV9/InternalServers/DNS_Logger.cpp
 	DEV9/InternalServers/DNS_Server.cpp
@@ -325,7 +323,8 @@ set(pcsx2DEV9Headers
 	DEV9/ATA/ATA.h
 	DEV9/ATA/HddCreate.h
 	DEV9/DEV9.h
-	DEV9/InternalServers/DHCP_Server.cpp
+	DEV9/InternalServers/DHCP_Logger.h
+	DEV9/InternalServers/DHCP_Server.h
 	DEV9/InternalServers/DNS_Logger.h
 	DEV9/InternalServers/DNS_Server.h
 	DEV9/net.h
@@ -384,10 +383,14 @@ set(pcsx2USBSources
 	USB/usb-mic/usb-mic-singstar.cpp
 	USB/usb-msd/usb-msd.cpp
 	USB/usb-pad/lg/lg_ff.cpp
+	USB/usb-pad/usb-buzz.cpp
+	USB/usb-pad/usb-gametrak.cpp
+	USB/usb-pad/usb-realplay.cpp
 	USB/usb-pad/usb-pad-ff.cpp
 	USB/usb-pad/usb-pad-sdl-ff.cpp
 	USB/usb-pad/usb-pad.cpp
 	USB/usb-pad/usb-seamic.cpp
+	USB/usb-pad/usb-trance-vibrator.cpp
 	USB/usb-pad/usb-turntable.cpp
 	USB/usb-printer/usb-printer.cpp
 )
@@ -418,8 +421,12 @@ set(pcsx2USBHeaders
 	USB/usb-mic/usb-mic-singstar.h
 	USB/usb-msd/usb-msd.h
 	USB/usb-pad/lg/lg_ff.h
+	USB/usb-pad/usb-buzz.h
+	USB/usb-pad/usb-gametrak.h
+	USB/usb-pad/usb-realplay.h
 	USB/usb-pad/usb-pad-sdl-ff.h
 	USB/usb-pad/usb-pad.h
+	USB/usb-pad/usb-trance-vibrator.h
 	USB/usb-printer/usb-printer.h
 )
 
@@ -429,6 +436,8 @@ set(pcsx2PADSources
 	SIO/Pad/PadBase.cpp
 	SIO/Pad/PadDualshock2.cpp
 	SIO/Pad/PadGuitar.cpp
+	SIO/Pad/PadJogcon.cpp
+	SIO/Pad/PadNegcon.cpp
 	SIO/Pad/PadPopn.cpp
 	SIO/Pad/PadNotConnected.cpp
 )
@@ -437,6 +446,8 @@ set(pcsx2PADHeaders
 	SIO/Pad/PadBase.h
 	SIO/Pad/PadDualshock2.h
 	SIO/Pad/PadGuitar.h
+	SIO/Pad/PadJogcon.h
+	SIO/Pad/PadNegcon.h
 	SIO/Pad/PadPopn.h
 	SIO/Pad/PadNotConnected.h
 	SIO/Pad/PadTypes.h
@@ -450,11 +461,21 @@ set(pcsx2GSSourcesUnshared
 	GS/Renderers/Common/GSVertexTraceFMM.cpp
 	GS/Renderers/HW/GSRendererHWMultiISA.cpp
 	GS/Renderers/SW/GSDrawScanline.cpp
-	GS/Renderers/SW/GSDrawScanlineCodeGenerator.all.cpp
 	GS/Renderers/SW/GSRasterizer.cpp
 	GS/Renderers/SW/GSRendererSW.cpp
-	GS/Renderers/SW/GSSetupPrimCodeGenerator.all.cpp
 )
+
+if(_M_X86)
+	list(APPEND pcsx2GSSourcesUnshared
+		GS/Renderers/SW/GSDrawScanlineCodeGenerator.all.cpp
+		GS/Renderers/SW/GSSetupPrimCodeGenerator.all.cpp
+	)
+elseif(_M_ARM64)
+	list(APPEND pcsx2GSSourcesUnshared
+		GS/Renderers/SW/GSDrawScanlineCodeGenerator.arm64.cpp
+		GS/Renderers/SW/GSSetupPrimCodeGenerator.arm64.cpp
+	)
+endif()
 
 set(pcsx2GSSources
 	GS/GS.cpp
@@ -510,10 +531,6 @@ set(pcsx2GSHeaders
 	GS/GSTables.h
 	GS/GSUtil.h
 	GS/GSVector.h
-	GS/GSVector4.h
-	GS/GSVector4i.h
-	GS/GSVector8.h
-	GS/GSVector8i.h
 	GS/GSXXH.h
 	GS/MultiISA.h
 	GS/Renderers/Common/GSDevice.h
@@ -540,6 +557,20 @@ set(pcsx2GSHeaders
 	GS/Renderers/SW/GSTextureCacheSW.h
 	GS/Renderers/SW/GSVertexSW.h
 	)
+
+if(_M_X86)
+	list(APPEND pcsx2GSHeaders
+		GS/GSVector4.h
+		GS/GSVector4i.h
+		GS/GSVector8.h
+		GS/GSVector8i.h
+	)
+elseif(_M_ARM64)
+	list(APPEND pcsx2GSHeaders
+		GS/GSVector4_arm64.h
+		GS/GSVector4i_arm64.h
+	)
+endif()
 
 if(USE_OPENGL)
 	list(APPEND pcsx2GSSources
@@ -610,7 +641,8 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
 	)
-	target_link_libraries(PCSX2_FLAGS INTERFACE Vulkan-Headers Shaderc::shaderc_shared)
+	target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers)
+	target_include_directories(PCSX2_FLAGS INTERFACE ${SHADERC_INCLUDE_DIR})
 endif()
 
 set(pcsx2GSMetalShaders
@@ -880,19 +912,16 @@ endif()
 set(pcsx2LinuxSources
 	CDVD/Linux/DriveUtility.cpp
 	CDVD/Linux/IOCtlSrc.cpp
-	Linux/LnxFlatFileReader.cpp
 	)
 
 set(pcsx2OSXSources
 	CDVD/Darwin/DriveUtility.cpp
 	CDVD/Darwin/IOCtlSrc.cpp
-	Darwin/DarwinFlatFileReader.cpp
 	)
 
 set(pcsx2FreeBSDSources
 	CDVD/Darwin/DriveUtility.cpp
 	CDVD/Darwin/IOCtlSrc.cpp
-	Darwin/DarwinFlatFileReader.cpp
 	)
 
 # Linux headers
@@ -959,7 +988,6 @@ set(pcsx2RecordingHeaders
 set(pcsx2WindowsSources
 	CDVD/Windows/DriveUtility.cpp
 	CDVD/Windows/IOCtlSrc.cpp
-	windows/FlatFileReaderWindows.cpp
 	windows/Optimus.cpp
 )
 
@@ -988,7 +1016,6 @@ set(pcsx2x86Sources
 	x86/ix86-32/iR5900Templates.cpp
 	x86/ix86-32/recVTLB.cpp
 	x86/newVif_Dynarec.cpp
-	x86/newVif_Unpack.cpp
 	x86/newVif_UnpackSSE.cpp
 	)
 
@@ -1029,10 +1056,21 @@ set(pcsx2x86Headers
 	x86/microVU_Tables.inl
 	x86/microVU_Upper.inl
 	x86/newVif.h
-	x86/newVif_HashBucket.h
 	x86/newVif_UnpackSSE.h
 	x86/R5900_Profiler.h
 	)
+
+# ARM64
+set(pcsx2arm64Sources
+	arm64/AsmHelpers.cpp
+	arm64/newVif_Dynarec.cpp
+	arm64/newVif_UnpackNEON.cpp
+	arm64/RecStubs.cpp
+	)
+
+set(pcsx2arm64Headers
+	arm64/AsmHelpers.h
+)
 
 # These ones benefit a lot from LTO
 set(pcsx2LTOSources
@@ -1040,19 +1078,22 @@ set(pcsx2LTOSources
 	${pcsx2Headers}
 	${pcsx2IPUSources}
 	${pcsx2IPUHeaders}
-	${pcsx2x86Sources}
-	${pcsx2x86Headers}
 	${pcsx2SPU2Sources}
 	${pcsx2SPU2Headers}
 	${pcsx2GSSources}
 	${pcsx2GSHeaders}
 )
 
+if(_M_X86)
+	list(APPEND pcsx2LTOSources ${pcsx2x86Sources} ${pcsx2x86Headers})
+	target_link_libraries(PCSX2_FLAGS INTERFACE zydis)
+elseif(_M_ARM64)
+	list(APPEND pcsx2LTOSources ${pcsx2arm64Sources} ${pcsx2arm64Headers})
+	target_link_libraries(PCSX2_FLAGS INTERFACE vixl)
+endif()
+
 if(LTO_PCSX2_CORE)
 	add_library(PCSX2_LTO ${pcsx2LTOSources})
-	if (WIN32)
-		target_compile_definitions(PCSX2_LTO PRIVATE _M_SSE=0x401)
-	endif()
 	if (DISABLE_ADVANCE_SIMD)
 		target_compile_definitions(PCSX2_LTO PRIVATE MULTI_ISA_SHARED_COMPILATION)
 	endif()
@@ -1093,7 +1134,6 @@ if(LINUX)
 		)
 
 	target_link_libraries(PCSX2_FLAGS INTERFACE
-		PkgConfig::AIO
 		PkgConfig::LIBUDEV
 	)
 endif()
@@ -1122,11 +1162,10 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 	common
 	imgui
 	fmt::fmt
-	ryml
+	rapidyaml::rapidyaml
 	libchdr
 	libzip::zip
 	cpuinfo
-	zydis
 	cubeb
 	rcheevos
 	discord-rpc
@@ -1173,15 +1212,15 @@ else()
 endif()
 
 # additonal include directories
+if(_M_X86)
+	target_include_directories(PCSX2_FLAGS INTERFACE "${CMAKE_SOURCE_DIR}/3rdparty/xbyak")
+	target_compile_definitions(PCSX2_FLAGS INTERFACE XBYAK_NO_EXCEPTION)
+endif()
 target_include_directories(PCSX2_FLAGS INTERFACE
 	"${CMAKE_CURRENT_SOURCE_DIR}"
 	"${CMAKE_BINARY_DIR}/pcsx2"
 	"${CMAKE_BINARY_DIR}/common/include"
-	"${CMAKE_SOURCE_DIR}/3rdparty/xbyak"
 	"${FFMPEG_INCLUDE_DIRS}"
-)
-target_compile_definitions(PCSX2_FLAGS INTERFACE
-	XBYAK_NO_EXCEPTION
 )
 
 set_source_files_properties(PrecompiledHeader.cpp PROPERTIES HEADER_FILE_ONLY TRUE)
@@ -1273,6 +1312,16 @@ function(setup_main_executable target)
 		install(CODE "file(WRITE \"${CMAKE_SOURCE_DIR}/bin/qt.conf\" \"[Paths]\\nPlugins = ./QtPlugins\")")
 	endif()
 
+
+	if (UNIX AND NOT APPLE)
+		if (PACKAGE_MODE)
+			install(TARGETS pcsx2-qt DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+			install(DIRECTORY ${CMAKE_SOURCE_DIR}/bin/resources DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/PCSX2)
+		else()
+			install(TARGETS pcsx2-qt DESTINATION ${CMAKE_SOURCE_DIR}/bin)
+		endif()
+	endif()
+
 	if(APPLE)
 		if(CMAKE_GENERATOR MATCHES "Xcode")
 			# If we're generating an xcode project, you can just add the shaders to the main pcsx2 target and xcode will deal with them properly
@@ -1318,9 +1367,15 @@ function(setup_main_executable target)
 			MACOSX_BUNDLE true
 			MACOSX_BUNDLE_INFO_PLIST "${PCSX2_SOURCE_DIR}/Resources/Info.plist.in"
 			OUTPUT_NAME PCSX2
+			# Fixes complaints when Xcode tries to sign for running locally about MoltenVK not being signed
+			XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS --deep
 		)
 
 		pcsx2_resource(${target} ${PCSX2_SOURCE_DIR}/Resources/PCSX2.icns ${PCSX2_SOURCE_DIR}/Resources)
+
+		# Copy shaderc into the bundle
+		target_sources(${target} PRIVATE "${SHADERC_LIBRARY}")
+		set_source_files_properties("${SHADERC_LIBRARY}" PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
 
 		# Copy MoltenVK into the bundle
 		unset(MOLTENVK_PATH CACHE)

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "Image.h"
 #include "FileSystem.h"
@@ -47,7 +47,7 @@ static constexpr FormatHandler s_format_handlers[] = {
 	{"webp", WebPBufferLoader, WebPBufferSaver, WebPFileLoader, WebPFileSaver},
 };
 
-static const FormatHandler* GetFormatHandler(const std::string_view& extension)
+static const FormatHandler* GetFormatHandler(const std::string_view extension)
 {
 	for (const FormatHandler& handler : s_format_handlers)
 	{

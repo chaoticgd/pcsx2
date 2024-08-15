@@ -1,7 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
-
-#if !defined(_WIN32) && !defined(__APPLE__)
+// SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "common/Pcsx2Types.h"
 #include "common/Console.h"
@@ -161,7 +159,7 @@ static bool SetScreensaverInhibitDBus(const bool inhibit_requested, const char* 
 	return true;
 }
 
-bool WindowInfo::InhibitScreensaver(const WindowInfo& wi, bool inhibit)
+bool Common::InhibitScreensaver(bool inhibit)
 {
 	return SetScreensaverInhibitDBus(inhibit, "PCSX2", "PCSX2 VM is running.");
 }
@@ -215,5 +213,3 @@ void Threading::SleepUntil(u64 ticks)
 	ts.tv_nsec = static_cast<long>(ticks % 1000000000ULL);
 	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
 }
-
-#endif

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
@@ -96,7 +96,7 @@ public:
 		return value;
 	}
 
-	__fi SmallString GetTinyStringValue(const char* section, const char* key, const char* default_value = "") const
+	__fi TinyString GetTinyStringValue(const char* section, const char* key, const char* default_value = "") const
 	{
 		TinyString value;
 		if (!GetStringValue(section, key, &value))

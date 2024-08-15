@@ -65,12 +65,12 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/BIOSSettingsWidget.cpp
 	Settings/BIOSSettingsWidget.h
 	Settings/BIOSSettingsWidget.ui
-	Settings/ControllerBindingWidget.ui
 	Settings/ControllerBindingWidget_DualShock2.ui
 	Settings/ControllerBindingWidget_Guitar.ui
 	Settings/ControllerBindingWidget_Popn.ui
-	Settings/ControllerBindingWidgets.cpp
-	Settings/ControllerBindingWidgets.h
+	Settings/ControllerBindingWidget.cpp
+	Settings/ControllerBindingWidget.h
+	Settings/ControllerBindingWidget.ui
 	Settings/ControllerLEDSettingsDialog.ui
 	Settings/ControllerGlobalSettingsWidget.cpp
 	Settings/ControllerGlobalSettingsWidget.h
@@ -229,6 +229,7 @@ target_link_libraries(pcsx2-qt PRIVATE
 target_compile_definitions(pcsx2-qt PRIVATE QT_NO_EXCEPTIONS)
 
 if(WIN32)
+	target_sources(pcsx2-qt PRIVATE VCRuntimeChecker.cpp)
 	set_source_files_properties(${TS_FILES} PROPERTIES OUTPUT_LOCATION "${CMAKE_SOURCE_DIR}/bin/translations")
 	qt_add_lrelease(pcsx2-qt TS_FILES ${TS_FILES})
 	copy_base_translations(pcsx2-qt)
