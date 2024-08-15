@@ -40,6 +40,7 @@ static const std::vector<DefaultBuiltInType> DEFAULT_BUILT_IN_TYPES = {
 	{"unsigned long", ccc::ast::BuiltInClass::UNSIGNED_64},
 	{"long long", ccc::ast::BuiltInClass::SIGNED_64},
 	{"unsigned long long", ccc::ast::BuiltInClass::UNSIGNED_64},
+	{"bool", ccc::ast::BuiltInClass::BOOL_8},
 	{"float", ccc::ast::BuiltInClass::FLOAT_32},
 	{"double", ccc::ast::BuiltInClass::FLOAT_64},
 	{"void", ccc::ast::BuiltInClass::VOID_TYPE},
