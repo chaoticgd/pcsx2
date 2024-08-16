@@ -268,6 +268,46 @@ char* DebugInterface::stringFromPointer(u32 p)
 	return buf;
 }
 
+std::optional<u32> DebugInterface::getCallerStackPointer(const ccc::Function& currentFunction)
+{
+	u32 sp = getRegister(EECAT_GPR, 29);
+	u32 pc = getPC();
+
+	if (pc != currentFunction.address().value)
+	{
+		std::optional<u32> stack_frame_size = getStackFrameSize(currentFunction);
+		if (!stack_frame_size.has_value())
+			return std::nullopt;
+
+		sp += *stack_frame_size;
+	}
+
+	return sp;
+}
+
+std::optional<u32> DebugInterface::getStackFrameSize(const ccc::Function& function)
+{
+	s32 stack_frame_size = function.stack_frame_size;
+
+	if (stack_frame_size < 0)
+	{
+		// The stack frame size isn't stored in the symbol table, so we try
+		// to extract it from the code by checking for an instruction at the
+		// start of the current function that is in the form of
+		// "addui $sp, $sp, frame_size" instead.
+
+		u32 instruction = read32(function.address().value);
+
+		if ((instruction & 0xffff0000) == 0x27bd0000)
+			stack_frame_size = -(instruction & 0xffff);
+
+		if (stack_frame_size < 0)
+			return std::nullopt;
+	}
+
+	return (u32)stack_frame_size;
+}
+
 bool DebugInterface::initExpression(const char* exp, PostfixExpression& dest)
 {
 	MipsExpressionFunctions funcs(this);

@@ -841,12 +841,12 @@ LocalVariableTreeWidget::~LocalVariableTreeWidget() = default;
 std::vector<SymbolTreeWidget::SymbolWork> LocalVariableTreeWidget::getSymbols(
 	const QString& filter, const ccc::SymbolDatabase& database)
 {
-	m_stack_pointer = m_cpu.getRegister(EECAT_GPR, 29);
-
 	u32 program_counter = m_cpu.getPC();
 	const ccc::Function* function = database.functions.symbol_overlapping_address(program_counter);
 	if (!function || !function->local_variables().has_value())
 		return std::vector<SymbolWork>();
+
+	m_caller_stack_pointer = m_cpu.getCallerStackPointer(*function);
 
 	std::vector<SymbolTreeWidget::SymbolWork> symbols;
 
@@ -857,6 +857,9 @@ std::vector<SymbolTreeWidget::SymbolWork> LocalVariableTreeWidget::getSymbols(
 			continue;
 
 		if (std::holds_alternative<ccc::GlobalStorage>(local_variable->storage) && !local_variable->address().valid())
+			continue;
+
+		if (std::holds_alternative<ccc::StackStorage>(local_variable->storage) && !m_caller_stack_pointer.has_value())
 			continue;
 
 		QString name = QString::fromStdString(local_variable->name());
@@ -890,11 +893,11 @@ std::unique_ptr<SymbolTreeNode> LocalVariableTreeWidget::buildNode(
 	node->symbol = ccc::MultiSymbolHandle(local_variable);
 
 	if (const ccc::GlobalStorage* storage = std::get_if<ccc::GlobalStorage>(&local_variable.storage))
-		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, m_stack_pointer + local_variable.address().value);
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, local_variable.address().value);
 	else if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&local_variable.storage))
 		node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 	else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&local_variable.storage))
-		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, m_stack_pointer + storage->stack_pointer_offset);
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, *m_caller_stack_pointer + storage->stack_pointer_offset);
 	node->size = local_variable.size();
 
 	return node;
@@ -934,8 +937,6 @@ ParameterVariableTreeWidget::~ParameterVariableTreeWidget() = default;
 std::vector<SymbolTreeWidget::SymbolWork> ParameterVariableTreeWidget::getSymbols(
 	const QString& filter, const ccc::SymbolDatabase& database)
 {
-	m_stack_pointer = m_cpu.getRegister(EECAT_GPR, 29);
-
 	std::vector<SymbolTreeWidget::SymbolWork> symbols;
 
 	u32 program_counter = m_cpu.getPC();
@@ -943,10 +944,15 @@ std::vector<SymbolTreeWidget::SymbolWork> ParameterVariableTreeWidget::getSymbol
 	if (!function || !function->parameter_variables().has_value())
 		return std::vector<SymbolWork>();
 
+	m_caller_stack_pointer = m_cpu.getCallerStackPointer(*function);
+
 	for (const ccc::ParameterVariableHandle parameter_variable_handle : *function->parameter_variables())
 	{
 		const ccc::ParameterVariable* parameter_variable = database.parameter_variables.symbol_from_handle(parameter_variable_handle);
 		if (!parameter_variable)
+			continue;
+
+		if (std::holds_alternative<ccc::StackStorage>(parameter_variable->storage) && !m_caller_stack_pointer.has_value())
 			continue;
 
 		QString name = QString::fromStdString(parameter_variable->name());
@@ -985,7 +991,7 @@ std::unique_ptr<SymbolTreeNode> ParameterVariableTreeWidget::buildNode(
 	if (const ccc::RegisterStorage* storage = std::get_if<ccc::RegisterStorage>(&parameter_variable.storage))
 		node->location = SymbolTreeLocation(SymbolTreeLocation::REGISTER, storage->dbx_register_number);
 	else if (const ccc::StackStorage* storage = std::get_if<ccc::StackStorage>(&parameter_variable.storage))
-		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, m_stack_pointer + storage->stack_pointer_offset);
+		node->location = SymbolTreeLocation(SymbolTreeLocation::MEMORY, *m_caller_stack_pointer + storage->stack_pointer_offset);
 	node->size = parameter_variable.size();
 
 	return node;

@@ -87,6 +87,9 @@ public:
 	void resumeCpu();
 	char* stringFromPointer(u32 p);
 
+	std::optional<u32> getCallerStackPointer(const ccc::Function& currentFunction);
+	std::optional<u32> getStackFrameSize(const ccc::Function& currentFunction);
+
 	static void setPauseOnEntry(bool pauseOnEntry) { m_pause_on_entry = pauseOnEntry; };
 	static bool getPauseOnEntry() { return m_pause_on_entry; }
 

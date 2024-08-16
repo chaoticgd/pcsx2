@@ -180,7 +180,7 @@ protected:
 
 	void onNewButtonPressed() override;
 
-	u32 m_stack_pointer = 0;
+	std::optional<u32> m_caller_stack_pointer;
 };
 
 class ParameterVariableTreeWidget : public SymbolTreeWidget
@@ -201,7 +201,7 @@ protected:
 
 	void onNewButtonPressed() override;
 
-	u32 m_stack_pointer = 0;
+	std::optional<u32> m_caller_stack_pointer;
 };
 
 struct SymbolFilters

@@ -436,6 +436,19 @@ bool NewLocalVariableDialog::parseUserInput()
 		if (!error_message.isEmpty())
 			return;
 
+		int function_index = m_ui.functionComboBox->currentIndex();
+		if (function_index > 0 && function_index < (int)m_functions.size())
+			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
+		else
+			m_function = ccc::FunctionHandle();
+
+		const ccc::Function* function = database.functions.symbol_from_handle(m_function);
+		if (!function)
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+
 		switch (storageType())
 		{
 			case GLOBAL_STORAGE:
@@ -458,6 +471,16 @@ bool NewLocalVariableDialog::parseUserInput()
 			{
 				ccc::StackStorage& stack_storage = m_storage.emplace<ccc::StackStorage>();
 				stack_storage.stack_pointer_offset = m_ui.stackPointerOffsetSpinBox->value();
+
+				// Convert to caller sp relative.
+				if (std::optional<u32> stack_frame_size = m_cpu.getStackFrameSize(*function))
+					stack_storage.stack_pointer_offset -= *stack_frame_size;
+				else
+				{
+					error_message = tr("Cannot determine stack frame size of selected function.");
+					return;
+				}
+
 				break;
 			}
 		}
@@ -466,18 +489,6 @@ bool NewLocalVariableDialog::parseUserInput()
 		m_type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty())
 			return;
-
-		int function_index = m_ui.functionComboBox->currentIndex();
-		if (function_index > 0 && function_index < (int)m_functions.size())
-			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
-		else
-			m_function = ccc::FunctionHandle();
-
-		if (!m_function.valid())
-		{
-			error_message = tr("Invalid function.");
-			return;
-		}
 	});
 
 	updateErrorMessage(error_message);
@@ -543,6 +554,19 @@ bool NewParameterVariableDialog::parseUserInput()
 		if (!error_message.isEmpty())
 			return;
 
+		int function_index = m_ui.functionComboBox->currentIndex();
+		if (function_index > 0 && function_index < (int)m_functions.size())
+			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
+		else
+			m_function = ccc::FunctionHandle();
+
+		const ccc::Function* function = database.functions.symbol_from_handle(m_function);
+		if (!function)
+		{
+			error_message = tr("Invalid function.");
+			return;
+		}
+
 		std::variant<ccc::RegisterStorage, ccc::StackStorage> storage;
 		switch (storageType())
 		{
@@ -561,6 +585,16 @@ bool NewParameterVariableDialog::parseUserInput()
 			{
 				ccc::StackStorage& stack_storage = storage.emplace<ccc::StackStorage>();
 				stack_storage.stack_pointer_offset = m_ui.stackPointerOffsetSpinBox->value();
+
+				// Convert to caller sp relative.
+				if (std::optional<u32> stack_frame_size = m_cpu.getStackFrameSize(*function))
+					stack_storage.stack_pointer_offset -= *stack_frame_size;
+				else
+				{
+					error_message = tr("Cannot determine stack frame size of selected function.");
+					return;
+				}
+
 				break;
 			}
 		}
@@ -569,18 +603,6 @@ bool NewParameterVariableDialog::parseUserInput()
 		m_type = stringToType(type_string, database, error_message);
 		if (!error_message.isEmpty())
 			return;
-
-		int function_index = m_ui.functionComboBox->currentIndex();
-		if (function_index > 0 && function_index < (int)m_functions.size())
-			m_function = m_functions[m_ui.functionComboBox->currentIndex()];
-		else
-			m_function = ccc::FunctionHandle();
-
-		if (!m_function.valid())
-		{
-			error_message = tr("Invalid function.");
-			return;
-		}
 	});
 
 	updateErrorMessage(error_message);
