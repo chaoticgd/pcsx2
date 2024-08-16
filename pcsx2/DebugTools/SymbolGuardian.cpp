@@ -3,16 +3,17 @@
 
 #include "SymbolGuardian.h"
 
+#include <demangle.h>
+#include <ccc/ast.h>
+#include <ccc/elf.h>
+#include <ccc/importer_flags.h>
+#include <ccc/symbol_file.h>
+
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/StringUtil.h"
 #include "common/Threading.h"
 
-#include "demangle.h"
-#include "ccc/ast.h"
-#include "ccc/elf.h"
-#include "ccc/importer_flags.h"
-#include "ccc/symbol_file.h"
 #include "DebugInterface.h"
 #include "MIPSAnalyst.h"
 #include "Host.h"

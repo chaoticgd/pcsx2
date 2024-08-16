@@ -5,10 +5,11 @@
 
 #include <QtCore/QAbstractItemModel>
 
+#include <ccc/ast.h>
+#include <ccc/symbol_database.h>
+
 #include "common/Pcsx2Defs.h"
 #include "DebugTools/DebugInterface.h"
-#include "DebugTools/ccc/ast.h"
-#include "DebugTools/ccc/symbol_database.h"
 #include "SymbolTreeNode.h"
 
 // Model for the symbol trees. It will dynamically grow itself as the user

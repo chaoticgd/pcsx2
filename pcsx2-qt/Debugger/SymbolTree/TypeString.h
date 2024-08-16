@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include <string_view>
+
 #include <QtCore/QString>
 
-#include "DebugTools/ccc/ast.h"
+#include <ccc/ast.h>
 
 // Take a string e.g. "int*[3]" and generates an AST. Supports type names by
 // themselves as well as pointers, references and arrays. Pointer characters

@@ -9,9 +9,10 @@
 #include <functional>
 #include <shared_mutex>
 
+#include <ccc/symbol_database.h>
+#include <ccc/symbol_file.h>
+
 #include "common/Pcsx2Types.h"
-#include "DebugTools/ccc/symbol_database.h"
-#include "DebugTools/ccc/symbol_file.h"
 
 class DebugInterface;
 

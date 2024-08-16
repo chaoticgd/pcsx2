@@ -1,8 +1,5 @@
 add_pcsx2_test(core_test
 	StubHost.cpp
-	DebugTools/ccc/mdebug_importer_tests.cpp
-	DebugTools/ccc/stabs_tests.cpp
-	DebugTools/ccc/symbol_database_tests.cpp
 )
 target_include_directories(core_test PUBLIC ${CMAKE_SOURCE_DIR}/pcsx2/DebugTools/)
 

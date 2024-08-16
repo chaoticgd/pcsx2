@@ -792,22 +792,7 @@ set(pcsx2DebugToolsSources
 	DebugTools/DisR5900asm.cpp
 	DebugTools/DisVU0Micro.cpp
 	DebugTools/DisVU1Micro.cpp
-	DebugTools/BiosDebugData.cpp
-	DebugTools/ccc/ast.cpp
-	DebugTools/ccc/elf.cpp
-	DebugTools/ccc/elf_symtab.cpp
-	DebugTools/ccc/importer_flags.cpp
-	DebugTools/ccc/mdebug_analysis.cpp
-	DebugTools/ccc/mdebug_importer.cpp
-	DebugTools/ccc/mdebug_section.cpp
-	DebugTools/ccc/mdebug_symbols.cpp
-	DebugTools/ccc/sndll.cpp
-	DebugTools/ccc/stabs.cpp
-	DebugTools/ccc/stabs_to_ast.cpp
-	DebugTools/ccc/symbol_database.cpp
-	DebugTools/ccc/symbol_file.cpp
-	DebugTools/ccc/symbol_table.cpp
-	DebugTools/ccc/util.cpp)
+	DebugTools/BiosDebugData.cpp)
 
 # DebugTools headers
 set(pcsx2DebugToolsHeaders
@@ -824,22 +809,9 @@ set(pcsx2DebugToolsHeaders
 	DebugTools/DisASM.h
 	DebugTools/DisVUmicro.h
 	DebugTools/DisVUops.h
-	DebugTools/BiosDebugData.h
-	DebugTools/ccc/ast.h
-	DebugTools/ccc/elf.h
-	DebugTools/ccc/elf_symtab.h
-	DebugTools/ccc/importer_flags.h
-	DebugTools/ccc/mdebug_analysis.h
-	DebugTools/ccc/mdebug_importer.h
-	DebugTools/ccc/mdebug_section.h
-	DebugTools/ccc/mdebug_symbols.h
-	DebugTools/ccc/sndll.h
-	DebugTools/ccc/stabs.h
-	DebugTools/ccc/stabs_to_ast.h
-	DebugTools/ccc/symbol_database.h
-	DebugTools/ccc/symbol_file.h
-	DebugTools/ccc/symbol_table.h
-	DebugTools/ccc/util.h)
+	DebugTools/BiosDebugData.h)
+
+target_link_libraries(PCSX2_FLAGS INTERFACE ccc)
 
 set(pcsx2HostSources
 	Host/AudioStream.cpp

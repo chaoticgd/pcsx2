@@ -1401,51 +1401,6 @@
     <ClCompile Include="DebugTools\SymbolGuardian.cpp">
       <Filter>System\Ps2\Debug</Filter>
     </ClCompile>
-    <ClCompile Include="DebugTools\ccc\ast.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\elf.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\elf_symtab.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\importer_flags.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\mdebug_analysis.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\mdebug_importer.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\mdebug_section.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\mdebug_symbols.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\sndll.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\stabs.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\stabs_to_ast.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\symbol_database.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\symbol_file.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\symbol_table.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
-    <ClCompile Include="DebugTools\ccc\util.cpp">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClCompile>
     <ClCompile Include="USB\usb-eyetoy\cam-jpeg.cpp">
       <Filter>System\Ps2\USB\usb-eyetoy</Filter>
     </ClCompile>
@@ -2386,51 +2341,6 @@
     <ClInclude Include="SupportURLs.h" />
     <ClInclude Include="DebugTools\SymbolGuardian.h">
       <Filter>System\Ps2\Debug</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\ast.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\elf.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\elf_symtab.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\importer_flags.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\mdebug_analysis.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\mdebug_importer.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\mdebug_section.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\mdebug_symbols.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\sndll.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\stabs.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\stabs_to_ast.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\symbol_database.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\symbol_file.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\symbol_table.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugTools\ccc\util.h">
-      <Filter>System\Ps2\Debug\ccc</Filter>
     </ClInclude>
     <ClInclude Include="USB\usb-eyetoy\cam-jpeg.h">
       <Filter>System\Ps2\USB\usb-eyetoy</Filter>

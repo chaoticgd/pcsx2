@@ -3,7 +3,7 @@
 
 #include "SymbolTreeNode.h"
 
-#include "DebugTools/ccc/ast.h"
+#include <ccc/ast.h>
 
 const QVariant& SymbolTreeNode::value() const
 {
