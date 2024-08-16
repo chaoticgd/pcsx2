@@ -52,10 +52,6 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, u32 alignment, DebugInterface& cpu, 
 	connectInputWidgets();
 
 	adjustSize();
-
-	QTimer::singleShot(0, this, [&]() {
-		parseUserInput();
-	});
 }
 
 void NewSymbolDialog::setName(QString name)
@@ -214,6 +210,10 @@ void NewSymbolDialog::onStorageTabChanged(int index)
 	m_ui.form->setRowVisible(Row::ADDRESS, name == "Global");
 	m_ui.form->setRowVisible(Row::REGISTER, name == "Register");
 	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
+
+	QTimer::singleShot(0, this, [&]() {
+		parseUserInput();
+	});
 }
 
 std::string NewSymbolDialog::parseName(QString& error_message)
