@@ -21,16 +21,24 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, u32 alignment, DebugInterface& cpu, 
 	connect(m_ui.storageTabBar, &QTabBar::currentChanged, this, &NewSymbolDialog::onStorageTabChanged);
 
 	if (flags & GLOBAL_STORAGE)
-		m_ui.storageTabBar->addTab("Global");
+	{
+		int tab = m_ui.storageTabBar->addTab(tr("Global"));
+		m_ui.storageTabBar->setTabData(tab, GLOBAL_STORAGE);
+	}
 
 	if (flags & REGISTER_STORAGE)
 	{
+		int tab = m_ui.storageTabBar->addTab(tr("Register"));
+		m_ui.storageTabBar->setTabData(tab, REGISTER_STORAGE);
+
 		setupRegisterField();
-		m_ui.storageTabBar->addTab("Register");
 	}
 
 	if (flags & STACK_STORAGE)
-		m_ui.storageTabBar->addTab("Stack");
+	{
+		int tab = m_ui.storageTabBar->addTab(tr("Stack"));
+		m_ui.storageTabBar->setTabData(tab, STACK_STORAGE);
+	}
 
 	if (m_ui.storageTabBar->count() == 1)
 		m_ui.storageTabBar->hide();
@@ -50,7 +58,7 @@ NewSymbolDialog::NewSymbolDialog(u32 flags, u32 alignment, DebugInterface& cpu, 
 		setupFunctionField();
 
 	connectInputWidgets();
-
+	onStorageTabChanged(0);
 	adjustSize();
 }
 
@@ -191,25 +199,16 @@ std::optional<u32> NewSymbolDialog::fillEmptySpaceSize(u32 address, const ccc::S
 
 u32 NewSymbolDialog::storageType() const
 {
-	QString name = m_ui.storageTabBar->tabText(m_ui.storageTabBar->currentIndex());
-
-	if (name == "Global")
-		return GLOBAL_STORAGE;
-	if (name == "Register")
-		return REGISTER_STORAGE;
-	if (name == "Stack")
-		return STACK_STORAGE;
-
-	return 0;
+	return m_ui.storageTabBar->tabData(m_ui.storageTabBar->currentIndex()).toUInt();
 }
 
 void NewSymbolDialog::onStorageTabChanged(int index)
 {
-	QString name = m_ui.storageTabBar->tabText(index);
+	u32 storage = m_ui.storageTabBar->tabData(index).toUInt();
 
-	m_ui.form->setRowVisible(Row::ADDRESS, name == "Global");
-	m_ui.form->setRowVisible(Row::REGISTER, name == "Register");
-	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, name == "Stack");
+	m_ui.form->setRowVisible(Row::ADDRESS, storage == GLOBAL_STORAGE);
+	m_ui.form->setRowVisible(Row::REGISTER, storage == REGISTER_STORAGE);
+	m_ui.form->setRowVisible(Row::STACK_POINTER_OFFSET, storage == STACK_STORAGE);
 
 	QTimer::singleShot(0, this, [&]() {
 		parseUserInput();
