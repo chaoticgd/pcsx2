@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #include "mdebug_importer.h"
 
@@ -286,10 +286,10 @@ Result<void> import_file(SymbolDatabase& database, const mdebug::File& input, co
 			case ParsedSymbolType::NON_STABS: {
 				if(symbol.raw->symbol_class == mdebug::SymbolClass::TEXT) {
 					if(symbol.raw->symbol_type == mdebug::SymbolType::PROC) {
-						Result<void> result = analyser.procedure(symbol.raw->string, symbol.raw->value, false);
+						Result<void> result = analyser.procedure(symbol.raw->string, symbol.raw->value, symbol.raw->procedure_descriptor, false);
 						CCC_RETURN_IF_ERROR(result);
 					} else if(symbol.raw->symbol_type == mdebug::SymbolType::STATICPROC) {
-						Result<void> result = analyser.procedure(symbol.raw->string, symbol.raw->value, true);
+						Result<void> result = analyser.procedure(symbol.raw->string, symbol.raw->value, symbol.raw->procedure_descriptor, true);
 						CCC_RETURN_IF_ERROR(result);
 					} else if(symbol.raw->symbol_type == mdebug::SymbolType::LABEL) {
 						Result<void> result = analyser.label(symbol.raw->string, symbol.raw->value, symbol.raw->index);

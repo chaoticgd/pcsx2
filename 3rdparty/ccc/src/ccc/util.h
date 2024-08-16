@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -252,7 +252,7 @@ struct Address {
 		if(address != 0) {
 			result = address;
 		}
-		return address;
+		return result;
 	}
 	
 	friend auto operator<=>(const Address& lhs, const Address& rhs) = default;

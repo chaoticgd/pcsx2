@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -47,7 +47,7 @@ protected:
 
 class SNDLLSymbolFile : public SymbolFile {
 public:
-	SNDLLSymbolFile(SNDLLFile sndll);
+	SNDLLSymbolFile(std::shared_ptr<SNDLLFile> sndll);
 	
 	std::string name() const override;
 	
@@ -56,7 +56,7 @@ public:
 		const std::vector<SymbolTableLocation>& sections) const override;
 	
 protected:
-	SNDLLFile m_sndll;
+	std::shared_ptr<SNDLLFile> m_sndll;
 };
 
 }

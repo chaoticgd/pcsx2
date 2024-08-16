@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -251,6 +251,9 @@ public:
 	bool is_marked_for_destruction() { return m_marked_for_destruction; }
 	
 protected:
+	void on_create() {}
+	void on_destroy(SymbolDatabase* database) {}
+	
 	u32 m_handle = (u32) -1;
 	SymbolSourceHandle m_source;
 	Address m_address;
@@ -385,6 +388,7 @@ public:
 	
 	std::string relative_path;
 	StorageClass storage_class;
+	s32 stack_frame_size = -1;
 	std::vector<LineNumberPair> line_numbers;
 	std::vector<SubSourceFile> sub_source_files;
 	bool is_member_function_ish = false; // Filled in by fill_in_pointers_to_member_function_definitions.

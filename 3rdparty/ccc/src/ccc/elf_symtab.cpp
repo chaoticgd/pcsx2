@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #include "elf_symtab.h"
 

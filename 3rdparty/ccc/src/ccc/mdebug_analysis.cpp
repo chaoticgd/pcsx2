@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #include "mdebug_analysis.h"
 
@@ -102,7 +102,8 @@ Result<void> LocalSymbolTableAnalyser::sub_source_file(const char* path, Address
 	return Result<void>();
 }
 
-Result<void> LocalSymbolTableAnalyser::procedure(const char* mangled_name, Address address, bool is_static)
+Result<void> LocalSymbolTableAnalyser::procedure(
+	const char* mangled_name, Address address, const ProcedureDescriptor* procedure_descriptor, bool is_static)
 {
 	if(!m_current_function || strcmp(mangled_name, m_current_function->mangled_name().c_str()) != 0) {
 		Result<void> result = create_function(mangled_name, address);
@@ -111,6 +112,10 @@ Result<void> LocalSymbolTableAnalyser::procedure(const char* mangled_name, Addre
 	
 	if(is_static) {
 		m_current_function->storage_class = STORAGE_CLASS_STATIC;
+	}
+	
+	if(procedure_descriptor) {
+		m_current_function->stack_frame_size = procedure_descriptor->frame_size;
 	}
 	
 	return Result<void>();

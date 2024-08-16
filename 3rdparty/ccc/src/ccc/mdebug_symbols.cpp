@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #include "mdebug_symbols.h"
 
@@ -169,6 +169,13 @@ static void mark_duplicate_symbols(std::vector<ParsedSymbol>& symbols)
 	for(size_t i = 0; i < symbols.size(); i++) {
 		ParsedSymbol& symbol = symbols[i];
 		if(symbol.type != ParsedSymbolType::NAME_COLON_TYPE) {
+			continue;
+		}
+		
+		bool is_type =
+			symbol.name_colon_type.descriptor == StabsSymbolDescriptor::TYPE_NAME ||
+			symbol.name_colon_type.descriptor == StabsSymbolDescriptor::ENUM_STRUCT_OR_TYPE_TAG;
+		if(!is_type) {
 			continue;
 		}
 		

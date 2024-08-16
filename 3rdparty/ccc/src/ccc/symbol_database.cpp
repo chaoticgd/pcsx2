@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2023 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// This file is part of the Chaos Compiler Collection.
+// SPDX-License-Identifier: MIT
 
 #include "symbol_database.h"
 
@@ -245,10 +245,7 @@ Result<SymbolType*> SymbolList<SymbolType>::create_symbol(
 		symbol.m_address = address;
 	}
 	
-	// Call SymbolType::on_create if it exists.
-	if constexpr(requires { symbol.on_create(); }) {
-		symbol.on_create();
-	}
+	symbol.on_create();
 	
 	CCC_ASSERT(symbol.source().valid());
 	
@@ -379,10 +376,7 @@ bool SymbolList<SymbolType>::mark_symbol_for_destruction(SymbolHandle<SymbolType
 	
 	symbol->mark_for_destruction();
 	
-	// Call SymbolType::on_destroy if it exists.
-	if constexpr(requires { symbol->on_destroy(database); }) {
-		symbol->on_destroy(database);
-	}
+	symbol->on_destroy(database);
 	
 	return true;
 }
@@ -397,10 +391,7 @@ void SymbolList<SymbolType>::mark_symbols_from_source_for_destruction(SymbolSour
 		
 		symbol.mark_for_destruction();
 		
-		// Call SymbolType::on_destroy if it exists.
-		if constexpr(requires { symbol.on_destroy(database); }) {
-			symbol.on_destroy(database);
-		}
+		symbol.on_destroy(database);
 	}
 }
 
@@ -414,10 +405,7 @@ void SymbolList<SymbolType>::mark_symbols_from_module_for_destruction(ModuleHand
 		
 		symbol.mark_for_destruction();
 		
-		// Call SymbolType::on_destroy if it exists.
-		if constexpr(requires { symbol.on_destroy(database); }) {
-			symbol.on_destroy(database);
-		}
+		symbol.on_destroy(database);
 	}
 }
 
@@ -944,7 +932,7 @@ Result<DataType*> SymbolDatabase::create_data_type_if_unique(
 			DataType* existing_type = data_types.symbol_from_handle(existing_type_handle);
 			CCC_ASSERT(existing_type);
 			
-			// We don't want to merge together types from different source or
+			// We don't want to merge together types from different sources or
 			// modules so that we can destroy all the types from one source
 			// without breaking anything else.
 			if(!group.is_in_group(*existing_type)) {
@@ -976,6 +964,7 @@ Result<DataType*> SymbolDatabase::create_data_type_if_unique(
 				break;
 			}
 		}
+		
 		if(!match) {
 			// This type doesn't match any of the others with the same name
 			// that have already been processed.
