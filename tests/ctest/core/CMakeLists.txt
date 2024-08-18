@@ -1,7 +1,6 @@
 add_pcsx2_test(core_test
 	StubHost.cpp
 )
-target_include_directories(core_test PUBLIC ${CMAKE_SOURCE_DIR}/pcsx2/DebugTools/)
 
 set(multi_isa_sources
 	GS/swizzle_test_main.cpp
