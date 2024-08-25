@@ -335,9 +335,9 @@ void ImGuiManager::SetStyle()
 	colors[ImGuiCol_ResizeGripActive] = ImVec4(0.27f, 0.32f, 0.38f, 1.00f);
 	colors[ImGuiCol_Tab] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
 	colors[ImGuiCol_TabHovered] = ImVec4(0.33f, 0.38f, 0.46f, 1.00f);
-	colors[ImGuiCol_TabActive] = ImVec4(0.27f, 0.32f, 0.38f, 1.00f);
-	colors[ImGuiCol_TabUnfocused] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
-	colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
+	colors[ImGuiCol_TabSelected] = ImVec4(0.27f, 0.32f, 0.38f, 1.00f);
+	colors[ImGuiCol_TabDimmed] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
+	colors[ImGuiCol_TabDimmedSelected] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
 	colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
 	colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
 	colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
@@ -755,9 +755,21 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		float actual_y = msg.last_y;
 		if (msg.target_y != expected_y)
 		{
+			if (msg.last_y < 0.0f)
+			{
+				// First showing.
+				msg.last_y = expected_y;
+			}
+			else
+			{
+				// We got repositioned, probably due to another message above getting removed.
+				const float time_since_move =
+					static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - msg.move_time));
+				const float frac = Easing::OutExpo(time_since_move / MOVE_DURATION);
+				msg.last_y = std::floor(msg.last_y - ((msg.last_y - msg.target_y) * frac));
+			}
 			msg.move_time = current_time;
 			msg.target_y = expected_y;
-			msg.last_y = (msg.last_y < 0.0f) ? expected_y : msg.last_y;
 			actual_y = msg.last_y;
 		}
 		else if (actual_y != expected_y)
@@ -773,7 +785,7 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 			else
 			{
 				const float frac = Easing::OutExpo(time_since_move / MOVE_DURATION);
-				actual_y = msg.last_y - ((msg.last_y - msg.target_y) * frac);
+				actual_y = std::floor(msg.last_y - ((msg.last_y - msg.target_y) * frac));
 			}
 		}
 
