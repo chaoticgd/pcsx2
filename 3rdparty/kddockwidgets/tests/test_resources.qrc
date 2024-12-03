@@ -1,0 +1,27 @@
+<RCC>
+    <qresource prefix="/">
+        <file>layouts/invalid.json</file>
+        <file>layouts/overlapping-item.json</file>
+        <file>layouts/unsupported-serialization-version.json</file>
+        <file>layouts/stuck-separator.json</file>
+        <file>layouts/layoutEquallyCrash.json</file>
+        <file>layouts/restoreWithIncompleteFactory.json</file>
+        <file>layouts/1.6layoutWithoutFloatingWindowFlags.json</file>
+        <file>layouts/nlohman_exception.json</file>
+        <file>layouts/invalidCurrentTab.json</file>
+        <file>layouts/sidebar_restore.json</file>
+        <file>layouts/minimizeBug.json</file>
+        <file>layouts/invalidPercentages.json</file>
+        <file>layouts/minSizeChanges.json</file>
+        <file>main.qml</file>
+        <file>main2.qml</file>
+        <file>main465.qml</file>
+        <file>main350.qml</file>
+        <file>main343.qml</file>
+        <file>main343_2.qml</file>
+        <file>main_persistentCentralWidget.qml</file>
+        <file>MyRectangle.qml</file>
+	    <file>main_tst_focusBetweenTabs.qml</file>
+        <file>MyRectangle2.qml</file>
+</qresource>
+</RCC>
