@@ -117,6 +117,13 @@ add_subdirectory(3rdparty/demangler EXCLUDE_FROM_ALL)
 # Symbol table parser.
 add_subdirectory(3rdparty/ccc EXCLUDE_FROM_ALL)
 
+# The docking system for the debugger.
+set(KDDockWidgets_QT6 true)
+set(KDDockWidgets_STATIC true)
+set(KDDockWidgets_EXAMPLES false)
+set(KDDockWidgets_FRONTENDS qtwidgets)
+add_subdirectory(3rdparty/kddockwidgets EXCLUDE_FROM_ALL)
+
 # Architecture-specific.
 if(_M_X86)
 	add_subdirectory(3rdparty/zydis EXCLUDE_FROM_ALL)

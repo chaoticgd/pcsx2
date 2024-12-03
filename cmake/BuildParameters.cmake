@@ -145,6 +145,7 @@ if(MSVC AND NOT USE_CLANG_CL)
 	)
 endif()
 
+if(FALSE)
 if(MSVC)
 	# Disable RTTI
 	string(REPLACE "/GR" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
@@ -157,6 +158,7 @@ else()
 		"$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
 		"$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
 	)
+endif()
 endif()
 
 set(CONFIG_REL_NO_DEB $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>)
