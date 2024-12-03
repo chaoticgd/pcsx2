@@ -117,6 +117,13 @@ add_subdirectory(3rdparty/demangler EXCLUDE_FROM_ALL)
 # Symbol table parser.
 add_subdirectory(3rdparty/ccc EXCLUDE_FROM_ALL)
 
+# The Qt Advanced Docking System.
+set(ADS_VERSION "4.3.1")
+set(BUILD_STATIC CACHE BOOL ON FORCE)
+set(BUILD_EXAMPLES CACHE BOOL OFF FORCE)
+set(QT_VERSION_MAJOR "6")
+add_subdirectory(3rdparty/qtdocking EXCLUDE_FROM_ALL)
+
 # Architecture-specific.
 if(_M_X86)
 	add_subdirectory(3rdparty/zydis EXCLUDE_FROM_ALL)

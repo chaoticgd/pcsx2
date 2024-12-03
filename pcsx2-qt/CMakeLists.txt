@@ -232,6 +232,7 @@ target_link_libraries(pcsx2-qt PRIVATE
 	Qt6::Core
 	Qt6::Gui
 	Qt6::Widgets
+	qt6advanceddocking
 )
 
 # Our Qt builds may have exceptions on, so force them off.
