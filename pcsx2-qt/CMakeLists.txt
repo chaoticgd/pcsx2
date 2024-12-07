@@ -158,17 +158,18 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/AnalysisOptionsDialog.cpp
 	Debugger/AnalysisOptionsDialog.h
 	Debugger/AnalysisOptionsDialog.ui
-	Debugger/CpuWidget.cpp
-	Debugger/CpuWidget.h
-	Debugger/CpuWidget.ui
 	Debugger/DebuggerSettingsManager.cpp
 	Debugger/DebuggerSettingsManager.h
+	Debugger/DebuggerWidget.cpp
+	Debugger/DebuggerWidget.h
 	Debugger/DebuggerWindow.cpp
 	Debugger/DebuggerWindow.h
 	Debugger/DebuggerWindow.ui
 	Debugger/DisassemblyWidget.cpp
 	Debugger/DisassemblyWidget.h
 	Debugger/DisassemblyWidget.ui
+	Debugger/DockLayoutManager.cpp
+	Debugger/DockLayoutManager.h
 	Debugger/MemorySearchWidget.cpp
 	Debugger/MemorySearchWidget.h
 	Debugger/MemorySearchWidget.ui
