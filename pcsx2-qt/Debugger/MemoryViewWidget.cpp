@@ -447,27 +447,25 @@ bool MemoryViewTable::KeyPress(int key, QChar keychar)
 /*
 	MemoryViewWidget
 */
-MemoryViewWidget::MemoryViewWidget(QWidget* parent)
-	: QWidget(parent)
+MemoryViewWidget::MemoryViewWidget(DebugInterface& cpu, QWidget* parent)
+	: DebuggerWidget(&cpu)
 	, m_table(this)
 {
 	ui.setupUi(this);
 	this->setFocusPolicy(Qt::FocusPolicy::ClickFocus);
 	connect(this, &MemoryViewWidget::customContextMenuRequested, this, &MemoryViewWidget::customMenuRequested);
+
+	m_table.SetCpu(&cpu);
+	m_table.UpdateStartAddress(0x480000);
+	
+	applyMonospaceFont();
 }
 
 MemoryViewWidget::~MemoryViewWidget() = default;
 
-void MemoryViewWidget::SetCpu(DebugInterface* cpu)
-{
-	m_cpu = cpu;
-	m_table.SetCpu(cpu);
-	m_table.UpdateStartAddress(0x480000);
-}
-
 void MemoryViewWidget::paintEvent(QPaintEvent* event)
 {
-	if (!m_cpu->isAlive())
+	if (!cpu().isAlive())
 		return;
 
 	QPainter painter(this);
@@ -477,7 +475,7 @@ void MemoryViewWidget::paintEvent(QPaintEvent* event)
 
 void MemoryViewWidget::mousePressEvent(QMouseEvent* event)
 {
-	if (!m_cpu->isAlive())
+	if (!cpu().isAlive())
 		return;
 
 	m_table.SelectAt(event->pos());
@@ -486,7 +484,7 @@ void MemoryViewWidget::mousePressEvent(QMouseEvent* event)
 
 void MemoryViewWidget::customMenuRequested(QPoint pos)
 {
-	if (!m_cpu->isAlive())
+	if (!cpu().isAlive())
 		return;
 
 	if (!m_contextMenu)
@@ -571,7 +569,7 @@ void MemoryViewWidget::customMenuRequested(QPoint pos)
 
 void MemoryViewWidget::contextCopyByte()
 {
-	QApplication::clipboard()->setText(QString::number(m_cpu->read8(m_table.selectedAddress), 16).toUpper());
+	QApplication::clipboard()->setText(QString::number(cpu().read8(m_table.selectedAddress), 16).toUpper());
 }
 
 void MemoryViewWidget::contextCopySegment()
@@ -581,7 +579,7 @@ void MemoryViewWidget::contextCopySegment()
 
 void MemoryViewWidget::contextCopyCharacter()
 {
-	QApplication::clipboard()->setText(QChar::fromLatin1(m_cpu->read8(m_table.selectedAddress)).toUpper());
+	QApplication::clipboard()->setText(QChar::fromLatin1(cpu().read8(m_table.selectedAddress)).toUpper());
 }
 
 void MemoryViewWidget::contextPaste()
@@ -600,7 +598,7 @@ void MemoryViewWidget::contextGoToAddress()
 
 	u64 address = 0;
 	std::string error;
-	if (!m_cpu->evaluateExpression(targetString.toStdString().c_str(), address, error))
+	if (!cpu().evaluateExpression(targetString.toStdString().c_str(), address, error))
 	{
 		QMessageBox::warning(this, tr("Cannot Go To"), QString::fromStdString(error));
 		return;

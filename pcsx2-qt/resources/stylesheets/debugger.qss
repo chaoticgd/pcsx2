@@ -1,0 +1,42 @@
+/*
+	The stylesheet for the debugger docking system.
+	
+	IMPORTANT: You can't use contextual selectors (e.g. [focused="true"]) here
+	since hey won't be re-evaluated properly when the properties change.
+ */
+
+ads--CDockContainerWidget {
+	background: palette(base);
+	padding: 4px;
+}
+
+ads--CDockAreaWidget {
+	background: palette(base);
+}
+
+ads--CDockAreaTitleBar {
+	background: palette(base);
+}
+
+/* CDockWidgetTab */
+
+ads--CDockWidgetTab {
+	background: palette(base);
+	padding-top: 4px;
+	padding-bottom: 4px;
+}
+
+ads--CDockWidgetTab:hover {
+	background: palette(button);
+}
+
+#tabCloseButton {
+	background: none;
+	border: none;
+	qproperty-icon: url(:/ads/images/close-button-focused.svg),
+		url(:/ads/images/close-button-disabled.svg) disabled;
+}
+
+ads--CDockWidget {
+	border: 1px solid palette(window);
+}

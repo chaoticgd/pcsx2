@@ -214,5 +214,6 @@
 		<file>images/Popn.svg</file>
 		<file>images/RyojouhenCon.svg</file>
 		<file>images/ShinkansenCon.svg</file>
+		<file>stylesheets/debugger.qss</file>
 	</qresource>
 </RCC>
