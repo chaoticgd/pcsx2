@@ -5,9 +5,11 @@
 
 #include "ui_DebuggerWindow.h"
 
-#include "DockManager.h"
+#include "DebugTools/DebugInterface.h"
 
 #include <kddockwidgets/MainWindow.h>
+
+class DockManager;
 
 class DebuggerWindow : public KDDockWidgets::QtWidgets::MainWindow
 {
@@ -16,6 +18,8 @@ class DebuggerWindow : public KDDockWidgets::QtWidgets::MainWindow
 public:
 	DebuggerWindow(QWidget* parent);
 	~DebuggerWindow();
+
+	DockManager& dockManager();
 
 public slots:
 	void onVMStateChanged();
@@ -26,8 +30,7 @@ public slots:
 	void onAnalyse();
 
 protected:
-	void showEvent(QShowEvent* event);
-	void hideEvent(QHideEvent* event);
+	void closeEvent(QCloseEvent* event);
 
 private:
 	Ui::DebuggerWindow m_ui;
@@ -36,7 +39,9 @@ private:
 	QAction* m_actionStepOver;
 	QAction* m_actionStepOut;
 
-	DockManager m_dock_manager;
+	DockManager* m_dock_manager;
 
 	void setTabActiveStyle(BreakPointCpu toggledCPU);
 };
+
+extern DebuggerWindow* g_debugger_window;

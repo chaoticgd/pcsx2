@@ -3,6 +3,8 @@
 
 #include "DebuggerWindow.h"
 
+#include "Debugger/Docking/DockManager.h"
+
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/Breakpoints.h"
 #include "DebugTools/SymbolImporter.h"
@@ -11,11 +13,17 @@
 #include "MainWindow.h"
 #include "AnalysisOptionsDialog.h"
 
+DebuggerWindow* g_debugger_window = nullptr;
+
 DebuggerWindow::DebuggerWindow(QWidget* parent)
 	: KDDockWidgets::QtWidgets::MainWindow(QStringLiteral("DebuggerWindow"), {}, parent)
-	, m_dock_manager(this)
+	, m_dock_manager(new DockManager(this))
 {
 	m_ui.setupUi(this);
+
+	g_debugger_window = this;
+
+	m_dock_manager->loadLayouts();
 
 	connect(m_ui.actionRun, &QAction::triggered, this, &DebuggerWindow::onRunPause);
 	connect(m_ui.actionStepInto, &QAction::triggered, this, &DebuggerWindow::onStepInto);
@@ -37,14 +45,31 @@ DebuggerWindow::DebuggerWindow(QWidget* parent)
 	//m_ui.cpuTabs->addTab(m_cpuWidget_r5900, "R5900");
 	//m_ui.cpuTabs->addTab(m_cpuWidget_r3000, "R3000");
 
-	m_dock_manager.switchToLayout(0);
+	m_dock_manager->switchToLayout(0);
 
 	//QTabBar* tabs = new QTabBar();
 	//tabs->addTab("Test");
 	//m_ui.menuBar->layout()->addWidget(tabs);
+
+	QMenuBar* menu_bar = menuBar();
+
+	setMenuWidget(m_dock_manager->createLayoutSwitcher(menu_bar));
+
+	connect(m_ui.menuWindows, &QMenu::aboutToShow, this, [this]() {
+		m_dock_manager->createWindowsMenu(m_ui.menuWindows);
+	});
+
+	Host::RunOnCPUThread([]() {
+		R5900SymbolImporter.OnDebuggerOpened();
+	});
 }
 
 DebuggerWindow::~DebuggerWindow() = default;
+
+DockManager& DebuggerWindow::dockManager()
+{
+	return *m_dock_manager;
+}
 
 // There is no straightforward way to set the tab text to bold in Qt
 // Sorry colour blind people, but this is the best we can do for now
@@ -131,18 +156,16 @@ void DebuggerWindow::onAnalyse()
 	dialog->show();
 }
 
-void DebuggerWindow::showEvent(QShowEvent* event)
+void DebuggerWindow::closeEvent(QCloseEvent* event)
 {
-	Host::RunOnCPUThread([]() {
-		R5900SymbolImporter.OnDebuggerOpened();
-	});
-	QMainWindow::showEvent(event);
-}
+	dockManager().saveLayouts();
 
-void DebuggerWindow::hideEvent(QHideEvent* event)
-{
 	Host::RunOnCPUThread([]() {
 		R5900SymbolImporter.OnDebuggerClosed();
 	});
-	QMainWindow::hideEvent(event);
+
+	KDDockWidgets::QtWidgets::MainWindow::closeEvent(event);
+
+	g_debugger_window = nullptr;
+	deleteLater();
 }

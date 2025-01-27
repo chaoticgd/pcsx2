@@ -290,8 +290,6 @@ private:
 	InputRecordingViewer* m_input_recording_viewer = nullptr;
 	AutoUpdaterDialog* m_auto_updater_dialog = nullptr;
 
-	DebuggerWindow* m_debugger_window = nullptr;
-
 	QProgressBar* m_status_progress_widget = nullptr;
 	QLabel* m_status_verbose_widget = nullptr;
 	QLabel* m_status_renderer_widget = nullptr;

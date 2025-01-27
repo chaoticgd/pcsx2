@@ -12,6 +12,7 @@
 #include "QtHost.h"
 #include "QtUtils.h"
 #include "SettingWidgetBinder.h"
+#include "Debugger/Docking/DockManager.h"
 #include "Settings/AchievementLoginDialog.h"
 #include "Settings/ControllerSettingsWindow.h"
 #include "Settings/GameListSettingsWidget.h"
@@ -603,11 +604,11 @@ void MainWindow::quit()
 
 void MainWindow::destroySubWindows()
 {
-	if (m_debugger_window)
+	if (g_debugger_window)
 	{
-		m_debugger_window->close();
-		m_debugger_window->deleteLater();
-		m_debugger_window = nullptr;
+		g_debugger_window->close();
+		g_debugger_window->deleteLater();
+		g_debugger_window = nullptr;
 	}
 
 	if (m_controller_settings_window)
@@ -782,11 +783,11 @@ void MainWindow::onAchievementsHardcoreModeChanged(bool enabled)
 	{
 		// If PauseOnEntry is enabled, we prompt the user to disable Hardcore Mode
 		// or cancel the action later, so we should keep the debugger around
-		if (m_debugger_window && !DebugInterface::getPauseOnEntry())
+		if (g_debugger_window && !DebugInterface::getPauseOnEntry())
 		{
-			m_debugger_window->close();
-			m_debugger_window->deleteLater();
-			m_debugger_window = nullptr;
+			g_debugger_window->close();
+			g_debugger_window->deleteLater();
+			g_debugger_window = nullptr;
 		}
 	}
 }
@@ -1735,10 +1736,10 @@ void MainWindow::updateTheme()
 {
 	// The debugger hates theme changes.
 	// We have unfortunately to destroy it and recreate it.
-	const bool debugger_is_open = m_debugger_window ? m_debugger_window->isVisible() : false;
-	const QSize debugger_size = m_debugger_window ? m_debugger_window->size() : QSize();
-	const QPoint debugger_pos = m_debugger_window ? m_debugger_window->pos() : QPoint();
-	if (m_debugger_window)
+	const bool debugger_is_open = g_debugger_window ? g_debugger_window->isVisible() : false;
+	const QSize debugger_size = g_debugger_window ? g_debugger_window->size() : QSize();
+	const QPoint debugger_pos = g_debugger_window ? g_debugger_window->pos() : QPoint();
+	if (g_debugger_window)
 	{
 		if (QMessageBox::question(this, tr("Theme Change"),
 				tr("Changing the theme will close the debugger window. Any unsaved data will be lost. Do you want to continue?"),
@@ -1751,16 +1752,16 @@ void MainWindow::updateTheme()
 	QtHost::UpdateApplicationTheme();
 	reloadThemeSpecificImages();
 
-	if (m_debugger_window)
+	if (g_debugger_window)
 	{
-		m_debugger_window->deleteLater();
-		m_debugger_window = nullptr;
+		g_debugger_window->deleteLater();
+		g_debugger_window = nullptr;
 		getDebuggerWindow(); // populates m_debugger_window
-		m_debugger_window->resize(debugger_size);
-		m_debugger_window->move(debugger_pos);
+		g_debugger_window->resize(debugger_size);
+		g_debugger_window->move(debugger_pos);
 		if (debugger_is_open)
 		{
-			m_debugger_window->show();
+			g_debugger_window->show();
 		}
 	}
 }
@@ -2614,16 +2615,16 @@ void MainWindow::doSettings(const char* category /* = nullptr */)
 
 DebuggerWindow* MainWindow::getDebuggerWindow()
 {
-	if (!m_debugger_window)
+	if (!g_debugger_window)
 	{
 		// Setup KDDockWidgets.
-		DockManager::configure_docking_system();
+		DockManager::configureDockingSystem();
 
 		// Don't pass us (this) as the parent, otherwise the window is always on top of the mainwindow (on windows at least)
-		m_debugger_window = new DebuggerWindow(nullptr);
+		static_cast<void>(new DebuggerWindow(nullptr));
 	}
 
-	return m_debugger_window;
+	return g_debugger_window;
 }
 
 void MainWindow::openDebugger()
