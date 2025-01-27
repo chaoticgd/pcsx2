@@ -12,16 +12,26 @@ inline void not_yet_implemented()
 	abort();
 }
 
+class JsonValueWrapper;
+
 class DebuggerWidget : public QWidget
 {
 	Q_OBJECT
 
-protected:
-	DebuggerWidget(DebugInterface* cpu, QWidget* parent = nullptr);
-
+public:
 	DebugInterface& cpu() const;
+	void setCpu(DebugInterface* cpu);
+
+	virtual void toJson(JsonValueWrapper& json);
+	virtual void fromJson(JsonValueWrapper& json);
 
 	void applyMonospaceFont();
+
+	size_t widget_description_index = SIZE_MAX;
+	QString unique_name;
+
+protected:
+	DebuggerWidget(DebugInterface* cpu, QWidget* parent = nullptr);
 
 private:
 	DebugInterface* m_cpu;

@@ -3,18 +3,41 @@
 
 #include "DebuggerWidget.h"
 
-#include "common/Assertions.h"
+#include "JsonValueWrapper.h"
 
-DebuggerWidget::DebuggerWidget(DebugInterface* cpu, QWidget* parent)
-	: QWidget(parent)
-	, m_cpu(cpu)
-{
-}
+#include "common/Assertions.h"
 
 DebugInterface& DebuggerWidget::cpu() const
 {
 	pxAssertRel(m_cpu, "DebuggerWidget::cpu() called on object that doesn't have a CPU type set.");
 	return *m_cpu;
+}
+
+void DebuggerWidget::setCpu(DebugInterface* cpu)
+{
+	m_cpu = cpu;
+}
+
+void DebuggerWidget::toJson(JsonValueWrapper& json)
+{
+	rapidjson::Value cpu_name;
+	switch (cpu().getCpuType())
+	{
+		case BREAKPOINT_EE:
+			cpu_name.SetString("EE");
+			break;
+		case BREAKPOINT_IOP:
+			cpu_name.SetString("IOP");
+			break;
+		default:
+			return;
+	}
+
+	json.value().AddMember("cpu", cpu_name, json.allocator());
+}
+
+void DebuggerWidget::fromJson(JsonValueWrapper& json)
+{
 }
 
 void DebuggerWidget::applyMonospaceFont()
@@ -28,4 +51,10 @@ void DebuggerWidget::applyMonospaceFont()
 #else
 	setStyleSheet(QStringLiteral("font: 10pt 'Monospace'"));
 #endif
+}
+
+DebuggerWidget::DebuggerWidget(DebugInterface* cpu, QWidget* parent)
+	: QWidget(parent)
+	, m_cpu(cpu)
+{
 }
