@@ -1355,7 +1355,6 @@ namespace EmuFolders
 	extern std::string AppRoot;
 	extern std::string DataRoot;
 	extern std::string Settings;
-	extern std::string DebuggerSettings;
 	extern std::string Bios;
 	extern std::string Snapshots;
 	extern std::string Savestates;
@@ -1371,6 +1370,8 @@ namespace EmuFolders
 	extern std::string Textures;
 	extern std::string InputProfiles;
 	extern std::string Videos;
+	extern std::string DebuggerLayouts;
+	extern std::string DebuggerSettings;
 
 	/// Initializes critical folders (AppRoot, DataRoot, Settings). Call once on startup.
 	void SetAppRoot();

@@ -1337,6 +1337,15 @@ bool FileSystem::CopyFilePath(const char* source, const char* destination, bool 
 #endif
 }
 
+bool FileSystem::MoveFilePath(const char* source, const char* destination)
+{
+#ifndef _WIN32
+	return rename(source, destination) == 0;
+#else
+	return MoveFileW(GetWin32Path(source).c_str(), GetWin32Path(destination).c_str());
+#endif
+}
+
 #ifdef _WIN32
 
 static u32 TranslateWin32Attributes(u32 Win32Attributes)

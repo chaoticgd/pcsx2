@@ -166,6 +166,9 @@ namespace FileSystem
 	/// Copies one file to another, optionally replacing it if it already exists.
 	bool CopyFilePath(const char* source, const char* destination, bool replace);
 
+	/// Move a file to another location.
+	bool MoveFilePath(const char* source, const char* destination);
+
 	/// Returns the path to the current executable.
 	std::string GetProgramPath();
 
