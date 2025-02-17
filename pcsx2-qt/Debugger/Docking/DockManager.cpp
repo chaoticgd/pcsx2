@@ -3,6 +3,7 @@
 
 #include "DockManager.h"
 
+#include "Debugger/DebuggerWidget.h"
 #include "Debugger/DebuggerWindow.h"
 #include "Debugger/Docking/DockTables.h"
 #include "Debugger/Docking/DockViews.h"
@@ -308,7 +309,7 @@ void DockManager::createWindowsMenu(QMenu* menu)
 	for (const auto& [type, desc] : DockTables::DEBUGGER_WIDGETS)
 	{
 		QAction* action = new QAction(menu);
-		action->setText(QCoreApplication::translate("DebuggerWidget", desc.title));
+		action->setText(QCoreApplication::translate("DebuggerWidget", desc.display_name));
 		action->setCheckable(true);
 		action->setChecked(layout.hasDebuggerWidget(type));
 		connect(action, &QAction::triggered, this, [&layout, type]() {
@@ -495,6 +496,7 @@ void DockManager::layoutSwitcherContextMenu(QPoint pos)
 		return;
 
 	QMenu* menu = new QMenu(tr("Layout Switcher Context Menu"), m_switcher);
+	menu->setAttribute(Qt::WA_DeleteOnClose);
 
 	QAction* edit_action = new QAction(tr("Edit Layout"), menu);
 	connect(edit_action, &QAction::triggered, [this, tab_index]() {
@@ -563,12 +565,37 @@ void DockManager::dockWidgetClosed(KDDockWidgets::Core::DockWidget* dock_widget)
 	m_layouts.at(m_current_layout).dockWidgetClosed(dock_widget);
 }
 
+const std::map<QString, QPointer<DebuggerWidget>>& DockManager::debuggerWidgets()
+{
+	static std::map<QString, QPointer<DebuggerWidget>> dummy;
+	if (m_current_layout == DockLayout::INVALID_INDEX)
+		return dummy;
+
+	return m_layouts.at(m_current_layout).debuggerWidgets();
+}
+
 void DockManager::recreateDebuggerWidget(QString unique_name)
 {
 	if (m_current_layout == DockLayout::INVALID_INDEX)
 		return;
 
 	m_layouts.at(m_current_layout).recreateDebuggerWidget(unique_name);
+}
+
+void DockManager::switchToDebuggerWidget(DebuggerWidget* widget)
+{
+	if (m_current_layout == DockLayout::INVALID_INDEX)
+		return;
+
+	for (const auto& [unique_name, test_widget] : m_layouts.at(m_current_layout).debuggerWidgets())
+	{
+		if (widget == test_widget)
+		{
+			auto [controller, view] = DockUtils::dockWidgetFromName(unique_name);
+			controller->setAsCurrentTab();
+			break;
+		}
+	}
 }
 
 bool DockManager::isLayoutLocked()

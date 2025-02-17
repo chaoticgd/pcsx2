@@ -25,5 +25,5 @@ public:
 private:
 	Ui::SavedAddressesWidget m_ui;
 
-	SavedAddressesModel m_model;
+	SavedAddressesModel* m_model;
 };

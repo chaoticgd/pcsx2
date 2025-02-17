@@ -26,8 +26,6 @@ SymbolTreeWidget::SymbolTreeWidget(
 {
 	m_ui.setupUi(this);
 
-	setupMenu();
-
 	connect(m_ui.refreshButton, &QPushButton::clicked, this, [&]() {
 		m_cpu.GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
 			m_cpu.GetSymbolGuardian().UpdateFunctionHashes(database, m_cpu);
@@ -50,6 +48,11 @@ SymbolTreeWidget::SymbolTreeWidget(
 
 	connect(m_ui.treeView, &QTreeView::expanded, this, [&]() {
 		updateVisibleNodes(true);
+	});
+
+	receiveEvent<DebuggerEvents::Refresh>([this](const DebuggerEvents::Refresh& event) -> bool {
+		updateModel();
+		return true;
 	});
 }
 
@@ -382,94 +385,6 @@ std::unique_ptr<SymbolTreeNode> SymbolTreeWidget::groupByModule(
 	return child;
 }
 
-void SymbolTreeWidget::setupMenu()
-{
-	m_context_menu = new QMenu(this);
-
-	QAction* copy_name = new QAction(tr("Copy Name"), this);
-	connect(copy_name, &QAction::triggered, this, &SymbolTreeWidget::onCopyName);
-	m_context_menu->addAction(copy_name);
-
-	if (m_flags & ALLOW_MANGLED_NAME_ACTIONS)
-	{
-		QAction* copy_mangled_name = new QAction(tr("Copy Mangled Name"), this);
-		connect(copy_mangled_name, &QAction::triggered, this, &SymbolTreeWidget::onCopyMangledName);
-		m_context_menu->addAction(copy_mangled_name);
-	}
-
-	QAction* copy_location = new QAction(tr("Copy Location"), this);
-	connect(copy_location, &QAction::triggered, this, &SymbolTreeWidget::onCopyLocation);
-	m_context_menu->addAction(copy_location);
-
-	m_context_menu->addSeparator();
-
-	m_rename_symbol = new QAction(tr("Rename Symbol"), this);
-	connect(m_rename_symbol, &QAction::triggered, this, &SymbolTreeWidget::onRenameSymbol);
-	m_context_menu->addAction(m_rename_symbol);
-
-	m_context_menu->addSeparator();
-
-	m_go_to_in_disassembly = new QAction(tr("Go to in Disassembly"), this);
-	connect(m_go_to_in_disassembly, &QAction::triggered, this, &SymbolTreeWidget::onGoToInDisassembly);
-	m_context_menu->addAction(m_go_to_in_disassembly);
-
-	m_m_go_to_in_memory_view = new QAction(tr("Go to in Memory View"), this);
-	connect(m_m_go_to_in_memory_view, &QAction::triggered, this, &SymbolTreeWidget::onGoToInMemoryView);
-	m_context_menu->addAction(m_m_go_to_in_memory_view);
-
-	m_show_size_column = new QAction(tr("Show Size Column"), this);
-	m_show_size_column->setCheckable(true);
-	connect(m_show_size_column, &QAction::triggered, this, &SymbolTreeWidget::reset);
-	m_context_menu->addAction(m_show_size_column);
-
-	if (m_flags & ALLOW_GROUPING)
-	{
-		m_context_menu->addSeparator();
-
-		m_group_by_module = new QAction(tr("Group by Module"), this);
-		m_group_by_module->setCheckable(true);
-		if (m_cpu.getCpuType() == BREAKPOINT_IOP)
-			m_group_by_module->setChecked(true);
-		connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
-		m_context_menu->addAction(m_group_by_module);
-
-		m_group_by_section = new QAction(tr("Group by Section"), this);
-		m_group_by_section->setCheckable(true);
-		connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
-		m_context_menu->addAction(m_group_by_section);
-
-		m_group_by_source_file = new QAction(tr("Group by Source File"), this);
-		m_group_by_source_file->setCheckable(true);
-		connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::reset);
-		m_context_menu->addAction(m_group_by_source_file);
-	}
-
-	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
-	{
-		m_context_menu->addSeparator();
-
-		m_sort_by_if_type_is_known = new QAction(tr("Sort by if type is known"), this);
-		m_sort_by_if_type_is_known->setCheckable(true);
-		m_context_menu->addAction(m_sort_by_if_type_is_known);
-
-		connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::reset);
-	}
-
-	if (m_flags & ALLOW_TYPE_ACTIONS)
-	{
-		m_context_menu->addSeparator();
-
-		m_reset_children = new QAction(tr("Reset children"), this);
-		m_context_menu->addAction(m_reset_children);
-
-		m_change_type_temporarily = new QAction(tr("Change type temporarily"), this);
-		m_context_menu->addAction(m_change_type_temporarily);
-
-		connect(m_reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
-		connect(m_change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
-	}
-}
-
 void SymbolTreeWidget::openMenu(QPoint pos)
 {
 	SymbolTreeNode* node = currentNode();
@@ -480,17 +395,116 @@ void SymbolTreeWidget::openMenu(QPoint pos)
 	bool node_is_symbol = node->symbol.valid();
 	bool node_is_memory = node->location.type == SymbolTreeLocation::MEMORY;
 
-	m_rename_symbol->setEnabled(node_is_symbol);
-	m_go_to_in_disassembly->setEnabled(node_is_memory);
-	m_m_go_to_in_memory_view->setEnabled(node_is_memory);
+	QMenu* menu = new QMenu(tr("Symbol Tree Context Menu"), this);
+	menu->setAttribute(Qt::WA_DeleteOnClose);
 
-	if (m_reset_children)
-		m_reset_children->setEnabled(node_is_object);
+	QAction* copy_name = new QAction(tr("Copy Name"), this);
+	connect(copy_name, &QAction::triggered, this, &SymbolTreeWidget::onCopyName);
+	menu->addAction(copy_name);
 
-	if (m_change_type_temporarily)
-		m_change_type_temporarily->setEnabled(node_is_object);
+	if (m_flags & ALLOW_MANGLED_NAME_ACTIONS)
+	{
+		QAction* copy_mangled_name = new QAction(tr("Copy Mangled Name"), this);
+		connect(copy_mangled_name, &QAction::triggered, this, &SymbolTreeWidget::onCopyMangledName);
+		menu->addAction(copy_mangled_name);
+	}
 
-	m_context_menu->exec(m_ui.treeView->viewport()->mapToGlobal(pos));
+	QAction* copy_location = new QAction(tr("Copy Location"), this);
+	connect(copy_location, &QAction::triggered, this, &SymbolTreeWidget::onCopyLocation);
+	menu->addAction(copy_location);
+
+	menu->addSeparator();
+
+	QAction* rename_symbol = new QAction(tr("Rename Symbol"), this);
+	rename_symbol->setEnabled(node_is_symbol);
+	connect(rename_symbol, &QAction::triggered, this, &SymbolTreeWidget::onRenameSymbol);
+	menu->addAction(rename_symbol);
+
+	menu->addSeparator();
+
+	std::vector<QAction*> go_to_actions = createEventActions<DebuggerEvents::GoToAddress>(
+		menu,
+		[this]() -> std::optional<DebuggerEvents::GoToAddress> {
+			SymbolTreeNode* node = currentNode();
+			if (!node)
+				return std::nullopt;
+
+			DebuggerEvents::GoToAddress event;
+			event.address = node->location.address;
+			return event;
+		});
+
+	for (QAction* action : go_to_actions)
+		action->setEnabled(node_is_memory);
+
+	if (!m_show_size_column)
+	{
+		m_show_size_column = new QAction(tr("Show Size Column"), this);
+		m_show_size_column->setCheckable(true);
+		connect(m_show_size_column, &QAction::triggered, this, &SymbolTreeWidget::reset);
+	}
+	menu->addAction(m_show_size_column);
+
+	if (m_flags & ALLOW_GROUPING)
+	{
+		menu->addSeparator();
+
+		if (!m_group_by_module)
+		{
+			m_group_by_module = new QAction(tr("Group by Module"), this);
+			m_group_by_module->setCheckable(true);
+			if (m_cpu.getCpuType() == BREAKPOINT_IOP)
+				m_group_by_module->setChecked(true);
+			connect(m_group_by_module, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		}
+		menu->addAction(m_group_by_module);
+
+		if (!m_group_by_section)
+		{
+			m_group_by_section = new QAction(tr("Group by Section"), this);
+			m_group_by_section->setCheckable(true);
+			connect(m_group_by_section, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		}
+		menu->addAction(m_group_by_section);
+
+		if (!m_group_by_source_file)
+		{
+			m_group_by_source_file = new QAction(tr("Group by Source File"), this);
+			m_group_by_source_file->setCheckable(true);
+			connect(m_group_by_source_file, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		}
+		menu->addAction(m_group_by_source_file);
+	}
+
+	if (m_flags & ALLOW_SORTING_BY_IF_TYPE_IS_KNOWN)
+	{
+		menu->addSeparator();
+
+		if (!m_sort_by_if_type_is_known)
+		{
+			m_sort_by_if_type_is_known = new QAction(tr("Sort by if type is known"), this);
+			m_sort_by_if_type_is_known->setCheckable(true);
+			connect(m_sort_by_if_type_is_known, &QAction::toggled, this, &SymbolTreeWidget::reset);
+		}
+		menu->addAction(m_sort_by_if_type_is_known);
+	}
+
+	if (m_flags & ALLOW_TYPE_ACTIONS)
+	{
+		menu->addSeparator();
+
+		QAction* reset_children = new QAction(tr("Reset Children"), this);
+		reset_children->setEnabled(node_is_object);
+		connect(reset_children, &QAction::triggered, this, &SymbolTreeWidget::onResetChildren);
+		menu->addAction(reset_children);
+
+		QAction* change_type_temporarily = new QAction(tr("Change Type Temporarily"), this);
+		change_type_temporarily->setEnabled(node_is_object);
+		connect(change_type_temporarily, &QAction::triggered, this, &SymbolTreeWidget::onChangeTypeTemporarily);
+		menu->addAction(change_type_temporarily);
+	}
+
+	menu->popup(m_ui.treeView->viewport()->mapToGlobal(pos));
 }
 
 bool SymbolTreeWidget::needsReset() const
@@ -575,24 +589,6 @@ void SymbolTreeWidget::onRenameSymbol()
 	});
 }
 
-void SymbolTreeWidget::onGoToInDisassembly()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	emit goToInDisassembly(node->location.address);
-}
-
-void SymbolTreeWidget::onGoToInMemoryView()
-{
-	SymbolTreeNode* node = currentNode();
-	if (!node)
-		return;
-
-	emit goToInMemoryView(node->location.address);
-}
-
 void SymbolTreeWidget::onResetChildren()
 {
 	if (!m_model)
@@ -635,22 +631,14 @@ void SymbolTreeWidget::onChangeTypeTemporarily()
 
 void SymbolTreeWidget::onTreeViewClicked(const QModelIndex& index)
 {
-	if (!index.isValid())
+	if (!index.isValid() || (m_flags & CLICK_TO_GO_TO_IN_DISASSEMBLER) == 0)
 		return;
 
 	SymbolTreeNode* node = m_model->nodeFromIndex(index);
-	if (!node)
+	if (!node || node->location.type != SymbolTreeLocation::MEMORY)
 		return;
 
-	switch (index.column())
-	{
-		case SymbolTreeModel::NAME:
-			emit nameColumnClicked(node->location.address);
-			break;
-		case SymbolTreeModel::LOCATION:
-			emit locationColumnClicked(node->location.address);
-			break;
-	}
+	goToInDisassembler(node->location.address);
 }
 
 SymbolTreeNode* SymbolTreeWidget::currentNode()
@@ -666,7 +654,7 @@ SymbolTreeNode* SymbolTreeWidget::currentNode()
 
 FunctionTreeWidget::FunctionTreeWidget(DebugInterface& cpu, QWidget* parent)
 	: SymbolTreeWidget(
-		  ALLOW_GROUPING | ALLOW_MANGLED_NAME_ACTIONS,
+		  ALLOW_GROUPING | ALLOW_MANGLED_NAME_ACTIONS | CLICK_TO_GO_TO_IN_DISASSEMBLER,
 		  4,
 		  cpu,
 		  parent)

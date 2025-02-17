@@ -37,5 +37,5 @@ public:
 private:
 	Ui::BreakpointWidget m_ui;
 
-	BreakpointModel m_model;
+	BreakpointModel* m_model;
 };

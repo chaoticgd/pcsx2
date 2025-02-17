@@ -23,6 +23,6 @@ public:
 private:
 	Ui::ThreadWidget m_ui;
 
-	ThreadModel m_model;
-	QSortFilterProxyModel m_proxy_model;
+	ThreadModel* m_model;
+	QSortFilterProxyModel* m_proxy_model;
 };

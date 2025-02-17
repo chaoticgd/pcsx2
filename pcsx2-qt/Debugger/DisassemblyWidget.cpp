@@ -26,9 +26,24 @@ DisassemblyWidget::DisassemblyWidget(DebugInterface& cpu, QWidget* parent)
 
 	m_disassemblyManager.setCpu(&cpu);
 
+	setContextMenuPolicy(Qt::ContextMenuPolicy::CustomContextMenu);
 	connect(this, &DisassemblyWidget::customContextMenuRequested, this, &DisassemblyWidget::customMenuRequested);
 
 	applyMonospaceFont();
+
+	receiveEvent<DebuggerEvents::Refresh>([this](const DebuggerEvents::Refresh& event) -> bool {
+		update();
+		return true;
+	});
+
+	receiveEvent<DebuggerEvents::GoToAddress>([this](const DebuggerEvents::GoToAddress& event) -> bool {
+		if (event.filter != DebuggerEvents::GoToAddress::NONE &&
+			event.filter != DebuggerEvents::GoToAddress::DISASSEMBLER)
+			return false;
+
+		gotoAddress(event.address, true);
+		return true;
+	});
 }
 
 DisassemblyWidget::~DisassemblyWidget() = default;
@@ -82,7 +97,7 @@ void DisassemblyWidget::contextAssembleInstruction()
 				this->m_nopedInstructions.insert({i, cpu->read32(i)});
 				cpu->write32(i, val);
 			}
-			emit VMUpdate();
+			DebuggerWidget::broadcastEvent(DebuggerEvents::VMUpdate());
 		});
 	}
 }
@@ -95,7 +110,7 @@ void DisassemblyWidget::contextNoopInstruction()
 			this->m_nopedInstructions.insert({i, cpu->read32(i)});
 			cpu->write32(i, 0x00);
 		}
-		emit VMUpdate();
+		DebuggerWidget::broadcastEvent(DebuggerEvents::VMUpdate());
 	});
 }
 
@@ -110,7 +125,7 @@ void DisassemblyWidget::contextRestoreInstruction()
 				this->m_nopedInstructions.erase(i);
 			}
 		}
-		emit VMUpdate();
+		DebuggerWidget::broadcastEvent(DebuggerEvents::VMUpdate());
 	});
 }
 
@@ -145,7 +160,7 @@ void DisassemblyWidget::contextToggleBreakpoint()
 		Host::RunOnCPUThread([cpuType, selectedAddressStart] { CBreakPoints::AddBreakPoint(cpuType, selectedAddressStart); });
 	}
 
-	breakpointsChanged();
+	broadcastEvent(DebuggerEvents::BreakpointsChanged());
 	this->repaint();
 }
 
@@ -254,7 +269,7 @@ void DisassemblyWidget::contextStubFunction()
 		this->m_stubbedFunctions.insert({address, {cpu->read32(address), cpu->read32(address + 4)}});
 		cpu->write32(address, 0x03E00008); // jr ra
 		cpu->write32(address + 4, 0x00000000); // nop
-		emit VMUpdate();
+		DebuggerWidget::broadcastEvent(DebuggerEvents::VMUpdate());
 	});
 }
 
@@ -275,7 +290,7 @@ void DisassemblyWidget::contextRestoreFunction()
 			cpu->write32(address, first_instruction);
 			cpu->write32(address + 4, second_instruction);
 			this->m_stubbedFunctions.erase(address);
-			emit VMUpdate();
+			DebuggerWidget::broadcastEvent(DebuggerEvents::VMUpdate());
 		});
 	}
 	else
@@ -517,7 +532,7 @@ void DisassemblyWidget::mouseDoubleClickEvent(QMouseEvent* event)
 	{
 		Host::RunOnCPUThread([cpuType, selectedAddress] { CBreakPoints::AddBreakPoint(cpuType, selectedAddress); });
 	}
-	breakpointsChanged();
+	broadcastEvent(DebuggerEvents::BreakpointsChanged());
 	this->repaint();
 }
 
@@ -612,6 +627,7 @@ void DisassemblyWidget::customMenuRequested(QPoint pos)
 		return;
 
 	QMenu* contextMenu = new QMenu(this);
+	contextMenu->setAttribute(Qt::WA_DeleteOnClose);
 
 	QAction* action = 0;
 	contextMenu->addAction(action = new QAction(tr("Copy Address"), this));
@@ -653,7 +669,9 @@ void DisassemblyWidget::customMenuRequested(QPoint pos)
 	action->setShortcut(QKeySequence(Qt::Key_G));
 	connect(action, &QAction::triggered, this, &DisassemblyWidget::contextGoToAddress);
 	contextMenu->addAction(action = new QAction(tr("Go to in Memory View"), this));
-	connect(action, &QAction::triggered, this, [this]() { gotoInMemory(m_selectedAddressStart); });
+	connect(action, &QAction::triggered, this, [this]() {
+		goToInMemoryView(m_selectedAddressStart);
+	});
 
 	contextMenu->addAction(action = new QAction(tr("Go to PC on Pause"), this));
 	action->setCheckable(true);
@@ -685,7 +703,6 @@ void DisassemblyWidget::customMenuRequested(QPoint pos)
 	action->setChecked(m_showInstructionOpcode);
 	connect(action, &QAction::triggered, this, &DisassemblyWidget::contextShowOpcode);
 
-	contextMenu->setAttribute(Qt::WA_DeleteOnClose);
 	contextMenu->popup(this->mapToGlobal(pos));
 }
 

@@ -22,5 +22,5 @@ public:
 private:
 	Ui::StackWidget m_ui;
 
-	StackModel m_model;
+	StackModel* m_model;
 };
