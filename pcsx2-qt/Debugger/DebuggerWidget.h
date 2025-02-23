@@ -15,6 +15,7 @@ class JsonValueWrapper;
 // Container for variables to be passed to the constructor of DebuggerWidget.
 struct DebuggerWidgetParameters
 {
+	QString unique_name;
 	DebugInterface* cpu = nullptr;
 	std::optional<BreakPointCpu> cpu_override;
 	QWidget* parent = nullptr;
@@ -26,8 +27,13 @@ class DebuggerWidget : public QWidget
 	Q_OBJECT
 
 public:
+	QString uniqueName();
+
 	// Get the translated name that should be displayed for this widget.
 	QString displayName();
+	QString displayNameWithoutSuffix();
+
+	void setDisplayName(QString display_name);
 
 	// Get the effective debug interface associated with this particular widget
 	// if it's set, otherwise return the one associated with the layout that
@@ -134,6 +140,8 @@ public:
 
 	void applyMonospaceFont();
 
+	void addToChain(std::map<QString, DebuggerWidget*>& widgets);
+
 protected:
 	DebuggerWidget(const DebuggerWidgetParameters& parameters);
 
@@ -149,7 +157,17 @@ private:
 		const char* event_text,
 		std::function<const DebuggerEvents::Event*()> event_func);
 
+	QString m_unique_name;
+
+	// A user-defined name, or an empty string if no name was specified so that
+	// the default names can be retranslated on the fly.
+	QString m_display_name;
+
 	DebugInterface* m_cpu;
 	std::optional<BreakPointCpu> m_cpu_override;
 	std::multimap<std::string, std::function<bool(const DebuggerEvents::Event&)>> m_event_handlers;
+
+	// A linked list of all the debugger widgets with the same display name.
+	DebuggerWidget* m_prev_with_name = nullptr;
+	DebuggerWidget* m_next_with_name = nullptr;
 };

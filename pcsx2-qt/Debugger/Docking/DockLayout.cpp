@@ -55,6 +55,7 @@ DockLayout::DockLayout(
 		const DockTables::DebuggerWidgetDescription& dock_description = iterator->second;
 
 		DebuggerWidgetParameters parameters;
+		parameters.unique_name = generateNewUniqueName();
 		parameters.cpu = &DebugInterface::get(cpu);
 		DebuggerWidget* widget = dock_description.create_widget(parameters);
 		m_widgets.emplace(QString::fromStdString(default_layout.widgets[i].type), widget);
@@ -95,6 +96,7 @@ DockLayout::DockLayout(
 			continue;
 
 		DebuggerWidgetParameters parameters;
+		parameters.unique_name = generateNewUniqueName();
 		parameters.cpu = &DebugInterface::get(cpu);
 		parameters.cpu_override = widget_to_clone->cpuOverride();
 		DebuggerWidget* new_widget = widget_description->second.create_widget(parameters);
@@ -158,8 +160,8 @@ void DockLayout::setCpu(BreakPointCpu cpu)
 
 void DockLayout::freeze()
 {
-	pxAssert(!m_is_frozen);
-	m_is_frozen = true;
+	pxAssert(m_is_active);
+	m_is_active = false;
 
 	if (g_debugger_window)
 		m_toolbars = g_debugger_window->saveState();
@@ -181,8 +183,8 @@ void DockLayout::freeze()
 
 void DockLayout::thaw()
 {
-	pxAssert(m_is_frozen);
-	m_is_frozen = false;
+	pxAssert(!m_is_active);
+	m_is_active = true;
 
 	if (!g_debugger_window)
 		return;
@@ -249,12 +251,12 @@ void DockLayout::thaw()
 		m_widgets.erase(widget_iterator);
 	}
 
-	retranslateDockWidgets();
+	updateDockWidgetTitles();
 }
 
 KDDockWidgets::Core::DockWidget* DockLayout::createDockWidget(const QString& name)
 {
-	pxAssert(!m_is_frozen);
+	pxAssert(m_is_active);
 	pxAssert(KDDockWidgets::LayoutSaver::restoreInProgress());
 
 	auto widget_iterator = m_widgets.find(name);
@@ -263,6 +265,7 @@ KDDockWidgets::Core::DockWidget* DockLayout::createDockWidget(const QString& nam
 
 	DebuggerWidget* widget = widget_iterator->second;
 	pxAssert(widget);
+	pxAssert(widget->uniqueName() == name);
 
 	auto view = static_cast<KDDockWidgets::QtWidgets::DockWidget*>(
 		KDDockWidgets::Config::self().viewFactory()->createDockWidget(name));
@@ -271,15 +274,19 @@ KDDockWidgets::Core::DockWidget* DockLayout::createDockWidget(const QString& nam
 	return view->asController<KDDockWidgets::Core::DockWidget>();
 }
 
-void DockLayout::retranslateDockWidgets()
+void DockLayout::updateDockWidgetTitles()
 {
+	if (!m_is_active)
+		return;
+
 	for (KDDockWidgets::Core::DockWidget* widget : KDDockWidgets::DockRegistry::self()->dockwidgets())
-		retranslateDockWidget(widget);
+		updateDockWidgetTitle(widget);
 }
 
-void DockLayout::retranslateDockWidget(KDDockWidgets::Core::DockWidget* dock_widget)
+void DockLayout::updateDockWidgetTitle(KDDockWidgets::Core::DockWidget* dock_widget)
 {
-	pxAssert(!m_is_frozen);
+	if (!m_is_active)
+		return;
 
 	auto widget_iterator = m_widgets.find(dock_widget->uniqueName());
 	if (widget_iterator == m_widgets.end())
@@ -288,18 +295,8 @@ void DockLayout::retranslateDockWidget(KDDockWidgets::Core::DockWidget* dock_wid
 	DebuggerWidget* widget = widget_iterator->second.get();
 	if (!widget)
 		return;
-	;
-	std::optional<BreakPointCpu> cpu_override = widget->cpuOverride();
 
-	if (cpu_override.has_value())
-	{
-		const char* cpu_name = DebugInterface::cpuName(*cpu_override);
-		dock_widget->setTitle(QString("%1 (%2)").arg(widget->displayName()).arg(cpu_name));
-	}
-	else
-	{
-		dock_widget->setTitle(std::move(widget->displayName()));
-	}
+	dock_widget->setTitle(widget->displayName());
 }
 
 void DockLayout::dockWidgetClosed(KDDockWidgets::Core::DockWidget* dock_widget)
@@ -329,7 +326,7 @@ bool DockLayout::hasDebuggerWidget(QString unique_name)
 
 void DockLayout::toggleDebuggerWidget(QString unique_name)
 {
-	pxAssert(!m_is_frozen);
+	pxAssert(m_is_active);
 
 	if (!g_debugger_window)
 		return;
@@ -350,12 +347,13 @@ void DockLayout::toggleDebuggerWidget(QString unique_name)
 		const DockTables::DebuggerWidgetDescription& description = description_iterator->second;
 
 		DebuggerWidgetParameters parameters;
+		parameters.unique_name = generateNewUniqueName();
 		parameters.cpu = &DebugInterface::get(m_cpu);
 		DebuggerWidget* widget = description.create_widget(parameters);
 		m_widgets.emplace(unique_name, widget);
 
 		auto view = static_cast<KDDockWidgets::QtWidgets::DockWidget*>(
-			KDDockWidgets::Config::self().viewFactory()->createDockWidget(unique_name));
+			KDDockWidgets::Config::self().viewFactory()->createDockWidget(widget->uniqueName()));
 		view->setWidget(widget);
 
 		KDDockWidgets::Core::DockWidget* controller = view->asController<KDDockWidgets::Core::DockWidget>();
@@ -366,7 +364,7 @@ void DockLayout::toggleDebuggerWidget(QString unique_name)
 		}
 
 		DockUtils::insertDockWidgetAtPreferredLocation(controller, description.preferred_location, g_debugger_window);
-		retranslateDockWidget(controller);
+		updateDockWidgetTitle(controller);
 	}
 	else
 	{
@@ -381,7 +379,7 @@ void DockLayout::toggleDebuggerWidget(QString unique_name)
 
 void DockLayout::recreateDebuggerWidget(QString unique_name)
 {
-	pxAssert(!m_is_frozen);
+	pxAssert(m_is_active);
 
 	auto [controller, view] = DockUtils::dockWidgetFromName(unique_name);
 	if (!controller || !view)
@@ -401,6 +399,7 @@ void DockLayout::recreateDebuggerWidget(QString unique_name)
 	const DockTables::DebuggerWidgetDescription& description = description_iterator->second;
 
 	DebuggerWidgetParameters parameters;
+	parameters.unique_name = generateNewUniqueName();
 	parameters.cpu = &DebugInterface::get(m_cpu);
 	parameters.cpu_override = old_debugger_widget->cpuOverride();
 	DebuggerWidget* new_debugger_widget = description.create_widget(parameters);
@@ -424,7 +423,7 @@ bool DockLayout::save(DockLayout::Index layout_index)
 	if (!g_debugger_window)
 		return false;
 
-	if (!m_is_frozen)
+	if (m_is_active)
 	{
 		m_toolbars = g_debugger_window->saveState();
 
@@ -548,7 +547,7 @@ void DockLayout::load(
 	LoadResult& result,
 	DockLayout::Index& index_last_session)
 {
-	pxAssert(m_is_frozen);
+	pxAssert(!m_is_active);
 
 	result = SUCCESS;
 
@@ -673,6 +672,7 @@ void DockLayout::load(
 			}
 
 			DebuggerWidgetParameters parameters;
+			parameters.unique_name = generateNewUniqueName();
 			parameters.cpu = &DebugInterface::get(m_cpu);
 			parameters.cpu_override = cpu_override;
 			DebuggerWidget* widget = description->second.create_widget(parameters);
@@ -703,7 +703,7 @@ void DockLayout::load(
 
 void DockLayout::setupDefaultLayout()
 {
-	pxAssert(!m_is_frozen);
+	pxAssert(m_is_active);
 
 	if (m_base_layout.empty() || !g_debugger_window)
 		return;
@@ -725,6 +725,7 @@ void DockLayout::setupDefaultLayout()
 
 		const QString& unique_name = widget_iterator->first;
 		DebuggerWidget* widget = widget_iterator->second;
+		pxAssert(widget->uniqueName() == unique_name);
 
 		auto view = static_cast<KDDockWidgets::QtWidgets::DockWidget*>(
 			KDDockWidgets::Config::self().viewFactory()->createDockWidget(unique_name));
@@ -749,5 +750,16 @@ void DockLayout::setupDefaultLayout()
 	for (KDDockWidgets::Core::Group* group : KDDockWidgets::DockRegistry::self()->groups())
 		group->setCurrentTabIndex(0);
 
-	retranslateDockWidgets();
+	updateDockWidgetTitles();
+}
+
+QString DockLayout::generateNewUniqueName()
+{
+	QString name;
+	do
+	{
+		name = QString::number(m_next_unique_name);
+		m_next_unique_name++;
+	} while (!hasDebuggerWidget(name));
+	return name;
 }

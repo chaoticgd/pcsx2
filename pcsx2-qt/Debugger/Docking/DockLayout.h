@@ -95,8 +95,8 @@ public:
 	void thaw();
 
 	KDDockWidgets::Core::DockWidget* createDockWidget(const QString& name);
-	void retranslateDockWidgets();
-	void retranslateDockWidget(KDDockWidgets::Core::DockWidget* dock_widget);
+	void updateDockWidgetTitles();
+	void updateDockWidgetTitle(KDDockWidgets::Core::DockWidget* dock_widget);
 	void dockWidgetClosed(KDDockWidgets::Core::DockWidget* dock_widget);
 
 	const std::map<QString, QPointer<DebuggerWidget>>& debuggerWidgets();
@@ -115,6 +115,8 @@ private:
 		DockLayout::Index& index_last_session);
 
 	void setupDefaultLayout();
+
+	QString generateNewUniqueName();
 
 	// The name displayed in the user interface. Also used to determine the
 	// file name for the layout file.
@@ -148,7 +150,10 @@ private:
 	// exists exists on disk, or empty if no such file exists.
 	std::string m_layout_file_path;
 
-	// If this layout is the currently selected layout this will be false,
-	// otherwise it will be true.
-	bool m_is_frozen = true;
+	// A counter used to generate new unique names for dock widgets.
+	u64 m_next_unique_name = 0;
+
+	// If this layout is the currently selected layout this will be true,
+	// otherwise it will be false.
+	bool m_is_active = false;
 };

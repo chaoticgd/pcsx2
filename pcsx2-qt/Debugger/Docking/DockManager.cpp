@@ -159,7 +159,7 @@ void DockManager::loadLayouts()
 		DockLayout& layout = m_layouts.at(index);
 		const std::string& name = layout.name();
 		std::string new_name = name;
-		for (int i = 2; hasNameConflict(new_name, index) && i < 100; i++)
+		for (int i = 2; hasNameConflict(new_name, index); i++)
 		{
 			if (i == 99)
 			{
@@ -550,12 +550,12 @@ bool DockManager::hasNameConflict(const std::string& name, DockLayout::Index lay
 	return false;
 }
 
-void DockManager::retranslateDockWidget(KDDockWidgets::Core::DockWidget* dock_widget)
+void DockManager::updateDockWidgetTitle(KDDockWidgets::Core::DockWidget* dock_widget)
 {
 	if (m_current_layout == DockLayout::INVALID_INDEX)
 		return;
 
-	m_layouts.at(m_current_layout).retranslateDockWidget(dock_widget);
+	m_layouts.at(m_current_layout).updateDockWidgetTitle(dock_widget);
 }
 
 void DockManager::dockWidgetClosed(KDDockWidgets::Core::DockWidget* dock_widget)

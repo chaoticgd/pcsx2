@@ -21,13 +21,48 @@ DebugInterface& DebuggerWidget::cpu() const
 	return *m_cpu;
 }
 
+QString DebuggerWidget::uniqueName()
+{
+	return m_unique_name;
+}
+
 QString DebuggerWidget::displayName()
 {
+	QString name = displayNameWithoutSuffix();
+
+	// If there are multiple debugger widgets of the same name, append a number
+	// to the display name.
+	if (m_prev_with_name || m_next_with_name)
+	{
+		u64 index = 1;
+
+		for (DebuggerWidget* widget = this; widget->m_prev_with_name != nullptr; widget = widget->m_prev_with_name)
+			index++;
+
+		name = tr("%1 #%2").arg(name).arg(index);
+	}
+
+	if (m_cpu_override)
+		name = tr("%1 (%2)").arg(name).arg(DebugInterface::cpuName(*m_cpu_override));
+
+	return name;
+}
+
+QString DebuggerWidget::displayNameWithoutSuffix()
+{
+	if (!m_display_name.isEmpty())
+		return m_display_name;
+
 	auto description = DockTables::DEBUGGER_WIDGETS.find(metaObject()->className());
 	if (description == DockTables::DEBUGGER_WIDGETS.end())
 		return QString();
 
 	return QCoreApplication::translate("DebuggerWidget", description->second.display_name);
+}
+
+void DebuggerWidget::setDisplayName(QString display_name)
+{
+	m_display_name = display_name;
 }
 
 bool DebuggerWidget::setCpu(DebugInterface& new_cpu)

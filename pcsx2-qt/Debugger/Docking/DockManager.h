@@ -71,7 +71,7 @@ public:
 
 	bool hasNameConflict(const std::string& name, DockLayout::Index layout_index);
 
-	void retranslateDockWidget(KDDockWidgets::Core::DockWidget* dock_widget);
+	void updateDockWidgetTitle(KDDockWidgets::Core::DockWidget* dock_widget);
 	void dockWidgetClosed(KDDockWidgets::Core::DockWidget* dock_widget);
 
 	const std::map<QString, QPointer<DebuggerWidget>>& debuggerWidgets();
