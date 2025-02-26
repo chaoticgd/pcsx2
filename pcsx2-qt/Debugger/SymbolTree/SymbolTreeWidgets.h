@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "Debugger/DebuggerWidget.h"
-#include "SymbolTreeModel.h"
-
 #include "ui_SymbolTreeWidget.h"
+
+#include "Debugger/DebuggerWidget.h"
+#include "Debugger/SymbolTree/SymbolTreeModel.h"
 
 struct SymbolFilters;
 
@@ -41,6 +41,9 @@ protected:
 		const DebuggerWidgetParameters& parameters);
 
 	void resizeEvent(QResizeEvent* event) override;
+
+	void toJson(JsonValueWrapper& json) override;
+	bool fromJson(const JsonValueWrapper& json) override;
 
 	void setupTree();
 	std::unique_ptr<SymbolTreeNode> buildTree(const SymbolFilters& filters, const ccc::SymbolDatabase& database);

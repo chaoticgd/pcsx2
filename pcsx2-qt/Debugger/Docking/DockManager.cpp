@@ -22,7 +22,6 @@
 
 #include <QtCore/QTimer>
 #include <QtCore/QtTranslation>
-#include <QtWidgets/QPushButton>
 
 #include "fmt/format.h"
 
@@ -463,18 +462,18 @@ QWidget* DockManager::createLayoutSwitcher(QWidget* menu_bar)
 	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	layout->addWidget(spacer);
 
+	bool layout_locked = Host::GetBaseBoolSettingValue("Debugger/UserInterface", "LayoutLocked", true);
+
 	QPushButton* lock_layout_toggle = new QPushButton;
-	connect(lock_layout_toggle, &QPushButton::toggled, this, [this, lock_layout_toggle](bool checked) {
-		setLayoutLocked(checked);
-		if (m_layout_locked)
-			lock_layout_toggle->setText(tr("Layout Locked"));
-		else
-			lock_layout_toggle->setText(tr("Layout Unlocked"));
-	});
 	lock_layout_toggle->setCheckable(true);
-	lock_layout_toggle->setChecked(m_layout_locked);
+	lock_layout_toggle->setChecked(layout_locked);
 	lock_layout_toggle->setFlat(true);
+	connect(lock_layout_toggle, &QPushButton::toggled, this, [this, lock_layout_toggle](bool checked) {
+		setLayoutLocked(checked, lock_layout_toggle, true);
+	});
 	layout->addWidget(lock_layout_toggle);
+
+	setLayoutLocked(layout_locked, lock_layout_toggle, false);
 
 	return container;
 }
@@ -722,15 +721,29 @@ void DockManager::switchToDebuggerWidget(DebuggerWidget* widget)
 	}
 }
 
+void DockManager::updateStyleSheets()
+{
+	if (m_current_layout == DockLayout::INVALID_INDEX)
+		return;
+
+	for (const auto& [unique_name, widget] : m_layouts.at(m_current_layout).debuggerWidgets())
+		widget->updateStyleSheet();
+}
 
 bool DockManager::isLayoutLocked()
 {
 	return m_layout_locked;
 }
 
-void DockManager::setLayoutLocked(bool locked)
+void DockManager::setLayoutLocked(bool locked, QPushButton* lock_layout_toggle, bool write_back)
 {
 	m_layout_locked = locked;
+
+	if (lock_layout_toggle)
+		if (m_layout_locked)
+			lock_layout_toggle->setText(tr("Layout Locked"));
+		else
+			lock_layout_toggle->setText(tr("Layout Unlocked"));
 
 	updateToolBarLockState();
 
@@ -742,6 +755,14 @@ void DockManager::setLayoutLocked(bool locked)
 		// HACK: Make sure the sizes of the tabs get updated.
 		if (stack->tabBar()->count() > 0)
 			stack->tabBar()->setTabText(0, stack->tabBar()->tabText(0));
+	}
+
+	if (write_back)
+	{
+		Host::SetBaseBoolSettingValue("Debugger/UserInterface", "LayoutLocked", m_layout_locked);
+
+		Host::CommitBaseSettingChanges();
+		g_emu_thread->applySettings();
 	}
 }
 

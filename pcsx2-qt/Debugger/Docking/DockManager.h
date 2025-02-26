@@ -12,6 +12,7 @@
 #include <kddockwidgets/core/Draggable_p.h>
 
 #include <QtCore/QPointer>
+#include <QtWidgets/QPushButton>
 #include <QtWidgets/QTabBar>
 
 class DockManager : public QObject
@@ -80,8 +81,10 @@ public:
 	void setPrimaryDebuggerWidget(DebuggerWidget* widget, bool is_primary);
 	void switchToDebuggerWidget(DebuggerWidget* widget);
 
+	void updateStyleSheets();
+
 	bool isLayoutLocked();
-	void setLayoutLocked(bool locked);
+	void setLayoutLocked(bool locked, QPushButton* lock_layout_toggle, bool write_back);
 	void updateToolBarLockState();
 
 	std::optional<BreakPointCpu> cpu();
