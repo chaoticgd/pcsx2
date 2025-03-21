@@ -164,6 +164,22 @@ void DockMenuBar::stopBlink()
 	}
 }
 
+void DockMenuBar::paintEvent(QPaintEvent* event)
+{
+	QPainter painter(this);
+
+	// This fixes the background colour of the menu bar when using the Windows
+	// native theme.
+	QStyleOptionMenuItem menu_option;
+	menu_option.palette = palette();
+	menu_option.state = QStyle::State_None;
+	menu_option.menuItemType = QStyleOptionMenuItem::EmptyArea;
+	menu_option.checkType = QStyleOptionMenuItem::NotCheckable;
+	menu_option.rect = rect();
+	menu_option.menuRect = rect();
+	style()->drawControl(QStyle::CE_MenuBarEmptyArea, &menu_option, &painter, this);
+}
+
 void DockMenuBar::tabChanged(int index)
 {
 	// Prevent recursion.

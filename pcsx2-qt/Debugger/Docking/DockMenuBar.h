@@ -41,6 +41,9 @@ Q_SIGNALS:
 
 	void layoutCanBeReset(DockLayout::Index layout_index, bool* result);
 
+protected:
+	void paintEvent(QPaintEvent* event) override;
+
 private:
 	void tabChanged(int index);
 
