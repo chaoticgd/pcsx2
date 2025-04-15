@@ -63,6 +63,11 @@ if(ENABLE_TESTS)
 	add_subdirectory(tests/ctest)
 endif()
 
+# Requires a BIOS passed as SYSTEM_TEST_BIOS.
+if(ENABLE_SYSTEM_TEST)
+	add_subdirectory(tests/system)
+endif()
+
 # gsrunner
 if(ENABLE_GSRUNNER)
 	add_subdirectory(pcsx2-gsrunner)
