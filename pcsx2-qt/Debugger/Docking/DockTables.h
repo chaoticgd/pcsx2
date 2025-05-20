@@ -30,18 +30,26 @@ namespace DockTables
 
 	extern const std::map<std::string, DebuggerViewDescription> DEBUGGER_VIEWS;
 
-	enum class DefaultDockGroup
+	enum DefaultDockGroup
 	{
-		ROOT = -1,
-		TOP_RIGHT = 0,
-		BOTTOM = 1,
-		TOP_LEFT = 2
+		DDG_ROOT = -1,
+		DDG_TOP_RIGHT = 0,
+		DDG_BOTTOM = 1,
+		DDG_TOP_LEFT = 2
+	};
+
+	enum TimelineDockGroup
+	{
+		TDG_ROOT = -1,
+		TDG_TOP = 0,
+		TDG_BOTTOM_LEFT = 1,
+		TDG_BOTTOM_RIGHT = 2
 	};
 
 	struct DefaultDockGroupDescription
 	{
 		KDDockWidgets::Location location;
-		DefaultDockGroup parent;
+		s32 parent;
 	};
 
 	extern const std::vector<DefaultDockGroupDescription> DEFAULT_DOCK_GROUPS;
@@ -49,7 +57,7 @@ namespace DockTables
 	struct DefaultDockWidgetDescription
 	{
 		std::string type;
-		DefaultDockGroup group;
+		s32 group;
 	};
 
 	struct DefaultDockLayout

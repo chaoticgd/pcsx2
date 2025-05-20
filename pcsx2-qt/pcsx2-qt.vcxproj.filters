@@ -37,6 +37,9 @@
     <Filter Include="Debugger\Memory">
       <UniqueIdentifier>{63790c94-0680-417d-926c-a8b74118f80f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Debugger\Tracing">
+      <UniqueIdentifier>{bd7a4ffe-9cc5-41cd-9c8c-ba68efefad31}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\pcsx2\windows\PCSX2.rc" />
@@ -494,6 +497,30 @@
     <ClCompile Include="Debugger\ThreadView.cpp">
       <Filter>Debugger</Filter>
     </ClCompile>
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineView.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventDetailsView.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventTimelineView.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModel.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Tracing\TimelineModel.cpp">
+      <Filter>Debugger\Tracing</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Tracing\TimelineView.cpp">
+      <Filter>Debugger\Tracing</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Tracing\EventDetailsView.cpp">
+      <Filter>Debugger\Tracing</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Tracing\EventTimelineView.cpp">
+      <Filter>Debugger\Tracing</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="..\pcsx2\windows\PCSX2.manifest">
@@ -728,6 +755,18 @@
     <QtMoc Include="Debugger\ThreadView.h">
       <Filter>Debugger</Filter>
     </QtMoc>
+    <QtMoc Include="Debugger\Tracing\TimelineView.h">
+      <Filter>Debugger\Tracing</Filter>
+    </QtMoc>
+    <QtMoc Include="Debugger\Tracing\TimelineModel.h">
+      <Filter>Debugger\Tracing</Filter>
+    </QtMoc>
+    <QtMoc Include="Debugger\Tracing\EventDetailsView.h">
+      <Filter>Debugger\Tracing</Filter>
+    </QtMoc>
+    <QtMoc Include="Debugger\Tracing\EventTimelineView.h">
+      <Filter>Debugger\Tracing</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <QtResource Include="resources\resources.qrc">
@@ -952,6 +991,12 @@
     </QtUi>
     <QtUi Include="Debugger\ThreadView.ui">
       <Filter>Debugger</Filter>
+    </QtUi>
+    <QtUi Include="Debugger\Tracing\EventDetailsView.ui">
+      <Filter>Debugger\Tracing</Filter>
+    </QtUi>
+    <QtUi Include="Debugger\Tracing\EventTimelineView.ui">
+      <Filter>Debugger\Tracing</Filter>
     </QtUi>
   </ItemGroup>
   <ItemGroup>

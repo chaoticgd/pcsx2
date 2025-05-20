@@ -133,6 +133,19 @@
    <addaction name="actionShutDown"/>
    <addaction name="actionReset"/>
   </widget>
+  <widget class="QToolBar" name="toolBarTracing">
+   <property name="windowTitle">
+    <string>Tracing</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionTraceRecord"/>
+   <addaction name="actionTraceStop"/>
+  </widget>
   <widget class="QToolBar" name="toolBarView">
    <property name="windowTitle">
     <string>View</string>
@@ -328,6 +341,22 @@
   <action name="actionWindowsDummy">
    <property name="text">
     <string/>
+   </property>
+  </action>
+  <action name="actionTraceRecord">
+   <property name="text">
+    <string>Record Trace</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="actionTraceStop">
+   <property name="text">
+    <string>Stop Recording Trace</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
    </property>
   </action>
  </widget>

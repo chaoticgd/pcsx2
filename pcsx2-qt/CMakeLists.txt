@@ -239,6 +239,16 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/SymbolTree/SymbolTreeView.ui
 	Debugger/SymbolTree/TypeString.cpp
 	Debugger/SymbolTree/TypeString.h
+	Debugger/Tracing/EventDetailsView.cpp
+	Debugger/Tracing/EventDetailsView.h
+	Debugger/Tracing/EventDetailsView.ui
+	Debugger/Tracing/EventTimelineView.cpp
+	Debugger/Tracing/EventTimelineView.h
+	Debugger/Tracing/EventTimelineView.ui
+	Debugger/Tracing/TimelineModel.cpp
+	Debugger/Tracing/TimelineModel.h
+	Debugger/Tracing/TimelineView.cpp
+	Debugger/Tracing/TimelineView.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp
 	Tools/InputRecording/NewInputRecordingDlg.h
 	Tools/InputRecording/NewInputRecordingDlg.ui

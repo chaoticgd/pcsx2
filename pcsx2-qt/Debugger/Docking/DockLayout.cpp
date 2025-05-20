@@ -890,7 +890,7 @@ void DockLayout::setupDefaultLayout()
 		if (!groups[static_cast<u32>(dock_description.group)])
 		{
 			KDDockWidgets::QtWidgets::DockWidget* parent = nullptr;
-			if (group.parent != DockTables::DefaultDockGroup::ROOT)
+			if (group.parent >= 0 && group.parent < static_cast<s32>(groups.size()))
 				parent = groups[static_cast<u32>(group.parent)];
 
 			g_debugger_window->addDockWidget(view, group.location, parent);

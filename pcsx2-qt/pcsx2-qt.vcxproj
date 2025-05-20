@@ -137,6 +137,10 @@
     <ClCompile Include="Debugger\Memory\MemoryView.cpp" />
     <ClCompile Include="Debugger\Memory\SavedAddressesModel.cpp" />
     <ClCompile Include="Debugger\Memory\SavedAddressesView.cpp" />
+    <ClCompile Include="Debugger\Tracing\EventDetailsView.cpp" />
+    <ClCompile Include="Debugger\Tracing\EventTimelineView.cpp" />
+    <ClCompile Include="Debugger\Tracing\TimelineModel.cpp" />
+    <ClCompile Include="Debugger\Tracing\TimelineView.cpp" />
     <ClCompile Include="Settings\BIOSSettingsWidget.cpp" />
     <ClCompile Include="Settings\ControllerBindingWidget.cpp" />
     <ClCompile Include="Settings\ControllerGlobalSettingsWidget.cpp" />
@@ -254,6 +258,10 @@
     <QtMoc Include="Debugger\Memory\MemoryView.h" />
     <QtMoc Include="Debugger\Memory\SavedAddressesModel.h" />
     <QtMoc Include="Debugger\Memory\SavedAddressesView.h" />
+    <QtMoc Include="Debugger\Tracing\EventDetailsView.h" />
+    <QtMoc Include="Debugger\Tracing\EventTimelineView.h" />
+    <QtMoc Include="Debugger\Tracing\TimelineModel.h" />
+    <QtMoc Include="Debugger\Tracing\TimelineView.h" />
     <QtMoc Include="Settings\ControllerBindingWidget.h" />
     <QtMoc Include="Settings\ControllerGlobalSettingsWidget.h" />
     <ClInclude Include="Settings\MemoryCardConvertWorker.h" />
@@ -331,6 +339,10 @@
     <ClCompile Include="$(IntDir)Debugger\SymbolTree\moc_SymbolTreeNode.cpp" />
     <ClCompile Include="$(IntDir)Debugger\SymbolTree\moc_SymbolTreeViews.cpp" />
     <ClCompile Include="$(IntDir)Debugger\SymbolTree\moc_TypeString.cpp" />
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventDetailsView.cpp" />
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventTimelineView.cpp" />
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModel.cpp" />
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineView.cpp" />
     <ClCompile Include="$(IntDir)GameList\moc_GameListModel.cpp" />
     <ClCompile Include="$(IntDir)GameList\moc_GameListRefreshThread.cpp" />
     <ClCompile Include="$(IntDir)GameList\moc_GameListWidget.cpp" />
@@ -368,6 +380,8 @@
     <QtUi Include="Debugger\StackView.ui" />
     <QtUi Include="Debugger\SymbolTree\NewSymbolDialog.ui" />
     <QtUi Include="Debugger\SymbolTree\SymbolTreeView.ui" />
+    <QtUi Include="Debugger\Tracing\EventDetailsView.ui" />
+    <QtUi Include="Debugger\Tracing\EventTimelineView.ui" />
     <QtUi Include="Debugger\ThreadView.ui" />
     <QtUi Include="GameList\EmptyGameListWidget.ui" />
     <QtUi Include="GameList\GameListWidget.ui" />

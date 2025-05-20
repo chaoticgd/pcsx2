@@ -13,6 +13,8 @@
 #include "Debugger/Memory/MemoryView.h"
 #include "Debugger/Memory/SavedAddressesView.h"
 #include "Debugger/SymbolTree/SymbolTreeViews.h"
+#include "Debugger/Tracing/EventDetailsView.h"
+#include "Debugger/Tracing/EventTimelineView.h"
 
 using namespace DockUtils;
 
@@ -39,6 +41,8 @@ static void hashString(const char* string, u32& hash);
 const std::map<std::string, DockTables::DebuggerViewDescription> DockTables::DEBUGGER_VIEWS = {
 	DEBUGGER_VIEW(BreakpointView, QT_TRANSLATE_NOOP("DebuggerView", "Breakpoints"), BOTTOM_MIDDLE),
 	DEBUGGER_VIEW(DisassemblyView, QT_TRANSLATE_NOOP("DebuggerView", "Disassembly"), TOP_RIGHT),
+	DEBUGGER_VIEW(EventDetailsView, QT_TRANSLATE_NOOP("DebuggerView", "Event Details"), BOTTOM_RIGHT),
+	DEBUGGER_VIEW(EventTimelineView, QT_TRANSLATE_NOOP("DebuggerView", "Timeline"), TOP_MIDDLE),
 	DEBUGGER_VIEW(FunctionTreeView, QT_TRANSLATE_NOOP("DebuggerView", "Functions"), TOP_LEFT),
 	DEBUGGER_VIEW(GlobalVariableTreeView, QT_TRANSLATE_NOOP("DebuggerView", "Globals"), BOTTOM_MIDDLE),
 	DEBUGGER_VIEW(LocalVariableTreeView, QT_TRANSLATE_NOOP("DebuggerView", "Locals"), BOTTOM_MIDDLE),
@@ -58,60 +62,84 @@ const std::vector<DockTables::DefaultDockLayout> DockTables::DEFAULT_DOCK_LAYOUT
 		.name = QT_TRANSLATE_NOOP("DebuggerLayout", "R5900"),
 		.cpu = BREAKPOINT_EE,
 		.groups = {
-			/* [DefaultDockGroup::TOP_RIGHT] = */ {KDDockWidgets::Location_OnRight, DefaultDockGroup::ROOT},
-			/* [DefaultDockGroup::BOTTOM]    = */ {KDDockWidgets::Location_OnBottom, DefaultDockGroup::TOP_RIGHT},
-			/* [DefaultDockGroup::TOP_LEFT]  = */ {KDDockWidgets::Location_OnLeft, DefaultDockGroup::TOP_RIGHT},
+			/* [DDG_TOP_RIGHT] = */ {KDDockWidgets::Location_OnRight, DDG_ROOT},
+			/* [DDG_BOTTOM]    = */ {KDDockWidgets::Location_OnBottom, DDG_TOP_RIGHT},
+			/* [DDG_TOP_LEFT]  = */ {KDDockWidgets::Location_OnLeft, DDG_TOP_RIGHT},
 		},
 		.widgets = {
-			/* DefaultDockGroup::TOP_RIGHT */
-			{"DisassemblyView", DefaultDockGroup::TOP_RIGHT},
-			/* DefaultDockGroup::BOTTOM */
-			{"MemoryView", DefaultDockGroup::BOTTOM},
-			{"BreakpointView", DefaultDockGroup::BOTTOM},
-			{"ThreadView", DefaultDockGroup::BOTTOM},
-			{"StackView", DefaultDockGroup::BOTTOM},
-			{"SavedAddressesView", DefaultDockGroup::BOTTOM},
-			{"GlobalVariableTreeView", DefaultDockGroup::BOTTOM},
-			{"LocalVariableTreeView", DefaultDockGroup::BOTTOM},
-			{"ParameterVariableTreeView", DefaultDockGroup::BOTTOM},
-			/* DefaultDockGroup::TOP_LEFT */
-			{"RegisterView", DefaultDockGroup::TOP_LEFT},
-			{"FunctionTreeView", DefaultDockGroup::TOP_LEFT},
-			{"MemorySearchView", DefaultDockGroup::TOP_LEFT},
+			/* DDG_TOP_RIGHT */
+			{"DisassemblyView", DDG_TOP_RIGHT},
+			/* DDG_BOTTOM */
+			{"MemoryView", DDG_BOTTOM},
+			{"BreakpointView", DDG_BOTTOM},
+			{"ThreadView", DDG_BOTTOM},
+			{"StackView", DDG_BOTTOM},
+			{"SavedAddressesView", DDG_BOTTOM},
+			{"GlobalVariableTreeView", DDG_BOTTOM},
+			{"LocalVariableTreeView", DDG_BOTTOM},
+			{"ParameterVariableTreeView", DDG_BOTTOM},
+			/* DDG_TOP_LEFT */
+			{"RegisterView", DDG_TOP_LEFT},
+			{"FunctionTreeView", DDG_TOP_LEFT},
+			{"MemorySearchView", DDG_TOP_LEFT},
 		},
 		.toolbars = {
 			"toolBarDebug",
 			"toolBarFile",
+			"toolBarTracing",
 		},
 	},
 	{
 		.name = QT_TRANSLATE_NOOP("DebuggerLayout", "R3000"),
 		.cpu = BREAKPOINT_IOP,
 		.groups = {
-			/* [DefaultDockGroup::TOP_RIGHT] = */ {KDDockWidgets::Location_OnRight, DefaultDockGroup::ROOT},
-			/* [DefaultDockGroup::BOTTOM]    = */ {KDDockWidgets::Location_OnBottom, DefaultDockGroup::TOP_RIGHT},
-			/* [DefaultDockGroup::TOP_LEFT]  = */ {KDDockWidgets::Location_OnLeft, DefaultDockGroup::TOP_RIGHT},
+			/* [DDG_TOP_RIGHT] = */ {KDDockWidgets::Location_OnRight, DDG_ROOT},
+			/* [DDG_BOTTOM]    = */ {KDDockWidgets::Location_OnBottom, DDG_TOP_RIGHT},
+			/* [DDG_TOP_LEFT]  = */ {KDDockWidgets::Location_OnLeft, DDG_TOP_RIGHT},
 		},
 		.widgets = {
-			/* DefaultDockGroup::TOP_RIGHT */
-			{"DisassemblyView", DefaultDockGroup::TOP_RIGHT},
-			/* DefaultDockGroup::BOTTOM */
-			{"MemoryView", DefaultDockGroup::BOTTOM},
-			{"BreakpointView", DefaultDockGroup::BOTTOM},
-			{"ThreadView", DefaultDockGroup::BOTTOM},
-			{"StackView", DefaultDockGroup::BOTTOM},
-			{"SavedAddressesView", DefaultDockGroup::BOTTOM},
-			{"GlobalVariableTreeView", DefaultDockGroup::BOTTOM},
-			{"LocalVariableTreeView", DefaultDockGroup::BOTTOM},
-			{"ParameterVariableTreeView", DefaultDockGroup::BOTTOM},
-			/* DefaultDockGroup::TOP_LEFT */
-			{"RegisterView", DefaultDockGroup::TOP_LEFT},
-			{"FunctionTreeView", DefaultDockGroup::TOP_LEFT},
-			{"MemorySearchView", DefaultDockGroup::TOP_LEFT},
+			/* DDG_TOP_RIGHT */
+			{"DisassemblyView", DDG_TOP_RIGHT},
+			/* DDG_BOTTOM */
+			{"MemoryView", DDG_BOTTOM},
+			{"BreakpointView", DDG_BOTTOM},
+			{"ThreadView", DDG_BOTTOM},
+			{"StackView", DDG_BOTTOM},
+			{"SavedAddressesView", DDG_BOTTOM},
+			{"GlobalVariableTreeView", DDG_BOTTOM},
+			{"LocalVariableTreeView", DDG_BOTTOM},
+			{"ParameterVariableTreeView", DDG_BOTTOM},
+			/* DDG_TOP_LEFT */
+			{"RegisterView", DDG_TOP_LEFT},
+			{"FunctionTreeView", DDG_TOP_LEFT},
+			{"MemorySearchView", DDG_TOP_LEFT},
 		},
 		.toolbars = {
 			"toolBarDebug",
 			"toolBarFile",
+			"toolBarTracing",
+		},
+	},
+	{
+		.name = QT_TRANSLATE_NOOP("DebuggerLayout", "Timeline"),
+		.cpu = BREAKPOINT_EE,
+		.groups = {
+			/* [TDG_TOP]          = */ {KDDockWidgets::Location_OnTop, TDG_ROOT},
+			/* [TDG_BOTTOM_LEFT]  = */ {KDDockWidgets::Location_OnBottom, TDG_TOP},
+			/* [TDG_BOTTOM_RIGHT] = */ {KDDockWidgets::Location_OnRight, TDG_BOTTOM_LEFT},
+		},
+		.widgets = {
+			/* TDG_TOP */
+			{"EventTimelineView", TDG_TOP},
+			/* TDG_BOTTOM_LEFT */
+			{"MemoryView", TDG_BOTTOM_LEFT},
+			/* TDG_BOTTOM_RIGHT */
+			{"EventDetailsView", TDG_BOTTOM_RIGHT},
+		},
+		.toolbars = {
+			"toolBarDebug",
+			"toolBarFile",
+			"toolBarTracing",
 		},
 	},
 };
