@@ -7,7 +7,7 @@
 
 #include "Debugger/DebuggerView.h"
 #include "Debugger/Tracing/TimelineView.h"
-#include "Debugger/Tracing/TimelineModel.h"
+#include "Debugger/Tracing/TimelineModels.h"
 
 class EventTimelineView final : public DebuggerView
 {
@@ -20,5 +20,6 @@ private:
 	Ui::EventTimelineView m_ui;
 
 	TimelineView* m_view;
-	DemoTimelineModel m_model;
+	DemoTimelineModel m_base_model;
+	CachedTimelineModel m_cached_model;
 };

@@ -139,7 +139,7 @@
     <ClCompile Include="Debugger\Memory\SavedAddressesView.cpp" />
     <ClCompile Include="Debugger\Tracing\EventDetailsView.cpp" />
     <ClCompile Include="Debugger\Tracing\EventTimelineView.cpp" />
-    <ClCompile Include="Debugger\Tracing\TimelineModel.cpp" />
+    <ClCompile Include="Debugger\Tracing\TimelineModels.cpp" />
     <ClCompile Include="Debugger\Tracing\TimelineView.cpp" />
     <ClCompile Include="Settings\BIOSSettingsWidget.cpp" />
     <ClCompile Include="Settings\ControllerBindingWidget.cpp" />
@@ -260,7 +260,7 @@
     <QtMoc Include="Debugger\Memory\SavedAddressesView.h" />
     <QtMoc Include="Debugger\Tracing\EventDetailsView.h" />
     <QtMoc Include="Debugger\Tracing\EventTimelineView.h" />
-    <QtMoc Include="Debugger\Tracing\TimelineModel.h" />
+    <QtMoc Include="Debugger\Tracing\TimelineModels.h" />
     <QtMoc Include="Debugger\Tracing\TimelineView.h" />
     <QtMoc Include="Settings\ControllerBindingWidget.h" />
     <QtMoc Include="Settings\ControllerGlobalSettingsWidget.h" />
@@ -341,7 +341,7 @@
     <ClCompile Include="$(IntDir)Debugger\SymbolTree\moc_TypeString.cpp" />
     <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventDetailsView.cpp" />
     <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventTimelineView.cpp" />
-    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModel.cpp" />
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModels.cpp" />
     <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineView.cpp" />
     <ClCompile Include="$(IntDir)GameList\moc_GameListModel.cpp" />
     <ClCompile Include="$(IntDir)GameList\moc_GameListRefreshThread.cpp" />

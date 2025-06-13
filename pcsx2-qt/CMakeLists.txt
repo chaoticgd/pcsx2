@@ -245,8 +245,8 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/Tracing/EventTimelineView.cpp
 	Debugger/Tracing/EventTimelineView.h
 	Debugger/Tracing/EventTimelineView.ui
-	Debugger/Tracing/TimelineModel.cpp
-	Debugger/Tracing/TimelineModel.h
+	Debugger/Tracing/TimelineModels.cpp
+	Debugger/Tracing/TimelineModels.h
 	Debugger/Tracing/TimelineView.cpp
 	Debugger/Tracing/TimelineView.h
 	Tools/InputRecording/NewInputRecordingDlg.cpp

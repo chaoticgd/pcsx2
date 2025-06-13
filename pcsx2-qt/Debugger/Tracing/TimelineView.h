@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Debugger/Tracing/TimelineModel.h"
+#include "Debugger/Tracing/TimelineModels.h"
 
 #include <QtWidgets/QAbstractScrollArea>
 
@@ -122,10 +122,11 @@ protected:
 	void paintEvent(QPaintEvent* event) override;
 
 private:
-	void drawChannelChildren(TimelineModel::ChannelID parent, int& index, int depth, QPainter& painter);
-	void drawChannel(TimelineModel::ChannelID channel, int index, int depth, QPainter& painter);
+	size_t drawChannelChildren(TimelineModel::ChannelID parent, int& index, int depth, QPainter& painter);
+	size_t drawChannel(TimelineModel::ChannelID channel, int index, int depth, QPainter& painter);
 	void drawChannelName(TimelineModel::ChannelID channel, int index, int depth, QPainter& painter);
-	QRect drawEvent(const TimelineModel::EventDetails& event, int channel_index, QPainter& painter);
+	QRect drawEvent(
+		const TimelineModel::EventDetails& event, int channel_index, bool is_placeholder, QPainter& painter);
 
 	QRect channelRect(int index);
 	QRect channelNameRect(int index);

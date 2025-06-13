@@ -506,10 +506,10 @@
     <ClCompile Include="$(IntDir)Debugger\Tracing\moc_EventTimelineView.cpp">
       <Filter>moc</Filter>
     </ClCompile>
-    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModel.cpp">
+    <ClCompile Include="$(IntDir)Debugger\Tracing\moc_TimelineModels.cpp">
       <Filter>moc</Filter>
     </ClCompile>
-    <ClCompile Include="Debugger\Tracing\TimelineModel.cpp">
+    <ClCompile Include="Debugger\Tracing\TimelineModels.cpp">
       <Filter>Debugger\Tracing</Filter>
     </ClCompile>
     <ClCompile Include="Debugger\Tracing\TimelineView.cpp">
@@ -758,7 +758,7 @@
     <QtMoc Include="Debugger\Tracing\TimelineView.h">
       <Filter>Debugger\Tracing</Filter>
     </QtMoc>
-    <QtMoc Include="Debugger\Tracing\TimelineModel.h">
+    <QtMoc Include="Debugger\Tracing\TimelineModels.h">
       <Filter>Debugger\Tracing</Filter>
     </QtMoc>
     <QtMoc Include="Debugger\Tracing\EventDetailsView.h">

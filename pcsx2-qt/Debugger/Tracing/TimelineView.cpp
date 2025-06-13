@@ -9,6 +9,13 @@
 #include <QtGui/QPainter>
 #include <QtWidgets/QStyleOptionHeader>
 
+#define PROFILE_TIMELINE_PAINT_EVENT
+
+#ifdef PROFILE_TIMELINE_PAINT_EVENT
+#include <common/Console.h>
+#include <common/Timer.h>
+#endif
+
 TimelineView::TimelineView(QWidget* parent)
 	: QAbstractScrollArea(parent)
 {
@@ -33,6 +40,13 @@ void TimelineView::setModel(TimelineModel* model)
 		view->m_scroll_x = 0;
 		view->m_scroll_y = 0;
 		view->m_zoom_x = (view->width() - view->channelNameColumnWidth()) / max_delta;
+
+		connect(view->m_model, &TimelineModel::dataChanged, view, [view]() {
+			if (!view)
+				return;
+
+			view->m_viewport->update();
+		});
 
 		view->update();
 	});
@@ -98,6 +112,8 @@ void TimelineView::zoom(QPoint pixel_delta)
 	else if (pixel_delta.x() < 0)
 		m_zoom_x *= 2.f / 3.f;
 
+	m_model->viewChanged(minVisibleTime(), maxVisibleTime(), m_viewport->width() - channelNameColumnWidth());
+
 	if (m_zoom_x != old_zoom_x)
 		update();
 }
@@ -117,6 +133,8 @@ void TimelineView::scroll(QPoint pixel_delta)
 	m_scroll_y -= pixel_delta.y() / abs(pixel_delta.y());
 	m_scroll_y = std::max(0, m_scroll_y);
 	m_scroll_y = std::min(max_rows - max_channels_fully_visible, m_scroll_y);
+
+	m_model->viewChanged(minVisibleTime(), maxVisibleTime(), m_viewport->width() - channelNameColumnWidth());
 
 	if (m_scroll_x != old_scroll_x || m_scroll_y != old_scroll_y)
 		update();
@@ -152,6 +170,8 @@ void TimelineView::updateGeometries()
 {
 	setViewportMargins(0, m_ruler->sizeHint().height() - 1, 0, 0);
 	m_ruler->setGeometry(0, 0, viewport()->width(), m_ruler->height());
+
+	m_model->viewChanged(minVisibleTime(), maxVisibleTime(), m_viewport->width() - channelNameColumnWidth());
 }
 
 void TimelineView::resizeEvent(QResizeEvent* event)
@@ -437,13 +457,17 @@ void TimelineViewportWidget::leaveEvent(QEvent* event)
 
 void TimelineViewportWidget::paintEvent(QPaintEvent* event)
 {
+#ifdef PROFILE_TIMELINE_PAINT_EVENT
+	Common::Timer timer;
+#endif
+
 	QPainter painter(this);
 
 	m_index_to_channel.clear();
 
 	// Draw all the channels and events.
 	int index = 0;
-	drawChannelChildren(model()->rootChannel(), index, 0, painter);
+	[[maybe_unused]] size_t events_drawn = drawChannelChildren(model()->rootChannel(), index, 0, painter);
 	m_visible_channel_count = index;
 
 	// Fill in the remaining space.
@@ -476,30 +500,39 @@ void TimelineViewportWidget::paintEvent(QPaintEvent* event)
 		painter.setPen(palette().highlight().color());
 		painter.drawLine(seek_x - 1, 0, seek_x - 1, height());
 	}
+
+#ifdef PROFILE_TIMELINE_PAINT_EVENT
+	Console.WriteLn("TimelineViewportWidget::paintEvent took %fms to draw %zu events",
+		timer.GetTimeMilliseconds(), events_drawn);
+#endif
 }
 
-void TimelineViewportWidget::drawChannelChildren(
+size_t TimelineViewportWidget::drawChannelChildren(
 	TimelineModel::ChannelID parent, int& index, int depth, QPainter& painter)
 {
+	size_t events_drawn = 0;
+
 	for (TimelineModel::ChannelID child : model()->channelChildren(parent))
 	{
-		drawChannel(child, index, depth, painter);
+		events_drawn += drawChannel(child, index, depth, painter);
 		index++;
 
 		auto collapsed = m_channel_collapsed.find(child);
 		if (collapsed == m_channel_collapsed.end() || !collapsed->second)
-			drawChannelChildren(child, index, depth + 1, painter);
+			events_drawn += drawChannelChildren(child, index, depth + 1, painter);
 	}
+
+	return events_drawn;
 }
 
-void TimelineViewportWidget::drawChannel(
+size_t TimelineViewportWidget::drawChannel(
 	TimelineModel::ChannelID channel, int index, int depth, QPainter& painter)
 {
 	m_index_to_channel[index] = channel;
 
 	const QRect channel_rect = channelRect(index);
 	if (!channel_rect.intersects(rect()))
-		return;
+		return 0;
 
 	// Draw the background.
 	QColor background_colour;
@@ -512,21 +545,36 @@ void TimelineViewportWidget::drawChannel(
 	// Draw the channel name column.
 	drawChannelName(channel, index, depth, painter);
 
-	// Draw all the events.
+	painter.setClipRect(eventsClipRect());
+
+	model()->startProcessingEvents(channel);
+
+	// Draw placeholder events. If the normal event data isn't ready yet, these
+	// get drawn behind the regular events to fill in gaps.
+	std::optional<const std::vector<TimelineModel::EventDetails>*> placeholder_events =
+		model()->placeholderEvents(channel);
+	if (placeholder_events.has_value())
+		for (const TimelineModel::EventDetails& placeholder : **placeholder_events)
+			drawEvent(placeholder, index, true, painter);
+
 	std::optional<TimelineModel::EventDetails> event = model()->firstEvent(
 		channel, m_view->minVisibleTime(), m_view->maxVisibleTime());
 
-	painter.setClipRect(eventsClipRect());
-
+	// Draw the regular events.
+	size_t events_drawn = 0;
 	QRect selected_event_rect;
 	while (event.has_value())
 	{
-		QRect event_rect = drawEvent(*event, index, painter);
+		QRect event_rect = drawEvent(*event, index, false, painter);
 		if (event->id == m_selected_event)
 			selected_event_rect = event_rect;
 
+		events_drawn++;
+
 		event = model()->nextEvent(event->id, m_view->maxVisibleTime());
 	}
+
+	model()->finishProcessingEvents(channel);
 
 	// Draw the selection highlight last so it doesn't get partially covered if
 	// another event comes directly after it.
@@ -539,6 +587,8 @@ void TimelineViewportWidget::drawChannel(
 	}
 
 	painter.setClipRect(rect());
+
+	return events_drawn;
 }
 
 void TimelineViewportWidget::drawChannelName(
@@ -587,7 +637,8 @@ static QColor getFusionHeaderColour(const QPalette& palette)
 	return title_line_color.lighter(104);
 }
 
-QRect TimelineViewportWidget::drawEvent(const TimelineModel::EventDetails& event, int channel_index, QPainter& painter)
+QRect TimelineViewportWidget::drawEvent(
+	const TimelineModel::EventDetails& event, int channel_index, bool is_placeholder, QPainter& painter)
 {
 	const int start_pos = static_cast<int>(m_view->pixelsFromTime(event.start_time - m_view->minVisibleTime()));
 	const int end_pos = static_cast<int>(m_view->pixelsFromTime(event.stop_time - m_view->minVisibleTime()));
@@ -616,10 +667,12 @@ QRect TimelineViewportWidget::drawEvent(const TimelineModel::EventDetails& event
 	QColor event_background_colour = event_colour;
 	if (event.id == m_hovered_event || event.id == m_selected_event)
 		event_background_colour = event_background_colour.lighter();
+	if (is_placeholder)
+		event_background_colour.setAlpha(64);
 	painter.fillRect(bounds.marginsRemoved(QMargins(0, 2, -1, 1)), event_background_colour);
 
 	// Only draw the borders if there's enough space.
-	if (event_width > 2)
+	if (event_width > 2 && !is_placeholder)
 	{
 		painter.setPen(event_colour.darker());
 		painter.drawRect(bounds.marginsRemoved(QMargins(0, 2, 0, 2)));
@@ -632,12 +685,12 @@ QRect TimelineViewportWidget::drawEvent(const TimelineModel::EventDetails& event
 	}
 
 	// Only draw text if there's enough space.
-	if (event_width > 8)
+	if (event_width > 8 && !is_placeholder)
 	{
 		painter.setPen(palette().text().color());
 		QRect text_bounds = bounds.marginsRemoved(QMargins(4, 0, 4, 0));
 		text_bounds.setLeft(std::max(text_bounds.left(), m_view->channelNameColumnWidth()));
-		painter.drawText(text_bounds, Qt::AlignLeft | Qt::AlignVCenter, model()->eventName(event.id));
+		painter.drawText(text_bounds, Qt::AlignLeft | Qt::AlignVCenter, model()->eventText(event.id));
 	}
 
 	return bounds;
