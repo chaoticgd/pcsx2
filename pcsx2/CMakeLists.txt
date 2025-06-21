@@ -1063,7 +1063,7 @@ set(pcsx2LTOSources
 
 if(_M_X86)
 	list(APPEND pcsx2LTOSources ${pcsx2x86Sources} ${pcsx2x86Headers})
-	target_link_libraries(PCSX2_FLAGS INTERFACE zydis)
+	target_link_libraries(PCSX2_FLAGS INTERFACE "Zydis")
 elseif(_M_ARM64)
 	list(APPEND pcsx2LTOSources ${pcsx2arm64Sources} ${pcsx2arm64Headers})
 	target_link_libraries(PCSX2_FLAGS INTERFACE vixl)
