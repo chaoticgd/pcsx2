@@ -7,7 +7,6 @@ endif(NOT TOP_CMAKE_WAS_SOURCED)
 
 add_library(common)
 
-# x86emitter sources
 target_sources(common PRIVATE
 	AlignedMalloc.cpp
 	Assertions.cpp
@@ -19,6 +18,7 @@ target_sources(common PRIVATE
 	FileSystem.cpp
 	HostSys.cpp
 	Image.cpp
+	HostDebug.cpp
 	HTTPDownloader.cpp
 	MemorySettingsInterface.cpp
 	MD5Digest.cpp
@@ -36,7 +36,6 @@ target_sources(common PRIVATE
 	WindowInfo.cpp
 )
 
-# x86emitter headers
 target_sources(common PRIVATE
 	AlignedMalloc.h
 	Assertions.h
@@ -58,6 +57,7 @@ target_sources(common PRIVATE
 	Image.h
 	LRUCache.h
 	HeapArray.h
+	HostDebug.h
 	HTTPDownloader.h
 	MemorySettingsInterface.h
 	MD5Digest.h

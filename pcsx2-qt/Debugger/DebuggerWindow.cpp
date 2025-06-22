@@ -11,9 +11,12 @@
 #include "DebugTools/MIPSAnalyst.h"
 #include "DebugTools/MipsStackWalk.h"
 #include "DebugTools/SymbolImporter.h"
+#include "Tracing/TraceRecorder.h"
 #include "QtHost.h"
 #include "MainWindow.h"
 #include "AnalysisOptionsDialog.h"
+
+#include "common/Console.h"
 
 #include <QtWidgets/QMessageBox>
 
@@ -121,6 +124,21 @@ DebuggerWindow::DebuggerWindow(QWidget* parent)
 	});
 
 	updateFromSettings();
+
+	connect(m_ui.actionTraceRecord, &QAction::triggered, this, []() {
+		Host::RunOnCPUThread([]() {
+			Error error;
+			if (!Tracing::g_recorder.BeginTrace(&error))
+			{
+				Console.Error(error.GetDescription());
+				return;
+			}
+		});
+	});
+
+	connect(m_ui.actionTraceStop, &QAction::triggered, this, []() {
+
+	});
 }
 
 DebuggerWindow* DebuggerWindow::getInstance()

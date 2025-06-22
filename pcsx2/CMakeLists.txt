@@ -818,6 +818,16 @@ set(pcsx2DebugToolsHeaders
 	DebugTools/DisVUops.h
 	DebugTools/BiosDebugData.h)
 
+set(pcsx2TracingSources
+	Tracing/ReplayManager.cpp
+	Tracing/TraceRecorder.cpp)
+
+set(pcsx2TracingHeaders
+	Tracing/ReplayManager.h
+	Tracing/TraceFormat.h
+	Tracing/TraceInstrumentation.h
+	Tracing/TraceRecorder.h)
+
 set(pcsx2HostSources
 	Host/AudioStream.cpp
 	Host/CubebAudioStream.cpp
@@ -1093,6 +1103,8 @@ target_sources(PCSX2 PRIVATE
 	${pcsx2RecordingSources}
 	${pcsx2DebugToolsSources}
 	${pcsx2DebugToolsHeaders}
+	${pcsx2TracingSources}
+	${pcsx2TracingHeaders}
 	${pcsx2HostSources}
 	${pcsx2HostHeaders}
 	${pcsx2ImGuiSources}

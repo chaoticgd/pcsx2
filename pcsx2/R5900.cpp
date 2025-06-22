@@ -25,6 +25,7 @@
 #include "DebugTools/Breakpoints.h"
 #include "DebugTools/MIPSAnalyst.h"
 #include "DebugTools/SymbolGuardian.h"
+#include "Tracing/TraceInstrumentation.h"
 #include "R5900OpcodeTables.h"
 
 #include "fmt/format.h"
@@ -34,7 +35,7 @@ using namespace R5900;	// for R5900 disasm tools
 s32 EEsCycle;		// used to sync the IOP to the EE
 u32 EEoCycle;
 
-alignas(16) cpuRegistersPack _cpuRegistersPack;
+PXTRACE_GLOBAL(_cpuRegistersPack, alignas(16) cpuRegistersPack _cpuRegistersPack);
 alignas(16) tlbs tlb[48];
 cachedTlbs_t cachedTlbs;
 

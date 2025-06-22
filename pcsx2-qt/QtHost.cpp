@@ -33,6 +33,7 @@
 #include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
+#include "pcsx2/Tracing/TraceInstrumentation.h"
 
 #include "common/Assertions.h"
 #include "common/Console.h"
@@ -2409,8 +2410,12 @@ int main(int argc, char* argv[])
 	else if (!s_nogui_mode)
 		g_main_window->startupUpdateCheck();
 
+	PXTRACE_PUSH_PROMISE(Tracing::NO_READS | Tracing::NO_WRITES);
+
 	// This doesn't return until we exit.
 	result = app.exec();
+	
+	PXTRACE_POP_PROMISE();
 
 shutdown_and_exit:
 	// Shutting down.
