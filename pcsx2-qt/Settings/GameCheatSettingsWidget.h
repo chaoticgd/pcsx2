@@ -21,8 +21,6 @@ namespace GameList
 	struct Entry;
 }
 
-class SettingsWindow;
-
 class GameCheatSettingsWidget : public QWidget
 {
 	Q_OBJECT
