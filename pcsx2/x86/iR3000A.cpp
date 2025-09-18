@@ -43,6 +43,7 @@ using namespace x86Emitter;
 
 extern void psxBREAK();
 
+std::atomic_bool g_iopCpuExecuting = false;
 u32 g_psxMaxRecMem = 0;
 
 uptr psxRecLUT[0x10000];
@@ -957,6 +958,8 @@ static void iopClearRecLUT(BASEBLOCK* base, int count)
 
 static __noinline s32 recExecuteBlock(s32 eeCycles)
 {
+	g_iopCpuExecuting = true;
+
 	psxRegs.iopBreak = 0;
 	psxRegs.iopCycleEE = eeCycles;
 
@@ -982,6 +985,8 @@ static __noinline s32 recExecuteBlock(s32 eeCycles)
 	// 	lea         eax,[edx+ecx]
 
 	((void (*)())iopEnterRecompiledCode)();
+
+	g_iopCpuExecuting = false;
 
 	return psxRegs.iopBreak + psxRegs.iopCycleEE;
 }

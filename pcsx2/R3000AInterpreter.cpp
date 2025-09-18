@@ -15,6 +15,7 @@ using namespace R3000A;
 
 // Used to flag delay slot instructions when throwig exceptions.
 bool iopIsDelaySlot = false;
+std::atomic_bool g_iopInterpretedCpuExecuting = false;
 
 static bool branch2 = 0;
 static u32 branchPC;
@@ -263,6 +264,8 @@ static void intReset() {
 
 static s32 intExecuteBlock( s32 eeCycles )
 {
+	g_iopInterpretedCpuExecuting = true;
+
 	psxRegs.iopBreak = 0;
 	psxRegs.iopCycleEE = eeCycles;
 	u32 lastIOPCycle = 0;
@@ -295,6 +298,8 @@ static s32 intExecuteBlock( s32 eeCycles )
 			psxRegs.iopCycleEE -= (psxRegs.cycle - lastIOPCycle) * 8;
 		}
 	}
+
+	g_iopInterpretedCpuExecuting = false;
 
 	return psxRegs.iopBreak + psxRegs.iopCycleEE;
 }

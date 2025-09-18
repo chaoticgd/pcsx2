@@ -282,6 +282,9 @@ static fpuRegisters& fpuRegs = _cpuRegistersPack.fpuRegs;
 
 extern bool eeEventTestIsActive;
 
+extern std::atomic_bool g_eeCpuExecuting;
+extern std::atomic_bool g_eeInterpretedCpuExecuting;
+
 void intUpdateCPUCycles();
 void intSetBranch();
 

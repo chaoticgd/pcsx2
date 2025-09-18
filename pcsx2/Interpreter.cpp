@@ -24,6 +24,8 @@ static bool intExitExecution = false;
 static fastjmp_buf intJmpBuf;
 static u32 intLastBranchTo;
 
+std::atomic_bool g_eeInterpretedCpuExecuting = false;
+
 static void intEventTest();
 
 void intUpdateCPUCycles()
@@ -589,6 +591,8 @@ static void intExecute()
 	if (fastjmp_set(&intJmpBuf) != 0)
 		return;
 
+	g_eeInterpretedCpuExecuting = true;
+
 	for (;;)
 	{
 		if (!VMManager::Internal::HasBootedELF())
@@ -650,6 +654,8 @@ static void intExecute()
 				execI();
 		}
 	}
+
+	g_eeInterpretedCpuExecuting = false;
 }
 
 static void intStep()

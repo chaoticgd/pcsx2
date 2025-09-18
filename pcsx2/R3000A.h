@@ -174,6 +174,9 @@ extern u32 psxNextStartCounter;
 extern bool iopEventAction;
 extern bool iopEventTestIsActive;
 
+extern std::atomic_bool g_iopCpuExecuting;
+extern std::atomic_bool g_iopInterpretedCpuExecuting;
+
 // Branching status used when throwing exceptions.
 extern bool iopIsDelaySlot;
 

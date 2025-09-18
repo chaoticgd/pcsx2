@@ -739,6 +739,29 @@ std::vector<IopMod> R5900DebugInterface::GetModuleList() const
 	return {};
 }
 
+std::map<u32, u64> R5900DebugInterface::RunSamplingProfiler(
+	size_t sample_count, std::chrono::nanoseconds interval, const std::atomic_bool* interrupt) const
+{
+	std::chrono::time_point time = std::chrono::steady_clock::now();
+
+	std::map<u32, u64> samples;
+	for (size_t i = 0; i < sample_count; i++)
+	{
+		if (interrupt && *interrupt)
+			return {};
+
+		if (g_eeCpuExecuting || g_eeInterpretedCpuExecuting)
+		{
+			samples[cpuRegs.pc]++;
+		} else printf("nah\n");
+
+		time += interval;
+		std::this_thread::sleep_until(time);
+	}
+
+	return samples;
+}
+
 //
 // R3000DebugInterface
 //
@@ -1070,6 +1093,27 @@ std::vector<std::unique_ptr<BiosThread>> R3000DebugInterface::GetThreadList() co
 std::vector<IopMod> R3000DebugInterface::GetModuleList() const
 {
 	return getIOPModules();
+}
+
+std::map<u32, u64> R3000DebugInterface::RunSamplingProfiler(
+	size_t sample_count, std::chrono::nanoseconds interval, const std::atomic_bool* interrupt) const
+{
+	std::chrono::time_point time = std::chrono::steady_clock::now();
+
+	std::map<u32, u64> samples;
+	for (size_t i = 0; i < sample_count; i++)
+	{
+		if (interrupt && *interrupt)
+			return {};
+
+		if (g_iopCpuExecuting || g_iopInterpretedCpuExecuting)
+			samples[psxRegs.pc]++;
+
+		time += interval;
+		std::this_thread::sleep_until(time);
+	}
+
+	return samples;
 }
 
 ElfMemoryReader::ElfMemoryReader(const ccc::ElfFile& elf)

@@ -189,6 +189,11 @@ target_sources(pcsx2-qt PRIVATE
 	Debugger/ModuleModel.h
 	Debugger/ModuleView.cpp
 	Debugger/ModuleView.h
+	Debugger/ProfilerModel.cpp
+	Debugger/ProfilerModel.h
+	Debugger/ProfilerView.cpp
+	Debugger/ProfilerView.h
+	Debugger/ProfilerView.ui
 	Debugger/RegisterView.cpp
 	Debugger/RegisterView.h
 	Debugger/RegisterView.ui

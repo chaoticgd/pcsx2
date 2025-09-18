@@ -40,8 +40,9 @@
 using namespace x86Emitter;
 using namespace R5900;
 
+std::atomic_bool g_eeCpuExecuting = false;
+
 static bool eeRecNeedsReset = false;
-static bool eeCpuExecuting = false;
 static bool eeRecExitRequested = false;
 static bool g_resetEeScalingStats = false;
 
@@ -652,7 +653,7 @@ static void recSafeExitExecution()
 
 static void recResetEE()
 {
-	if (eeCpuExecuting)
+	if (g_eeCpuExecuting)
 	{
 		// get outta here as soon as we can
 		eeRecNeedsReset = true;
@@ -684,13 +685,13 @@ static void recExecute()
 	// but will return the longjmp 2nd parameter (here 1)
 	if (!fastjmp_set(&m_SetJmp_StateCheck))
 	{
-		eeCpuExecuting = true;
+		g_eeCpuExecuting = true;
 		((void (*)())EnterRecompiledCode)();
 
 		// Generally unreachable code here ...
 	}
 
-	eeCpuExecuting = false;
+	g_eeCpuExecuting = false;
 
 	EE::Profiler.Print();
 }

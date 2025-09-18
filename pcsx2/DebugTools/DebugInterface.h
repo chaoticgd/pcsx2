@@ -92,6 +92,9 @@ public:
 	virtual std::vector<std::unique_ptr<BiosThread>> GetThreadList() const = 0;
 	virtual std::vector<IopMod> GetModuleList() const = 0;
 
+	virtual std::map<u32, u64> RunSamplingProfiler(
+		size_t sample_count, std::chrono::nanoseconds interval, const std::atomic_bool* interrupt) const = 0;
+
 	bool isAlive();
 	bool isCpuPaused();
 	void pauseCpu();
@@ -158,6 +161,9 @@ public:
 	bool isValidAddress(u32 address) override;
 	u32 getCycles() override;
 	BreakPointCpu getCpuType() override;
+
+	std::map<u32, u64> RunSamplingProfiler(
+		size_t sample_count, std::chrono::nanoseconds interval, const std::atomic_bool* interrupt) const override;
 };
 
 class R3000DebugInterface : public DebugInterface
@@ -202,6 +208,9 @@ public:
 	bool isValidAddress(u32 address) override;
 	u32 getCycles() override;
 	BreakPointCpu getCpuType() override;
+
+	std::map<u32, u64> RunSamplingProfiler(
+		size_t sample_count, std::chrono::nanoseconds interval, const std::atomic_bool* interrupt) const override;
 };
 
 // Provides access to the loadable segments from the ELF as they are on disk.
