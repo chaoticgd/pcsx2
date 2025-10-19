@@ -1,4 +1,5 @@
 add_pcsx2_test(core_test
+	pnach_tests.cpp
 	StubHost.cpp
 )
 

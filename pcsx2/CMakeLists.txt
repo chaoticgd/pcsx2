@@ -95,6 +95,7 @@ set(pcsx2Sources
 	Patch.cpp
 	Pcsx2Config.cpp
 	PerformanceMetrics.cpp
+	Pnach.cpp
 	PrecompiledHeader.cpp
 	R3000A.cpp
 	R3000AInterpreter.cpp
@@ -175,6 +176,7 @@ set(pcsx2Headers
 	MemoryTypes.h
 	Patch.h
 	PerformanceMetrics.h
+	Pnach.h
 	PrecompiledHeader.h
 	R3000A.h
 	R5900.h
