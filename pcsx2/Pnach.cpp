@@ -98,15 +98,15 @@ static bool HexStringIsLowerCase(std::string_view string)
 	return true;
 }
 
-std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter, Error* error)
+std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameters, Error* error)
 {
 	Patch patch;
 
-	const std::vector<std::string_view> pieces(StringUtil::SplitString(parameter, ',', false));
+	const std::vector<std::string_view> pieces(StringUtil::SplitString(parameters, ',', false));
 	if (pieces.size() != 5)
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("Pnach", "Got {} comma-separated patch parameters, expected 5: <place>,<cpu>,<address>,<type>,<data>."), pieces.size());
+			TRANSLATE_FS("Pnach", "Found {} comma-separated patch parameters, expected 5: <place>,<cpu>,<address>,<type>,<data>."), pieces.size());
 		return std::nullopt;
 	}
 
@@ -114,7 +114,7 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	if (!place.has_value())
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("Pnach", "Invalid place '{}' specified as first patch parameter, expected '0' (once on startup), '1' (continuously), or '2' (both)."), pieces[0]);
+			TRANSLATE_FS("Pnach", "Invalid place '{}' passed as first patch parameter, expected '0' (once on startup), '1' (continuously), or '2' (both)."), pieces[0]);
 		return std::nullopt;
 	}
 
@@ -124,7 +124,7 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	if (!cpu.has_value())
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("Pnach", "Invalid CPU '{}' specified as second patch parameter, expected 'EE' or 'IOP'."), pieces[1]);
+			TRANSLATE_FS("Pnach", "Invalid CPU '{}' passed as second patch parameter, expected 'EE' or 'IOP'."), pieces[1]);
 		return std::nullopt;
 	}
 
@@ -135,7 +135,7 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	if (!address.has_value() || !address_end.empty())
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("Pnach", "Invalid address '{}' specified as third patch parameter, expected a hexadecimal number without a prefix."), pieces[2]);
+			TRANSLATE_FS("Pnach", "Invalid address '{}' passed as third patch parameter, expected a hexadecimal number without a prefix."), pieces[2]);
 		return std::nullopt;
 	}
 
@@ -148,7 +148,15 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	if (!type.has_value())
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("Pnach", "Invalid type '{}' specified as fourth patch parameter, expected a hexadecimal number without a prefix."), pieces[3]);
+			TRANSLATE_FS("Pnach", "Invalid type '{}' passed as fourth patch parameter, expected {}."),
+			pieces[3], PatchTypesSupportedForCPU(patch.m_cpu));
+		return std::nullopt;
+	}
+	if (!PatchTypeSupportedForCPU(*type, patch.m_cpu))
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Patch type '{}' passed as fourth patch parameter is incompatible with the specified CPU '{}', expected {}."),
+			pieces[3], pieces[1], PatchTypesSupportedForCPU(patch.m_cpu));
 		return std::nullopt;
 	}
 
@@ -157,11 +165,11 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	if (type != PatchType::BYTES)
 	{
 		std::string_view data_end;
-		std::optional<u64> data = StringUtil::FromChars<u64>(pieces[4], 16, &data_end);
+		const std::optional<u64> data = StringUtil::FromChars<u64>(pieces[4], 16, &data_end);
 		if (!data.has_value())
 		{
 			Error::SetStringFmt(error,
-				TRANSLATE_FS("Pnach", "Invalid data '{}' specified as fifth patch parameter, expected a hexadecimal number without a prefix."), pieces[4]);
+				TRANSLATE_FS("Pnach", "Invalid data '{}' passed as fifth patch parameter, expected a hexadecimal number without a prefix."), pieces[4]);
 			return std::nullopt;
 		}
 
@@ -171,11 +179,11 @@ std::optional<Pnach::Patch> Pnach::Patch::FromString(std::string_view parameter,
 	}
 	else
 	{
-		std::optional<std::vector<u8>> bytes = StringUtil::DecodeHex(pieces[4]);
+		const std::optional<std::vector<u8>> bytes = StringUtil::DecodeHex(pieces[4]);
 		if (!bytes.has_value() || bytes->empty())
 		{
 			Error::SetStringFmt(error,
-				TRANSLATE_FS("Pnach", "Invalid data '{}' specified as fifth patch parameter, expected a hexadecimal string without prefix (e.g. 0123ABCD)."), pieces[4]);
+				TRANSLATE_FS("Pnach", "Invalid data '{}' passed as fifth patch parameter, expected a hexadecimal string without prefix (e.g. 0123ABCD)."), pieces[4]);
 			return std::nullopt;
 		}
 
@@ -191,7 +199,7 @@ std::string Pnach::Patch::ToString() const
 {
 	const char* place = PatchPlaceToString(m_place);
 	const char* cpu = PatchCPUToString(m_cpu, false);
-	const char* type = PatchTypeToString(m_type, false);
+	const char* type = PatchTypeToString(m_type);
 
 	std::string data;
 	if (m_type != PatchType::BYTES)
@@ -222,6 +230,173 @@ std::string Pnach::Patch::ToString() const
 
 // *****************************************************************************
 
+std::span<const Pnach::DynamicPatchEntry> Pnach::DynamicPatch::Pattern() const
+{
+	return std::span(m_pattern.get(), m_pattern_count);
+}
+
+bool Pnach::DynamicPatch::SetPattern(std::span<const DynamicPatchEntry> pattern)
+{
+	if (pattern.size() > UINT32_MAX)
+		return false;
+
+	m_pattern.reset(new DynamicPatchEntry[pattern.size()]);
+	m_pattern_count = static_cast<u32>(pattern.size());
+	std::memcpy(m_pattern.get(), pattern.data(), pattern.size() * sizeof(DynamicPatchEntry));
+
+	// Make sure the offsets are aligned to instruction boundaries.
+	for (size_t i = 0; i < m_pattern_count; i++)
+		m_pattern[i].offset &= ~3;
+
+	return true;
+}
+
+std::span<const Pnach::DynamicPatchEntry> Pnach::DynamicPatch::Replacement() const
+{
+	return std::span(m_replacement.get(), m_replacement_count);
+}
+
+bool Pnach::DynamicPatch::SetReplacement(std::span<const DynamicPatchEntry> replacement)
+{
+	if (replacement.size() > UINT32_MAX)
+		return false;
+
+	m_replacement.reset(new DynamicPatchEntry[replacement.size()]);
+	m_replacement_count = static_cast<u32>(replacement.size());
+	std::memcpy(m_replacement.get(), replacement.data(), replacement.size() * sizeof(DynamicPatchEntry));
+
+	// Make sure the offsets are aligned to instruction boundaries.
+	for (size_t i = 0; i < m_pattern_count; i++)
+		m_pattern[i].offset &= ~3;
+
+	return true;
+}
+
+static bool ParseDynamicPatchEntries(
+	std::span<Pnach::DynamicPatchEntry> output,
+	const std::vector<std::string_view>& pieces,
+	size_t& next_parameter,
+	Error* error,
+	fmt::runtime_format_string<> offset_error_format_string,
+	fmt::runtime_format_string<> value_error_format_string)
+{
+	for (size_t i = 0; i < output.size(); i++)
+	{
+		size_t offset_parameter = next_parameter++;
+		std::string_view offset_end;
+		const std::optional<u32> offset = StringUtil::FromChars<u32>(pieces[offset_parameter], 16, &offset_end);
+		if (!offset.has_value() || !offset_end.empty() || *offset % 4 != 0)
+		{
+			Error::SetStringFmt(error, offset_error_format_string, pieces[offset_parameter], i + 1);
+			return false;
+		}
+
+		output[i].offset = *offset;
+
+		size_t value_parameter = next_parameter++;
+		std::string_view value_end;
+		const std::optional<u32> value = StringUtil::FromChars<u32>(pieces[value_parameter], 16, &value_end);
+		if (!value.has_value() || !value_end.empty())
+		{
+			Error::SetStringFmt(error, value_error_format_string, pieces[value_parameter], i + 1);
+			return false;
+		}
+
+		output[i].value = *value;
+	}
+
+	return true;
+}
+
+std::optional<Pnach::DynamicPatch> Pnach::DynamicPatch::FromString(std::string_view parameters, Error* error)
+{
+	Pnach::DynamicPatch patch;
+
+	const std::vector<std::string_view> pieces(StringUtil::SplitString(parameters, ',', false));
+	if (pieces.size() < 3)
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Found {} comma-separated patch parameters, expected 3 or more: <type>,<pattern count>,<replacement count>,[patterns...],[replacements...]."), pieces.size());
+		return std::nullopt;
+	}
+
+	std::string_view type_end;
+	const std::optional<u32> type = StringUtil::FromChars<u32>(pieces[0], 10, &type_end);
+	if (!type.has_value() || !type_end.empty() || *type != 0)
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Invalid type '{}' passed as first patch parameter, expected '0' (only currently supported value)."), pieces[0]);
+		return std::nullopt;
+	}
+
+	std::string_view pattern_count_end;
+	const std::optional<u32> pattern_count = StringUtil::FromChars<u32>(pieces[1], 16, &pattern_count_end);
+	if (!pattern_count.has_value() || !pattern_count_end.empty())
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Invalid pattern count '{}' passed as second patch parameter, expected a hexadecimal number without a prefix."), pieces[1]);
+		return std::nullopt;
+	}
+
+	patch.m_pattern.reset(new DynamicPatchEntry[*pattern_count]);
+	patch.m_pattern_count = *pattern_count;
+
+	std::string_view replacement_count_end;
+	const std::optional<u32> replacement_count = StringUtil::FromChars<u32>(pieces[2], 16, &replacement_count_end);
+	if (!replacement_count.has_value() || !replacement_count_end.empty())
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Invalid replacement count '{}' passed as third patch parameter, expected a hexadecimal number without a prefix."), pieces[2]);
+		return std::nullopt;
+	}
+
+	patch.m_replacement.reset(new DynamicPatchEntry[*replacement_count]);
+	patch.m_replacement_count = *replacement_count;
+
+	size_t expected_parameter_count = 3 + patch.m_pattern_count * 2 + patch.m_replacement_count * 2;
+	if (pieces.size() != expected_parameter_count)
+	{
+		Error::SetStringFmt(error,
+			TRANSLATE_FS("Pnach", "Found {} comma-separated patch parameters, expected {} (type, pattern count, replacement count, and an offset and size for each pattern and replacement)."),
+			pieces.size(), expected_parameter_count);
+		return std::nullopt;
+	}
+
+	size_t next_parameter = 3;
+
+	std::span<DynamicPatchEntry> patterns(patch.m_pattern.get(), patch.m_pattern_count);
+	if (!ParseDynamicPatchEntries(patterns, pieces, next_parameter, error,
+			TRANSLATE_FS("Pnach", "Invalid offset {} passed as parameter of pattern {}, expected a multiple of four as hexadecimal number without a prefix."),
+			TRANSLATE_FS("Pnach", "Invalid value {} passed as parameter of pattern {}, expected a hexadecimal number without a prefix.")))
+		return std::nullopt;
+
+	std::span<DynamicPatchEntry> replacements(patch.m_replacement.get(), patch.m_replacement_count);
+	if (!ParseDynamicPatchEntries(replacements, pieces, next_parameter, error,
+			TRANSLATE_FS("Pnach", "Invalid offset {} passed as parameter of replacement {}, expected a multiple of four as hexadecimal number without a prefix."),
+			TRANSLATE_FS("Pnach", "Invalid value {} passed as parameter of replacement {}, expected a hexadecimal number without a prefix.")))
+		return std::nullopt;
+
+	return patch;
+}
+
+std::string Pnach::DynamicPatch::ToString() const
+{
+	std::vector<std::string> pieces;
+	pieces.reserve(1 + m_pattern_count + m_replacement_count);
+
+	pieces.emplace_back(fmt::format("0,{:x},{:x}", m_pattern_count, m_replacement_count));
+
+	for (u32 i = 0; i < m_pattern_count; i++)
+		pieces.emplace_back(fmt::format("{:08x},{:08x}", m_pattern[i].offset, m_pattern[i].value));
+
+	for (u32 i = 0; i < m_replacement_count; i++)
+		pieces.emplace_back(fmt::format("{:08x},{:08x}", m_replacement[i].offset, m_replacement[i].value));
+
+	return StringUtil::JoinString(pieces.begin(), pieces.end(), ',');
+}
+
+// *****************************************************************************
+
 bool Pnach::PatchTypeSupportedForCPU(PatchType type, PatchCPU cpu)
 {
 	bool supported = false;
@@ -240,6 +415,14 @@ bool Pnach::PatchTypeSupportedForCPU(PatchType type, PatchCPU cpu)
 	}
 
 	return supported;
+}
+
+std::string Pnach::PatchTypesSupportedForCPU(PatchCPU cpu)
+{
+	if (cpu == PatchCPU::EE)
+		return TRANSLATE("Pnach", "'byte', 'short', 'word', 'double', 'beshort', 'beword', 'bedouble', 'bytes' or 'extended'");
+	else
+		return TRANSLATE("Pnach", "'byte', 'short', 'word' or 'bytes");
 }
 
 size_t Pnach::DataSizeFromPatchType(PatchType type)
@@ -377,7 +560,7 @@ std::optional<Pnach::PatchType> Pnach::PatchTypeFromString(std::string_view stri
 	return std::nullopt;
 }
 
-const char* Pnach::PatchTypeToString(PatchType type, bool translate)
+const char* Pnach::PatchTypeToString(PatchType type)
 {
 	return s_type_names.at(static_cast<size_t>(type));
 }

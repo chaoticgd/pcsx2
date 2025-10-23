@@ -17,7 +17,7 @@
 
 namespace Pnach
 {
-	// The point in time where the patch is applied.
+	/// The point in time where the patch is applied.
 	enum class PatchPlace : u8
 	{
 		ONCE_ON_LOAD = 0,
@@ -26,7 +26,7 @@ namespace Pnach
 	};
 	inline constexpr u32 PATCH_PLACE_COUNT = 3;
 
-	// The cpu parameter.
+	/// The cpu parameter.
 	enum class PatchCPU : u8
 	{
 		EE = 0,
@@ -34,7 +34,7 @@ namespace Pnach
 	};
 	inline constexpr u32 PATCH_CPU_COUNT = 2;
 
-	// The type parameter.
+	/// The type parameter.
 	enum class PatchType : u8
 	{
 		BYTE = 0,
@@ -49,50 +49,51 @@ namespace Pnach
 	};
 	inline constexpr u32 PATCH_TYPE_COUNT = 9;
 
-	// The parameters for a single patch command.
+	/// A single patch command. These are for patching code or data at fixed
+	/// addresses and are used for the majority of patches.
 	class Patch
 	{
 	public:
-		// Accesses the place parameter.
+		/// Accesses the place parameter.
 		PatchPlace Place() const;
 		void SetPlace(PatchPlace place);
 
-		// Accesses the CPU parameter.
+		/// Accesses the CPU parameter.
 		PatchCPU CPU() const;
 		void SetCPU(PatchCPU cpu);
 
-		// Access the raw address parameter. Note that for patches of type
-		// EXTENDED this may not be an actual address.
+		/// Access the raw address parameter. Note that for patches of type
+		/// EXTENDED this may not be an actual address.
 		u32 Address() const;
 		void SetAddress(u32 address);
 
-		// Accesses the raw type parameter. Note that for patches of type
-		// EXTENDED there will be a secondary opcode stored in the address
-		// parameter.
+		/// Accesses the raw type parameter. Note that for patches of type
+		/// EXTENDED there will be a secondary opcode stored in the address
+		/// parameter.
 		PatchType Type() const;
 		void SetType(PatchType type);
 
-		// Accesses the data for patches not of type BYTES.
+		/// Accesses the data for patches not of type BYTES.
 		u64 Data() const;
 		void SetData(u64 data);
 
-		// Accesses the data for patches of type BYTES.
+		/// Accesses the data for patches of type BYTES.
 		std::span<const u8> Bytes() const;
 		void SetBytes(std::span<const u8> bytes);
 
-		// Parse the parameter of the patch command, which should be a
-		// comma-separated list of values in the following format:
-		//   <place>,<cpu>,<address>,<type>,<data>
-		static std::optional<Patch> FromString(std::string_view parameter, Error* error = nullptr);
+		/// Parse the parameters of a patch command, which should be a
+		/// comma-separated list of values in the following format:
+		///   <place>,<cpu>,<address>,<type>,<data>
+		static std::optional<Patch> FromString(std::string_view parameters, Error* error = nullptr);
 
-		// Convert the patch back to a string containing a comma-separated list
-		// of values (see the from_string function).
+		/// Convert the patch back to a string containing a comma-separated list
+		/// of values (see the FromString function).
 		std::string ToString() const;
 
 	private:
-		// These two members change their meaning depending on if m_type is
-		// equal to BYTES or not. If it is, the data is stored in m_bytes and is
-		// of length m_data, otherwise the data is stored directly in m_data.
+		/// These two members change their meaning depending on if m_type is
+		/// equal to BYTES or not. If it is, the data is stored in m_bytes and
+		/// is of length m_data, otherwise the data is stored in m_data.
 		u64 m_data = 0;
 		std::unique_ptr<u8[]> m_bytes;
 
@@ -102,16 +103,60 @@ namespace Pnach
 		PatchCPU m_cpu = PatchCPU::EE;
 		PatchType m_type = PatchType::WORD;
 
-		// Save how the patch was formatted in the text file so we can avoid
-		// modifying it unnecessarily when writing it out. For simplicity only
-		// some common formatting choices have been implemented.
+		/// Save how the patch was formatted in the text file so we can avoid
+		/// modifying it unnecessarily when writing it out. For simplicity only
+		/// some common formatting choices have been implemented.
 		bool m_address_has_leading_zeroes : 1 = true;
 		bool m_address_is_lowercase : 1 = true;
 		bool m_data_has_leading_zeroes : 1 = true;
 		bool m_data_is_lowercase : 1 = true;
 	};
 
+	/// A single instruction to be matched or replaced.
+	struct DynamicPatchEntry
+	{
+		/// The offset from the instruction currently being recompiled.
+		u32 offset;
+
+		/// The memory value to match or write, depending on whether this is a
+		/// pattern or replacement entry.
+		u32 value;
+	};
+
+	/// A single dynamic patch command. These are used when code (but not data)
+	/// moves around in memory and so a patch for that code cannot operate on a
+	/// fixed address.
+	class DynamicPatch
+	{
+	public:
+		std::span<const DynamicPatchEntry> Pattern() const;
+		bool SetPattern(std::span<const DynamicPatchEntry> pattern);
+
+		std::span<const DynamicPatchEntry> Replacement() const;
+		bool SetReplacement(std::span<const DynamicPatchEntry> replacement);
+
+		/// Parse the parameters of a patch command, which should be a
+		/// variable-length comma-separated list in the following format:
+		///   <type>,<pattern count>,<replacement count>,[patterns...],[replacements...]
+		/// where each pattern and replacement is in the following format:
+		///   <offset>,<value>
+		static std::optional<DynamicPatch> FromString(std::string_view parameters, Error* error = nullptr);
+
+		/// Convert the patch back to a string containing a comma-separated list
+		/// of values (see the FromString function).
+		std::string ToString() const;
+
+	private:
+		/// Make the DynamicPatch class smaller, since it seems like it would be
+		/// a shame to bloat every single patch for such a rarely used feature.
+		std::unique_ptr<DynamicPatchEntry[]> m_pattern;
+		std::unique_ptr<DynamicPatchEntry[]> m_replacement;
+		u32 m_pattern_count;
+		u32 m_replacement_count;
+	};
+
 	bool PatchTypeSupportedForCPU(PatchType type, PatchCPU cpu);
+	std::string PatchTypesSupportedForCPU(PatchCPU cpu);
 	size_t DataSizeFromPatchType(PatchType type);
 	u64 TruncateDataForPatchType(u64 data, PatchType type);
 
@@ -122,5 +167,5 @@ namespace Pnach
 	const char* PatchCPUToString(PatchCPU cpu, bool translate);
 	const char* PatchCPUToLongString(PatchCPU cpu, bool translate);
 	std::optional<PatchType> PatchTypeFromString(std::string_view string);
-	const char* PatchTypeToString(PatchType type, bool translate);
+	const char* PatchTypeToString(PatchType type);
 } // namespace Pnach

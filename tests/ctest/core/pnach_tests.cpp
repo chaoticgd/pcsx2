@@ -48,6 +48,9 @@ TEST(Pnach, PatchFromStringInvalid)
 	std::optional<Pnach::Patch> invalid_type = Pnach::Patch::FromString("1,EE,0,qubit,0");
 	ASSERT_FALSE(invalid_type.has_value());
 
+	std::optional<Pnach::Patch> incompatible_type = Pnach::Patch::FromString("1,IOP,0,extended,0");
+	ASSERT_FALSE(incompatible_type.has_value());
+
 	std::optional<Pnach::Patch> invalid_data = Pnach::Patch::FromString("1,EE,0,byte,hello");
 	ASSERT_FALSE(invalid_data.has_value());
 
@@ -66,7 +69,7 @@ TEST(Pnach, PatchToString)
 	patch.SetAddress(0x100000u);
 	patch.SetType(Pnach::PatchType::SHORT);
 	patch.SetData(0x1234u);
-	ASSERT_EQ(patch.ToString(), "1,EE,00100000,short,1234");
+	EXPECT_EQ(patch.ToString(), "1,EE,00100000,short,1234");
 
 	Pnach::Patch bytes_patch;
 	bytes_patch.SetPlace(Pnach::PatchPlace::CONTINUOUSLY);
@@ -75,7 +78,7 @@ TEST(Pnach, PatchToString)
 	bytes_patch.SetType(Pnach::PatchType::BYTES);
 	std::array<u8, 2> bytes = {0x12u, 0x34u};
 	bytes_patch.SetBytes(bytes);
-	ASSERT_EQ(bytes_patch.ToString(), "1,EE,00100000,bytes,1234");
+	EXPECT_EQ(bytes_patch.ToString(), "1,EE,00100000,bytes,1234");
 }
 
 #define PATCH_ROUND_TRIP_TEST(parameters) \
@@ -173,12 +176,129 @@ TEST(Pnach, PatchOverrideFormatting)
 }
 
 #define PATCH_TRUNCATE_TEST(parameters, expected) \
-	EXPECT_EQ(Pnach::Patch::FromString(parameters)->ToString(), expected)
-
+	{ \
+		std::optional<Pnach::Patch> patch; \
+		patch = Pnach::Patch::FromString(parameters); \
+		ASSERT_TRUE(patch.has_value()); \
+		EXPECT_EQ(patch->ToString(), expected); \
+	}
 
 TEST(Pnach, PatchTruncateDataForType)
 {
 	PATCH_TRUNCATE_TEST("1,EE,0,byte,1234", "1,EE,0,byte,34");
 	PATCH_TRUNCATE_TEST("1,EE,0,short,1234abcd", "1,EE,0,short,abcd");
 	PATCH_TRUNCATE_TEST("1,EE,0,word,12345678abcd", "1,EE,0,word,5678abcd");
+}
+
+// *****************************************************************************
+
+TEST(Pnach, DynamicPatchFromString)
+{
+	std::optional<Pnach::DynamicPatch> simple = Pnach::DynamicPatch::FromString(
+		"0,1,1,00000000,03e00008,00000004,25080001");
+	ASSERT_TRUE(simple.has_value());
+	ASSERT_TRUE(simple->Pattern().size() == 1);
+	EXPECT_TRUE(simple->Pattern()[0].offset == 0);
+	EXPECT_TRUE(simple->Pattern()[0].value == 0x03e00008);
+	ASSERT_TRUE(simple->Replacement().size() == 1);
+	EXPECT_TRUE(simple->Replacement()[0].offset == 4);
+	EXPECT_TRUE(simple->Replacement()[0].value == 0x25080001);
+
+	std::optional<Pnach::DynamicPatch> different_counts = Pnach::DynamicPatch::FromString(
+		"0,2,1,00000000,03e00008,00000004,00000000,00000004,25080001");
+	ASSERT_TRUE(different_counts.has_value());
+	ASSERT_TRUE(different_counts->Pattern().size() == 2);
+	EXPECT_TRUE(different_counts->Pattern()[0].offset == 0);
+	EXPECT_TRUE(different_counts->Pattern()[0].value == 0x03e00008);
+	EXPECT_TRUE(different_counts->Pattern()[1].offset == 4);
+	EXPECT_TRUE(different_counts->Pattern()[1].value == 0);
+	ASSERT_TRUE(different_counts->Replacement().size() == 1);
+	EXPECT_TRUE(different_counts->Replacement()[0].offset == 4);
+	EXPECT_TRUE(different_counts->Replacement()[0].value == 0x25080001);
+}
+
+TEST(Pnach, DynamicPatchFromStringInvalid)
+{
+	std::optional<Pnach::DynamicPatch> no_commas = Pnach::DynamicPatch::FromString("hello");
+	ASSERT_FALSE(no_commas.has_value());
+
+	std::optional<Pnach::DynamicPatch> too_few_commas = Pnach::DynamicPatch::FromString("0,1,1");
+	ASSERT_FALSE(too_few_commas.has_value());
+
+	std::optional<Pnach::DynamicPatch> too_many_commas = Pnach::DynamicPatch::FromString("0,0,0,0,0,0,0");
+	ASSERT_FALSE(too_few_commas.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_type = Pnach::DynamicPatch::FromString("123,0,0");
+	ASSERT_FALSE(invalid_type.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_pattern_count = Pnach::DynamicPatch::FromString("0,0hello,0");
+	ASSERT_FALSE(invalid_pattern_count.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_replacement_count = Pnach::DynamicPatch::FromString("0,0,0hello");
+	ASSERT_FALSE(invalid_replacement_count.has_value());
+
+	std::optional<Pnach::DynamicPatch> too_few_parameters = Pnach::DynamicPatch::FromString("0,1,0,0");
+	ASSERT_FALSE(too_few_parameters.has_value());
+
+	std::optional<Pnach::DynamicPatch> too_many_parameters = Pnach::DynamicPatch::FromString("0,1,0,0,0,0,0");
+	ASSERT_FALSE(too_many_parameters.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_pattern_offset = Pnach::DynamicPatch::FromString("0,1,0,0hello,0");
+	ASSERT_FALSE(invalid_pattern_offset.has_value());
+
+	std::optional<Pnach::DynamicPatch> unaligned_pattern_offset = Pnach::DynamicPatch::FromString("0,1,0,3,0");
+	ASSERT_FALSE(unaligned_pattern_offset.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_pattern_value = Pnach::DynamicPatch::FromString("0,1,0,0,0hello");
+	ASSERT_FALSE(invalid_pattern_value.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_replacement_offset = Pnach::DynamicPatch::FromString("0,0,1,0hello,0");
+	ASSERT_FALSE(invalid_replacement_offset.has_value());
+
+	std::optional<Pnach::DynamicPatch> unaligned_replacement_offset = Pnach::DynamicPatch::FromString("0,0,1,3,0");
+	ASSERT_FALSE(unaligned_replacement_offset.has_value());
+
+	std::optional<Pnach::DynamicPatch> invalid_replacement_value = Pnach::DynamicPatch::FromString("0,0,1,0,0hello");
+	ASSERT_FALSE(invalid_replacement_value.has_value());
+}
+
+TEST(Pnach, DynamicPatchToString)
+{
+	Pnach::DynamicPatch simple;
+	std::array<Pnach::DynamicPatchEntry, 1> simple_pattern = {{
+		{
+			.offset = 0,
+			.value = 0x03e00008,
+		},
+	}};
+	simple.SetPattern(simple_pattern);
+	std::array<Pnach::DynamicPatchEntry, 1> simple_replacement = {{
+		{
+			.offset = 4,
+			.value = 0x25080001,
+		},
+	}};
+	simple.SetReplacement(simple_replacement);
+	EXPECT_EQ(simple.ToString(), "0,1,1,00000000,03e00008,00000004,25080001");
+
+	Pnach::DynamicPatch different_counts;
+	std::array<Pnach::DynamicPatchEntry, 2> different_counts_pattern = {{
+		{
+			.offset = 0,
+			.value = 0x03e00008,
+		},
+		{
+			.offset = 4,
+			.value = 0x00000000,
+		},
+	}};
+	different_counts.SetPattern(different_counts_pattern);
+	std::array<Pnach::DynamicPatchEntry, 1> different_counts_replacement = {{
+		{
+			.offset = 4,
+			.value = 0x25080001,
+		},
+	}};
+	different_counts.SetReplacement(different_counts_replacement);
+	EXPECT_EQ(different_counts.ToString(), "0,2,1,00000000,03e00008,00000004,00000000,00000004,25080001");
 }
