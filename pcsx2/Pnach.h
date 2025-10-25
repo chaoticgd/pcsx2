@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "Config.h"
+
 #include "common/Error.h"
 #include "common/Pcsx2Defs.h"
 
@@ -54,11 +56,11 @@ namespace Pnach
 	class Patch
 	{
 	public:
-		/// Accesses the place parameter.
+		/// Access the place parameter.
 		PatchPlace Place() const;
 		void SetPlace(PatchPlace place);
 
-		/// Accesses the CPU parameter.
+		/// Access the CPU parameter.
 		PatchCPU CPU() const;
 		void SetCPU(PatchCPU cpu);
 
@@ -67,24 +69,24 @@ namespace Pnach
 		u32 Address() const;
 		void SetAddress(u32 address);
 
-		/// Accesses the raw type parameter. Note that for patches of type
+		/// Access the raw type parameter. Note that for patches of type
 		/// EXTENDED there will be a secondary opcode stored in the address
 		/// parameter.
 		PatchType Type() const;
 		void SetType(PatchType type);
 
-		/// Accesses the data for patches not of type BYTES.
+		/// Access the data for patches not of type BYTES.
 		u64 Data() const;
 		void SetData(u64 data);
 
-		/// Accesses the data for patches of type BYTES.
+		/// Access the data for patches of type BYTES.
 		std::span<const u8> Bytes() const;
 		void SetBytes(std::span<const u8> bytes);
 
 		/// Parse the parameters of a patch command, which should be a
 		/// comma-separated list of values in the following format:
 		///   <place>,<cpu>,<address>,<type>,<data>
-		static std::optional<Patch> FromString(std::string_view parameters, Error* error = nullptr);
+		static std::optional<Patch> FromString(std::string_view input, Error* error = nullptr);
 
 		/// Convert the patch back to a string containing a comma-separated list
 		/// of values (see the FromString function).
@@ -116,11 +118,11 @@ namespace Pnach
 	struct DynamicPatchEntry
 	{
 		/// The offset from the instruction currently being recompiled.
-		u32 offset;
+		u32 offset = 0;
 
 		/// The memory value to match or write, depending on whether this is a
 		/// pattern or replacement entry.
-		u32 value;
+		u32 value = 0;
 	};
 
 	/// A single dynamic patch command. These are used when code (but not data)
@@ -130,10 +132,10 @@ namespace Pnach
 	{
 	public:
 		std::span<const DynamicPatchEntry> Pattern() const;
-		bool SetPattern(std::span<const DynamicPatchEntry> pattern);
+		void SetPattern(std::span<const DynamicPatchEntry> pattern);
 
 		std::span<const DynamicPatchEntry> Replacement() const;
-		bool SetReplacement(std::span<const DynamicPatchEntry> replacement);
+		void SetReplacement(std::span<const DynamicPatchEntry> replacement);
 
 		/// Parse the parameters of a patch command, which should be a
 		/// variable-length comma-separated list in the following format:
@@ -147,12 +149,127 @@ namespace Pnach
 		std::string ToString() const;
 
 	private:
-		/// Make the DynamicPatch class smaller, since it seems like it would be
-		/// a shame to bloat every single patch for such a rarely used feature.
+		// Make the DynamicPatch class smaller, since it seems like it would be
+		// a shame to bloat every single patch for such a rarely used feature.
 		std::unique_ptr<DynamicPatchEntry[]> m_pattern;
 		std::unique_ptr<DynamicPatchEntry[]> m_replacement;
-		u32 m_pattern_count;
-		u32 m_replacement_count;
+		u32 m_pattern_count = 0;
+		u32 m_replacement_count = 0;
+	};
+
+	struct GSAspectRatio
+	{
+		u32 dividend = 0;
+		u32 divisor = 0;
+
+		static std::optional<GSAspectRatio> FromString(std::string_view input, Error* error = nullptr);
+		std::string ToString() const;
+	};
+
+	enum class PatchLineType
+	{
+		PATCH, // Patch.
+		DPATCH, // Dynamic patch.
+
+		GSASPECTRATIO,
+		GSINTERLACEMODE,
+
+		AUTHOR,
+		COMMENT,
+		DESCRIPTION,
+		GAMETITLE,
+
+		SPACER, // The line is empty (except for if an end of line comment exists).
+		INVALID, // The line could not be parsed.
+	};
+
+	/// A single line in a .pnach file.
+	class PatchLine
+	{
+	public:
+		/// Retrieve the type of this line.
+		PatchLineType Type() const;
+
+		/// Access the contained patch. Only valid for PATCH lines.
+		Patch& GetPatch();
+		const Patch& GetPatch() const;
+
+		/// Change the type to PATCH.
+		void SetPatch(Patch patch);
+
+		/// Access the contained dynamic patch. Only valid for DPATCH lines.
+		DynamicPatch& GetDynamicPatch();
+		const DynamicPatch& GetDynamicPatch() const;
+
+		/// Change the type to DPATCH.
+		void SetDynamicPatch(DynamicPatch dynamic_patch);
+
+		/// Retrieve the contained GS aspect ratio.
+		GSAspectRatio GetGSAspectRatio() const;
+
+		/// Change the type to GSAPSECTRATIO.
+		void SetGSAspectRatio(GSAspectRatio aspect_ratio);
+
+		/// Retrieve the contained GS interlace mode.
+		GSInterlaceMode GetGSInterlaceMode() const;
+
+		//// Change the type to GSINTERLACEMODE.
+		void SetGSInterlaceMode(GSInterlaceMode interlace_mode);
+
+		/// Retrieve the contained string. Not valid for PATCH, DPATCH,
+		/// GSASPECTRATIO or GSINTERLACEMODE lines.
+		std::string_view GetString() const;
+
+		/// Change the type to the one specified (except for PATCH, DPATCH,
+		/// GSASPECTRATIO and GSINTERLACEMODE) and store the pased string.
+		void SetString(PatchLineType type, std::string_view string, bool reset_formatting = true);
+
+		/// Change the type to SPACER.
+		void SetSpacer();
+
+		/// Retrieve the end of line comment.
+		std::string_view EndOfLineComment() const;
+
+		/// Update the end of line comment. This does not change the line type.
+		void SetEndOfLineComment(std::string_view comment, bool reset_formatting = true);
+
+		/// Remove the end of line comment.
+		void RemoveEndOfLineComment();
+
+		/// Reset the numbers of spaces between different parts of the line to
+		// the default values.
+		void ResetFormatting();
+
+		/// Parse a patch line from a .pnach file.
+		static PatchLine FromString(std::string_view input, Error* error = nullptr);
+
+		/// Convert the line to a string, including a comment if one exists.
+		std::string ToString() const;
+
+	private:
+		/// Parse a patch line that has had its comment removed.
+		bool ParseAssignment(std::string_view assignment, Error* error = nullptr);
+		void AppendAssignmentOperator(std::string& string) const;
+
+		struct StringLine
+		{
+			PatchLineType type;
+			std::unique_ptr<char[]> string;
+			size_t string_size = 0;
+		};
+
+		using PatchLineData = std::variant<Patch, DynamicPatch, GSAspectRatio, GSInterlaceMode, StringLine>;
+		PatchLineData m_data = StringLine{PatchLineType::SPACER};
+
+		// Try to save some space here since in the worst case, where someone
+		// tries to fill memory using patches, comments will be rare.
+		std::unique_ptr<char[]> m_end_of_line_comment;
+		u16 m_end_of_line_comment_size = 0;
+		u8 m_spaces_at_start_of_line = 0;
+		u8 m_spaces_before_assignment_operator = 0;
+		u8 m_spaces_after_assignment_operator = 0;
+		u8 m_spaces_before_end_of_line_comment_delimiter = 1;
+		u8 m_spaces_after_end_of_line_comment_delimiter = 1;
 	};
 
 	bool PatchTypeSupportedForCPU(PatchType type, PatchCPU cpu);

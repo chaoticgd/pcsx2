@@ -14,6 +14,22 @@ TEST(Pnach, PatchFromString)
 	ASSERT_EQ(patch->Type(), Pnach::PatchType::SHORT);
 	ASSERT_EQ(patch->Data(), 0x1234u);
 
+	std::optional<Pnach::Patch> load_patch = Pnach::Patch::FromString("0,EE,00100000,short,1234");
+	ASSERT_TRUE(load_patch.has_value());
+	ASSERT_EQ(load_patch->Place(), Pnach::PatchPlace::ONCE_ON_LOAD);
+	ASSERT_EQ(load_patch->CPU(), Pnach::PatchCPU::EE);
+	ASSERT_EQ(load_patch->Address(), 0x100000u);
+	ASSERT_EQ(load_patch->Type(), Pnach::PatchType::SHORT);
+	ASSERT_EQ(load_patch->Data(), 0x1234u);
+
+	std::optional<Pnach::Patch> iop_patch = Pnach::Patch::FromString("1,IOP,00100000,short,1234");
+	ASSERT_TRUE(iop_patch.has_value());
+	ASSERT_EQ(iop_patch->Place(), Pnach::PatchPlace::CONTINUOUSLY);
+	ASSERT_EQ(iop_patch->CPU(), Pnach::PatchCPU::IOP);
+	ASSERT_EQ(iop_patch->Address(), 0x100000u);
+	ASSERT_EQ(iop_patch->Type(), Pnach::PatchType::SHORT);
+	ASSERT_EQ(iop_patch->Data(), 0x1234u);
+
 	std::optional<Pnach::Patch> bytes_patch = Pnach::Patch::FromString("1,EE,00100000,bytes,1234");
 	ASSERT_TRUE(bytes_patch.has_value());
 	ASSERT_EQ(bytes_patch->Place(), Pnach::PatchPlace::CONTINUOUSLY);
@@ -71,6 +87,22 @@ TEST(Pnach, PatchToString)
 	patch.SetData(0x1234u);
 	EXPECT_EQ(patch.ToString(), "1,EE,00100000,short,1234");
 
+	Pnach::Patch load_patch;
+	load_patch.SetPlace(Pnach::PatchPlace::ONCE_ON_LOAD);
+	load_patch.SetCPU(Pnach::PatchCPU::EE);
+	load_patch.SetAddress(0x100000u);
+	load_patch.SetType(Pnach::PatchType::SHORT);
+	load_patch.SetData(0x1234u);
+	EXPECT_EQ(load_patch.ToString(), "0,EE,00100000,short,1234");
+
+	Pnach::Patch iop_patch;
+	iop_patch.SetPlace(Pnach::PatchPlace::CONTINUOUSLY);
+	iop_patch.SetCPU(Pnach::PatchCPU::IOP);
+	iop_patch.SetAddress(0x100000u);
+	iop_patch.SetType(Pnach::PatchType::SHORT);
+	iop_patch.SetData(0x1234u);
+	EXPECT_EQ(iop_patch.ToString(), "1,IOP,00100000,short,1234");
+
 	Pnach::Patch bytes_patch;
 	bytes_patch.SetPlace(Pnach::PatchPlace::CONTINUOUSLY);
 	bytes_patch.SetCPU(Pnach::PatchCPU::EE);
@@ -81,12 +113,11 @@ TEST(Pnach, PatchToString)
 	EXPECT_EQ(bytes_patch.ToString(), "1,EE,00100000,bytes,1234");
 }
 
-#define PATCH_ROUND_TRIP_TEST(parameters) \
+#define PATCH_ROUND_TRIP_TEST(input) \
 	{ \
-		std::optional<Pnach::Patch> patch; \
-		patch = Pnach::Patch::FromString(parameters); \
+		std::optional<Pnach::Patch> patch = Pnach::Patch::FromString(input); \
 		ASSERT_TRUE(patch.has_value()); \
-		EXPECT_EQ(patch->ToString(), parameters); \
+		EXPECT_EQ(patch->ToString(), input); \
 	}
 
 TEST(Pnach, PatchPreserveFormatting)
@@ -175,10 +206,10 @@ TEST(Pnach, PatchOverrideFormatting)
 	EXPECT_EQ(case_patch->ToString(), "1,EE,0012abcd,word,1234abcd");
 }
 
-#define PATCH_TRUNCATE_TEST(parameters, expected) \
+#define PATCH_TRUNCATE_TEST(input, expected) \
 	{ \
 		std::optional<Pnach::Patch> patch; \
-		patch = Pnach::Patch::FromString(parameters); \
+		patch = Pnach::Patch::FromString(input); \
 		ASSERT_TRUE(patch.has_value()); \
 		EXPECT_EQ(patch->ToString(), expected); \
 	}
@@ -197,24 +228,36 @@ TEST(Pnach, DynamicPatchFromString)
 	std::optional<Pnach::DynamicPatch> simple = Pnach::DynamicPatch::FromString(
 		"0,1,1,00000000,03e00008,00000004,25080001");
 	ASSERT_TRUE(simple.has_value());
-	ASSERT_TRUE(simple->Pattern().size() == 1);
-	EXPECT_TRUE(simple->Pattern()[0].offset == 0);
-	EXPECT_TRUE(simple->Pattern()[0].value == 0x03e00008);
-	ASSERT_TRUE(simple->Replacement().size() == 1);
-	EXPECT_TRUE(simple->Replacement()[0].offset == 4);
-	EXPECT_TRUE(simple->Replacement()[0].value == 0x25080001);
+	ASSERT_EQ(simple->Pattern().size(), 1u);
+	EXPECT_EQ(simple->Pattern()[0].offset, 0u);
+	EXPECT_EQ(simple->Pattern()[0].value, 0x03e00008u);
+	ASSERT_EQ(simple->Replacement().size(), 1u);
+	EXPECT_EQ(simple->Replacement()[0].offset, 4u);
+	EXPECT_EQ(simple->Replacement()[0].value, 0x25080001u);
 
-	std::optional<Pnach::DynamicPatch> different_counts = Pnach::DynamicPatch::FromString(
+	std::optional<Pnach::DynamicPatch> more_patterns = Pnach::DynamicPatch::FromString(
 		"0,2,1,00000000,03e00008,00000004,00000000,00000004,25080001");
-	ASSERT_TRUE(different_counts.has_value());
-	ASSERT_TRUE(different_counts->Pattern().size() == 2);
-	EXPECT_TRUE(different_counts->Pattern()[0].offset == 0);
-	EXPECT_TRUE(different_counts->Pattern()[0].value == 0x03e00008);
-	EXPECT_TRUE(different_counts->Pattern()[1].offset == 4);
-	EXPECT_TRUE(different_counts->Pattern()[1].value == 0);
-	ASSERT_TRUE(different_counts->Replacement().size() == 1);
-	EXPECT_TRUE(different_counts->Replacement()[0].offset == 4);
-	EXPECT_TRUE(different_counts->Replacement()[0].value == 0x25080001);
+	ASSERT_TRUE(more_patterns.has_value());
+	ASSERT_EQ(more_patterns->Pattern().size(), 2u);
+	EXPECT_EQ(more_patterns->Pattern()[0].offset, 0u);
+	EXPECT_EQ(more_patterns->Pattern()[0].value, 0x03e00008u);
+	EXPECT_EQ(more_patterns->Pattern()[1].offset, 4u);
+	EXPECT_EQ(more_patterns->Pattern()[1].value, 0u);
+	ASSERT_EQ(more_patterns->Replacement().size(), 1u);
+	EXPECT_EQ(more_patterns->Replacement()[0].offset, 4u);
+	EXPECT_EQ(more_patterns->Replacement()[0].value, 0x25080001u);
+
+	std::optional<Pnach::DynamicPatch> more_replacements = Pnach::DynamicPatch::FromString(
+		"0,1,2,00000000,03e00008,00000004,25080001,00000008,00000000");
+	ASSERT_TRUE(more_replacements.has_value());
+	ASSERT_EQ(more_replacements->Pattern().size(), 1u);
+	EXPECT_EQ(more_replacements->Pattern()[0].offset, 0u);
+	EXPECT_EQ(more_replacements->Pattern()[0].value, 0x03e00008u);
+	ASSERT_EQ(more_replacements->Replacement().size(), 2u);
+	EXPECT_EQ(more_replacements->Replacement()[0].offset, 4u);
+	EXPECT_EQ(more_replacements->Replacement()[0].value, 0x25080001u);
+	EXPECT_EQ(more_replacements->Replacement()[1].offset, 8u);
+	EXPECT_EQ(more_replacements->Replacement()[1].value, 0u);
 }
 
 TEST(Pnach, DynamicPatchFromStringInvalid)
@@ -281,8 +324,8 @@ TEST(Pnach, DynamicPatchToString)
 	simple.SetReplacement(simple_replacement);
 	EXPECT_EQ(simple.ToString(), "0,1,1,00000000,03e00008,00000004,25080001");
 
-	Pnach::DynamicPatch different_counts;
-	std::array<Pnach::DynamicPatchEntry, 2> different_counts_pattern = {{
+	Pnach::DynamicPatch more_patterns;
+	std::array<Pnach::DynamicPatchEntry, 2> more_patterns_pattern = {{
 		{
 			.offset = 0,
 			.value = 0x03e00008,
@@ -292,13 +335,235 @@ TEST(Pnach, DynamicPatchToString)
 			.value = 0x00000000,
 		},
 	}};
-	different_counts.SetPattern(different_counts_pattern);
-	std::array<Pnach::DynamicPatchEntry, 1> different_counts_replacement = {{
+	more_patterns.SetPattern(more_patterns_pattern);
+	std::array<Pnach::DynamicPatchEntry, 1> more_patterns_replacement = {{
 		{
 			.offset = 4,
 			.value = 0x25080001,
 		},
 	}};
-	different_counts.SetReplacement(different_counts_replacement);
-	EXPECT_EQ(different_counts.ToString(), "0,2,1,00000000,03e00008,00000004,00000000,00000004,25080001");
+	more_patterns.SetReplacement(more_patterns_replacement);
+	EXPECT_EQ(more_patterns.ToString(), "0,2,1,00000000,03e00008,00000004,00000000,00000004,25080001");
+
+
+	Pnach::DynamicPatch more_replacements;
+	std::array<Pnach::DynamicPatchEntry, 1> more_replacements_pattern = {{
+		{
+			.offset = 0,
+			.value = 0x03e00008,
+		},
+	}};
+	more_replacements.SetPattern(more_replacements_pattern);
+	std::array<Pnach::DynamicPatchEntry, 2> more_replacements_replacement = {{
+		{
+			.offset = 4,
+			.value = 0x25080001,
+		},
+		{
+			.offset = 8,
+			.value = 0x00000000,
+		},
+	}};
+	more_replacements.SetReplacement(more_replacements_replacement);
+	EXPECT_EQ(more_replacements.ToString(), "0,1,2,00000000,03e00008,00000004,25080001,00000008,00000000");
+}
+
+TEST(Pnach, DynamicPatchAlignment)
+{
+	Pnach::DynamicPatch dynamic_patch;
+
+	std::array<Pnach::DynamicPatchEntry, 1> pattern = {{
+		{
+			.offset = 1,
+			.value = 0,
+		},
+	}};
+	dynamic_patch.SetPattern(pattern);
+
+	ASSERT_EQ(dynamic_patch.Pattern().size(), 1u);
+	ASSERT_EQ(dynamic_patch.Pattern()[0].offset, 0u);
+
+	std::array<Pnach::DynamicPatchEntry, 1> replacement = {{
+		{
+			.offset = 1,
+			.value = 0,
+		},
+	}};
+	dynamic_patch.SetReplacement(replacement);
+
+	ASSERT_EQ(dynamic_patch.Replacement().size(), 1u);
+	ASSERT_EQ(dynamic_patch.Replacement()[0].offset, 0u);
+}
+
+// *****************************************************************************
+
+TEST(Pnach, GSAspectRatioFromString)
+{
+	std::optional<Pnach::GSAspectRatio> widescreen = Pnach::GSAspectRatio::FromString("16:9");
+	ASSERT_TRUE(widescreen.has_value());
+	EXPECT_EQ(widescreen->dividend, 16u);
+	EXPECT_EQ(widescreen->divisor, 9u);
+}
+
+TEST(Pnach, GSAspectRatioFromStringInvalid)
+{
+	std::optional<Pnach::GSAspectRatio> empty = Pnach::GSAspectRatio::FromString("");
+	ASSERT_FALSE(empty.has_value());
+
+	std::optional<Pnach::GSAspectRatio> single_number = Pnach::GSAspectRatio::FromString("169");
+	ASSERT_FALSE(single_number.has_value());
+
+	std::optional<Pnach::GSAspectRatio> wrong_delimiter = Pnach::GSAspectRatio::FromString("16/9");
+	ASSERT_FALSE(wrong_delimiter.has_value());
+}
+
+// *****************************************************************************
+
+TEST(Pnach, PatchLineFromString)
+{
+	Pnach::PatchLine patch = Pnach::PatchLine::FromString("patch=1,EE,00100000,short,1234");
+	ASSERT_EQ(patch.Type(), Pnach::PatchLineType::PATCH);
+	ASSERT_EQ(patch.GetPatch().Place(), Pnach::PatchPlace::CONTINUOUSLY);
+	ASSERT_EQ(patch.GetPatch().CPU(), Pnach::PatchCPU::EE);
+	ASSERT_EQ(patch.GetPatch().Address(), 0x00100000u);
+	ASSERT_EQ(patch.GetPatch().Type(), Pnach::PatchType::SHORT);
+	ASSERT_EQ(patch.GetPatch().Data(), 0x1234u);
+
+	Pnach::PatchLine dynamic_patch = Pnach::PatchLine::FromString("dpatch=0,0,0");
+	ASSERT_EQ(dynamic_patch.Type(), Pnach::PatchLineType::DPATCH);
+	EXPECT_EQ(dynamic_patch.GetDynamicPatch().Pattern().size(), 0u);
+	EXPECT_EQ(dynamic_patch.GetDynamicPatch().Replacement().size(), 0u);
+
+	Pnach::PatchLine aspect_ratio = Pnach::PatchLine::FromString("gsaspectratio=16:9");
+	ASSERT_EQ(aspect_ratio.Type(), Pnach::PatchLineType::GSASPECTRATIO);
+	EXPECT_EQ(aspect_ratio.GetGSAspectRatio().dividend, 16u);
+	EXPECT_EQ(aspect_ratio.GetGSAspectRatio().divisor, 9u);
+
+	Pnach::PatchLine interlace_mode = Pnach::PatchLine::FromString("gsinterlacemode=0");
+	ASSERT_EQ(interlace_mode.Type(), Pnach::PatchLineType::GSINTERLACEMODE);
+	EXPECT_EQ(interlace_mode.GetGSInterlaceMode(), GSInterlaceMode::Automatic);
+
+	Pnach::PatchLine author = Pnach::PatchLine::FromString("author=David");
+	ASSERT_EQ(author.Type(), Pnach::PatchLineType::AUTHOR);
+	EXPECT_EQ(author.GetString(), "David");
+
+	Pnach::PatchLine comment = Pnach::PatchLine::FromString("comment=Cause bug");
+	ASSERT_EQ(comment.Type(), Pnach::PatchLineType::COMMENT);
+	EXPECT_EQ(comment.GetString(), "Cause bug");
+
+	Pnach::PatchLine description = Pnach::PatchLine::FromString("description=Fix bug");
+	ASSERT_EQ(description.Type(), Pnach::PatchLineType::DESCRIPTION);
+	EXPECT_EQ(description.GetString(), "Fix bug");
+
+	Pnach::PatchLine gametitle = Pnach::PatchLine::FromString("gametitle=Spacewar!");
+	ASSERT_EQ(gametitle.Type(), Pnach::PatchLineType::GAMETITLE);
+	EXPECT_EQ(gametitle.GetString(), "Spacewar!");
+
+	Pnach::PatchLine spacer = Pnach::PatchLine::FromString("");
+	ASSERT_EQ(spacer.Type(), Pnach::PatchLineType::SPACER);
+
+	Pnach::PatchLine invalid = Pnach::PatchLine::FromString("?=?");
+	ASSERT_EQ(invalid.Type(), Pnach::PatchLineType::INVALID);
+
+	Pnach::PatchLine end_of_line_comment = Pnach::PatchLine::FromString("// Hello world");
+	ASSERT_EQ(end_of_line_comment.Type(), Pnach::PatchLineType::SPACER);
+	EXPECT_EQ(end_of_line_comment.EndOfLineComment(), "Hello world");
+
+	Pnach::PatchLine empty_comment = Pnach::PatchLine::FromString("//");
+	ASSERT_EQ(empty_comment.Type(), Pnach::PatchLineType::SPACER);
+	EXPECT_EQ(empty_comment.EndOfLineComment(), "");
+
+	Pnach::PatchLine patch_with_comment = Pnach::PatchLine::FromString("dpatch=0,0,0 // do thing");
+	ASSERT_EQ(patch_with_comment.Type(), Pnach::PatchLineType::DPATCH);
+	EXPECT_EQ(patch_with_comment.EndOfLineComment(), "do thing");
+
+	Pnach::PatchLine patch_with_compact_comment = Pnach::PatchLine::FromString("dpatch=0,0,0//patch the game");
+	ASSERT_EQ(patch_with_compact_comment.Type(), Pnach::PatchLineType::DPATCH);
+	EXPECT_EQ(patch_with_compact_comment.EndOfLineComment(), "patch the game");
+
+	Pnach::PatchLine whitespace_at_start_of = Pnach::PatchLine::FromString(" patch=1,EE,00100000,short,1234");
+	ASSERT_EQ(whitespace_at_start_of.Type(), Pnach::PatchLineType::PATCH);
+
+	Pnach::PatchLine whitespace_before_assignment = Pnach::PatchLine::FromString("patch =1,EE,00100000,short,1234");
+	ASSERT_EQ(whitespace_before_assignment.Type(), Pnach::PatchLineType::PATCH);
+
+	Pnach::PatchLine whitespace_after_assignment = Pnach::PatchLine::FromString("patch= 1,EE,00100000,short,1234");
+	ASSERT_EQ(whitespace_after_assignment.Type(), Pnach::PatchLineType::PATCH);
+}
+
+TEST(Pnach, PatchLineToString)
+{
+	Pnach::Patch patch_command;
+	patch_command.SetPlace(Pnach::PatchPlace::CONTINUOUSLY);
+	patch_command.SetCPU(Pnach::PatchCPU::EE);
+	patch_command.SetAddress(0x00100000);
+	patch_command.SetType(Pnach::PatchType::SHORT);
+	patch_command.SetData(0x1234);
+	Pnach::PatchLine patch;
+	patch.SetPatch(std::move(patch_command));
+	EXPECT_EQ(patch.ToString(), "patch=1,EE,00100000,short,1234");
+
+	Pnach::PatchLine dynamic_patch;
+	dynamic_patch.SetDynamicPatch(Pnach::DynamicPatch());
+	EXPECT_EQ(dynamic_patch.ToString(), "dpatch=0,0,0");
+
+	Pnach::PatchLine aspect_ratio;
+	aspect_ratio.SetGSAspectRatio(Pnach::GSAspectRatio{.dividend = 16, .divisor = 9});
+	EXPECT_EQ(aspect_ratio.ToString(), "gsaspectratio=16:9");
+
+	Pnach::PatchLine interlace_mode;
+	interlace_mode.SetGSInterlaceMode(GSInterlaceMode::Automatic);
+	EXPECT_EQ(interlace_mode.ToString(), "gsinterlacemode=0");
+
+	Pnach::PatchLine author;
+	author.SetString(Pnach::PatchLineType::AUTHOR, "David");
+	EXPECT_EQ(author.ToString(), "author=David");
+
+	Pnach::PatchLine comment;
+	comment.SetString(Pnach::PatchLineType::COMMENT, "Cause bug");
+	EXPECT_EQ(comment.ToString(), "comment=Cause bug");
+
+	Pnach::PatchLine description;
+	description.SetString(Pnach::PatchLineType::DESCRIPTION, "Fix bug");
+	EXPECT_EQ(description.ToString(), "description=Fix bug");
+
+	Pnach::PatchLine gametitle;
+	gametitle.SetString(Pnach::PatchLineType::GAMETITLE, "Spacewar!");
+	EXPECT_EQ(gametitle.ToString(), "gametitle=Spacewar!");
+
+	Pnach::PatchLine spacer;
+	EXPECT_EQ(spacer.ToString(), "");
+
+	Pnach::PatchLine invalid;
+	invalid.SetString(Pnach::PatchLineType::INVALID, "?=?");
+	EXPECT_EQ(invalid.ToString(), "?=?");
+
+	Pnach::PatchLine end_of_line_comment;
+	end_of_line_comment.SetEndOfLineComment("Hello world");
+	EXPECT_EQ(end_of_line_comment.ToString(), "// Hello world");
+
+	Pnach::PatchLine empty_comment;
+	empty_comment.SetEndOfLineComment("");
+	EXPECT_EQ(empty_comment.ToString(), "//");
+
+	Pnach::PatchLine patch_with_comment;
+	patch_with_comment.SetDynamicPatch(Pnach::DynamicPatch());
+	patch_with_comment.SetEndOfLineComment("do thing");
+	EXPECT_EQ(patch_with_comment.ToString(), "dpatch=0,0,0 // do thing");
+}
+
+#define PATCH_LINE_ROUND_TRIP_TEST(input) \
+	{ \
+		Pnach::PatchLine line = Pnach::PatchLine::FromString(input); \
+		EXPECT_EQ(line.ToString(), input); \
+	}
+
+TEST(Pnach, PatchLinePreserveFormatting)
+{
+	PATCH_LINE_ROUND_TRIP_TEST(" description=test");
+	PATCH_LINE_ROUND_TRIP_TEST("description =test");
+	PATCH_LINE_ROUND_TRIP_TEST("description= test");
+	PATCH_LINE_ROUND_TRIP_TEST("description=test// hello");
+	PATCH_LINE_ROUND_TRIP_TEST("description=test //hello");
+	PATCH_LINE_ROUND_TRIP_TEST("   description  =      test      //   hello");
 }
