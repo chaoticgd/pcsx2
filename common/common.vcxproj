@@ -83,6 +83,7 @@
     <ClCompile Include="Windows\WinThreads.cpp" />
     <ClCompile Include="HostSys.cpp" />
     <ClCompile Include="Semaphore.cpp" />
+    <ClCompile Include="Zip.cpp" />
     <ClCompile Include="emitter\bmi.cpp">
       <ExcludedFromBuild Condition="'$(Platform)'=='ARM64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -188,6 +189,7 @@
     <ClInclude Include="emitter\implement\simd_shufflepack.h" />
     <ClInclude Include="WrappedMemCopy.h" />
     <ClInclude Include="ZipHelpers.h" />
+    <ClInclude Include="Zip.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

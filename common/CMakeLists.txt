@@ -34,6 +34,7 @@ target_sources(common PRIVATE
 	WAVWriter.cpp
 	WindowInfo.cpp
 	YAML.cpp
+	Zip.cpp
 )
 
 target_sources(common PRIVATE
@@ -81,6 +82,7 @@ target_sources(common PRIVATE
 	WindowInfo.h
 	WrappedMemCopy.h
 	YAML.h
+	Zip.h
 )
 
 if(_M_X86)
