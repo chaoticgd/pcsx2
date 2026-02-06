@@ -127,8 +127,12 @@ QVariant ModuleModel::headerData(int section, Qt::Orientation orientation, int r
 
 void ModuleModel::refreshData()
 {
+	std::vector<IopMod> modules = m_cpu.GetModuleList();
+	if (modules == m_modules)
+		return;
+	
 	beginResetModel();
-	m_modules = m_cpu.GetModuleList();
+	m_modules = std::move(modules);
 	endResetModel();
 }
 

@@ -4,6 +4,7 @@
 #include "RegisterView.h"
 
 #include "AsyncDialogs.h"
+#include "Debugger/DebuggerEvents.h"
 #include "QtUtils.h"
 #include "Debugger/JsonValueWrapper.h"
 
@@ -401,7 +402,7 @@ void RegisterView::contextChangeValue()
 
 	fetchNewValue(old_value, false, [this, category_index, row](u64 input) {
 		cpu().setRegister(category_index, row, u128::From64(input));
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 }
 
@@ -415,7 +416,7 @@ void RegisterView::contextChangeTop()
 		u128 new_value = old_value;
 		new_value.hi = input;
 		cpu().setRegister(category_index, row, new_value);
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 }
 
@@ -429,7 +430,7 @@ void RegisterView::contextChangeBottom()
 		u128 new_value = old_value;
 		new_value.lo = input;
 		cpu().setRegister(category_index, row, new_value);
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 }
 
@@ -445,7 +446,7 @@ void RegisterView::contextChangeSegment()
 		u128 new_value = old_value;
 		new_value._u32[3 - field] = input;
 		cpu().setRegister(category_index, row, new_value);
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 }
 

@@ -41,6 +41,8 @@ struct EEInternalThread
 	int stackSize;
 	u32 root;
 	u32 heap_base;
+
+	friend auto operator<=>(const EEInternalThread&, const EEInternalThread&) = default;
 };
 
 // Not the full struct, just what we care about
@@ -55,6 +57,8 @@ struct IOPInternalThread
 	u32 waitstate;
 	u32 waitId;
 	u32 initPriority;
+
+	friend auto operator<=>(const IOPInternalThread&, const IOPInternalThread&) = default;
 };
 
 enum class IOPWaitStatus
@@ -100,6 +104,7 @@ public:
 	[[nodiscard]] virtual u32 EntryPoint() const = 0;
 	[[nodiscard]] virtual u32 StackTop() const = 0;
 	[[nodiscard]] virtual u32 Priority() const = 0;
+	[[nodiscard]] virtual bool Equals(const BiosThread& rhs) const = 0;
 };
 
 class EEThread : public BiosThread
@@ -133,6 +138,14 @@ public:
 	[[nodiscard]] u32 EntryPoint() const override { return data.entry_init; };
 	[[nodiscard]] u32 StackTop() const override { return data.stack; };
 	[[nodiscard]] u32 Priority() const override { return data.currentPriority; };
+	[[nodiscard]] bool Equals(const BiosThread& rhs) const override
+	{
+		const EEThread* rhs_ee = dynamic_cast<const EEThread*>(&rhs);
+		if (!rhs_ee)
+			return false;
+
+		return tid == rhs_ee->tid && data == rhs_ee->data;
+	}
 
 private:
 	u32 tid;
@@ -177,6 +190,14 @@ public:
 	[[nodiscard]] u32 EntryPoint() const override { return data.entrypoint; };
 	[[nodiscard]] u32 StackTop() const override { return data.stackTop; };
 	[[nodiscard]] u32 Priority() const override { return data.initPriority; };
+	[[nodiscard]] bool Equals(const BiosThread& rhs) const override
+	{
+		const IOPThread* rhs_iop = dynamic_cast<const IOPThread*>(&rhs);
+		if (!rhs_iop)
+			return false;
+
+		return data == rhs_iop->data;
+	}
 
 private:
 	IOPInternalThread data;
@@ -192,6 +213,8 @@ struct IopMod
 	u32 text_size;
 	u32 data_size;
 	u32 bss_size;
+
+	friend auto operator<=>(const IopMod&, const IopMod&) = default;
 };
 
 std::vector<std::unique_ptr<BiosThread>> getIOPThreads();

@@ -3,6 +3,7 @@
 
 #include "StackView.h"
 
+#include "Debugger/DebuggerEvents.h"
 #include "QtUtils.h"
 
 #include <QtGui/QClipboard>
@@ -26,7 +27,7 @@ StackView::StackView(const DebuggerViewParameters& parameters)
 		i++;
 	}
 
-	receiveEvent<DebuggerEvents::VMUpdate>([this](const DebuggerEvents::VMUpdate& event) -> bool {
+	receiveEvent<DebuggerEvents::Refresh>([this](const DebuggerEvents::Refresh& event) -> bool {
 		m_model->refreshData();
 		return true;
 	});

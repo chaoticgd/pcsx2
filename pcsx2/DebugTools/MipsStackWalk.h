@@ -18,6 +18,8 @@ namespace MipsStackWalk {
 		u32 sp;
 		// Size of stack frame in bytes.
 		int stackSize;
+
+		friend auto operator<=>(const StackFrame&, const StackFrame&) = default;
 	};
 
 	std::vector<StackFrame> Walk(DebugInterface* cpu, u32 pc, u32 ra, u32 sp, u32 threadEntry, u32 threadStackTop);

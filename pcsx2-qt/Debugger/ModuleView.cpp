@@ -28,12 +28,6 @@ ModuleView::ModuleView(const DebuggerViewParameters& parameters)
 	}
 
 	receiveEvent<DebuggerEvents::Refresh>([this](const DebuggerEvents::Refresh& event) -> bool {
-		if (!QtHost::IsVMPaused())
-			m_model->refreshData();
-		return true;
-	});
-
-	receiveEvent<DebuggerEvents::VMUpdate>([this](const DebuggerEvents::VMUpdate& event) -> bool {
 		m_model->refreshData();
 		return true;
 	});

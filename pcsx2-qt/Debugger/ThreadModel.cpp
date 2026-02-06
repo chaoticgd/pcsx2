@@ -132,8 +132,64 @@ QVariant ThreadModel::headerData(int section, Qt::Orientation orientation, int r
 
 void ThreadModel::refreshData()
 {
+	daspjgapjswdg
+	
+	// TODO FIGURE THIS OUT
+	
+	std::vector<std::unique_ptr<BiosThread>> threads = m_cpu.GetThreadList();
+
+	// Match the entries for the new threads up with the existing entries so
+	// that the user doesn't lose their selection.
+	size_t source_index = 0;
+	size_t destination_index = 0;
+
+	while (source_index < threads.size() && destination_index < m_threads.size())
+	{
+		u32 source_tid = threads[source_index]->TID();
+		u32 destination_tid = m_threads[destination_index]->TID();
+		if (source_tid < destination_tid)
+		{
+			beginInsertRows(QModelIndex(), static_cast<int>(destination_index), static_cast<int>(destination_index));
+			m_threads.insert(m_threads.begin() + destination_index, std::move(threads[source_index]));
+			endInsertRows();
+			source_index++;
+			destination_index++;
+		}
+		else if (source_tid > destination_tid)
+		{
+			beginRemoveRows(QModelIndex(), static_cast<int>(destination_index), static_cast<int>(destination_index));
+			m_threads.erase(m_threads.begin() + destination_index);
+			endRemoveRows();
+		}
+		else
+		{
+			if (!threads[source_index]->Equals(*m_threads[destination_index]))
+			{
+				*m_threads[destination_index] = std::move(*threads[source_index]);
+				QModelIndex index_changed(index(destination_index, destination_index, QModelIndex()));
+				emit dataChanged(index_changed, index_changed);
+			}
+
+			source_index++;
+			destination_index++;
+		}
+	}
+
+	if (source_index < threads.size())
+	{
+		int first = static_cast<int>(m_threads.size());
+		int last = static_cast<int>(m_threads.size() + (threads.size() - source_index) - 1);
+		beginInsertRows(QModelIndex(), first, last);
+	}
+	else if (destination_index < m_threads.size())
+	{
+		beginRemoveRows(QModelIndex(), static_cast<int>(destination_index), static_cast<int>(m_threads.size() - 1));
+		m_threads.erase(m_threads.begin() + destination_index, m_threads.end());
+		endRemoveRows();
+	}
+
 	beginResetModel();
-	m_threads = m_cpu.GetThreadList();
+	m_threads = std::move(threads);
 	endResetModel();
 }
 

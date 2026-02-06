@@ -4,6 +4,7 @@
 #include "DebuggerWindow.h"
 
 #include "AsyncDialogs.h"
+#include "Debugger/DebuggerEvents.h"
 #include "Debugger/DebuggerView.h"
 #include "Debugger/Docking/DockManager.h"
 
@@ -87,7 +88,7 @@ DebuggerWindow::DebuggerWindow(QWidget* parent)
 	});
 
 	connect(g_emu_thread, &EmuThread::onVMPaused, this, []() {
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 
 	connect(g_emu_thread, &EmuThread::onVMStarting, this, &DebuggerWindow::onVMStarting);

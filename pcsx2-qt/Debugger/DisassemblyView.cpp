@@ -206,7 +206,7 @@ void DisassemblyView::contextRestoreInstruction()
 			if (original_instructions[i].has_value())
 				cpu->write32(address, *original_instructions[i]);
 		}
-		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+		DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 	});
 }
 
@@ -343,7 +343,7 @@ void DisassemblyView::contextStubFunction()
 				return;
 
 			view->m_stubbedFunctions.emplace(address, std::make_tuple(first_instruction, second_instruction));
-			DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+			DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 		});
 	});
 }
@@ -366,7 +366,7 @@ void DisassemblyView::contextRestoreFunction()
 		Host::RunOnCPUThread([address, cpu = &cpu(), first_instruction, second_instruction] {
 			cpu->write32(address, first_instruction);
 			cpu->write32(address + 4, second_instruction);
-			DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+			DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 		});
 	}
 	else
@@ -1064,7 +1064,7 @@ void DisassemblyView::setInstructions(u32 start, u32 end, u32 value)
 				view->m_nopedInstructions.emplace(address, original_instructions[i]);
 			}
 
-			DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+			DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 		});
 	});
 }

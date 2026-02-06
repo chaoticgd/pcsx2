@@ -955,7 +955,7 @@ void MemoryView::keyPressEvent(QKeyEvent* event)
 		}
 	}
 	this->repaint();
-	DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
+	DebuggerView::broadcastEvent(DebuggerEvents::Refresh());
 }
 
 void MemoryView::gotoAddress(u32 address)

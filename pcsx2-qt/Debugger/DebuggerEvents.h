@@ -15,7 +15,8 @@ namespace DebuggerEvents
 	};
 
 	// Sent when a debugger view is first created, and subsequently broadcast to
-	// all debugger views at regular intervals.
+	// all debugger views at regular intervals and when the state of the VM is
+	// changed from the debugger.
 	struct Refresh : Event
 	{
 	};
@@ -40,12 +41,6 @@ namespace DebuggerEvents
 
 		static constexpr const char* ACTION_STRING = QT_TRANSLATE_NOOP("DebuggerEvents", "Go to in %1");
 		static constexpr const char* ACTION_OVERFLOW_STRING = QT_TRANSLATE_NOOP("DebuggerEvents", "Go to in...");
-	};
-
-	// The state of the VM has changed and views should be updated to reflect
-	// the new state (e.g. the VM has been paused).
-	struct VMUpdate : Event
-	{
 	};
 
 	// Add the address to the saved addresses list and switch to that tab.

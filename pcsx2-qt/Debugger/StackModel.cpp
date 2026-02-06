@@ -106,16 +106,22 @@ void StackModel::refreshData()
 {
 	// Hopefully in the near future we can get a stack frame for
 	// each thread
-	beginResetModel();
+	std::vector<MipsStackWalk::StackFrame> stack_frames;
 	for (const auto& thread : m_cpu.GetThreadList())
 	{
 		if (thread->Status() == ThreadStatus::THS_RUN)
 		{
-			m_stackFrames = MipsStackWalk::Walk(&m_cpu, m_cpu.getPC(), m_cpu.getRegister(0, 31), m_cpu.getRegister(0, 29),
+			stack_frames = MipsStackWalk::Walk(&m_cpu, m_cpu.getPC(), m_cpu.getRegister(0, 31), m_cpu.getRegister(0, 29),
 				thread->EntryPoint(), thread->StackTop());
 			break;
 		}
 	}
+
+	if (stack_frames == m_stackFrames)
+		return;
+
+	beginResetModel();
+	m_stackFrames = std::move(stack_frames);
 	endResetModel();
 }
 
