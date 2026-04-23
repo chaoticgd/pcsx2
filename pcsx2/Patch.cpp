@@ -216,7 +216,7 @@ u32 Patch::LoadPatchesFromString(std::vector<PatchGroup>* patch_list, const std:
 				if (ungrouped_patch != patch_list->end())
 				{
 					Console.WriteLn(Color_Gray, fmt::format(
-						"Patch: Merging {} new patch commands into ungrouped list.", current_patch_group.patches.size()));
+													"Patch: Merging {} new patch commands into ungrouped list.", current_patch_group.patches.size()));
 
 					ungrouped_patch->patches.reserve(ungrouped_patch->patches.size() + current_patch_group.patches.size());
 					for (PatchCommand& cmd : current_patch_group.patches)
@@ -243,8 +243,8 @@ u32 Patch::LoadPatchesFromString(std::vector<PatchGroup>* patch_list, const std:
 		else
 		{
 			Console.WriteLn(Color_Gray, fmt::format(
-				"Patch: Skipped loading patch '{}' since a patch with a duplicate name was already loaded.",
-				current_patch_group.name));
+											"Patch: Skipped loading patch '{}' since a patch with a duplicate name was already loaded.",
+											current_patch_group.name));
 		}
 	};
 
@@ -669,7 +669,8 @@ u32 Patch::EnablePatches(const std::vector<PatchGroup>* patches, const std::vect
 
 		for (const DynamicPatch& dp : p.dpatches)
 		{
-			s_active_pnach_dynamic_patches.push_back(dp);
+			DynamicPatch& dest = s_active_pnach_dynamic_patches.emplace_back(dp);
+			dest.group = &p;
 		}
 
 		if (p.override_aspect_ratio.has_value())
@@ -1818,6 +1819,22 @@ void Patch::ApplyDynaPatch(const DynamicPatch& patch, u32 address)
 	}
 
 	Console.WriteLn("Applying Dynamic Patch to address 0x%08X", address);
+
+	if (patch.group)
+	{
+		EEMemoryInterface ee;
+		IOPMemoryInterface iop;
+		ExtendedState state;
+
+		for (const PatchCommand& command : patch.group->patches)
+		{
+			if (command.placetopatch == PPT_ON_DYNAPATCH_APPLICATION)
+			{
+				ApplyPatch(&command, ee, iop, state);
+			}
+		}
+	}
+
 	// If everything passes, apply the patch.
 	for (const auto& replacement : patch.replacement)
 	{
@@ -1845,6 +1862,9 @@ const char* Patch::PlaceToString(std::optional<patch_place_type> place)
 		case Patch::PPT_ON_LOAD_OR_WHEN_ENABLED:
 			//: Time when a patch is applied.
 			return TRANSLATE("Patch", "On Startup & When Enabled");
+		case Patch::PPT_ON_DYNAPATCH_APPLICATION:
+			//: Time when a patch is applied.
+			return TRANSLATE("Patch", "On Dynamic Patch Application");
 		default:
 		{
 		}
